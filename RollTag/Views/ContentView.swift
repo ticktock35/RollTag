@@ -6,6 +6,7 @@ struct ContentView: View {
     @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.locale) private var locale
 
     var body: some View {
         ZStack {
@@ -161,7 +162,7 @@ struct ContentView: View {
             model.warehouses.first(where: { $0.id == id })?.preference.name ?? String(localized: "app.name")
         case .tagCategory(let id):
             model.populatedTagCategories.first(where: { $0.id == id })?.title
-                ?? model.catalog.categories.first(where: { $0.id == id })?.localizedName(locale: model.localeID)
+                ?? model.catalog.categories.first(where: { $0.id == id })?.localizedName(locale: TagCatalogLoader.localeID(from: locale))
                 ?? String(localized: "tags.customCategory")
         }
     }

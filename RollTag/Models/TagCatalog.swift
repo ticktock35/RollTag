@@ -34,14 +34,28 @@ enum TagCatalogLoader {
         return catalog
     }
 
-    static func localeID(from locale: Locale = .current) -> String {
-        if locale.identifier.lowercased().hasPrefix("zh-hant") || locale.identifier.hasPrefix("zh_TW") || locale.identifier.hasPrefix("zh-TW") {
+    static func localeID(from locale: Locale? = nil, preferred: [String]? = nil) -> String {
+        if let locale {
+            return mapped(locale.identifier)
+        }
+        let candidates = preferred ?? Bundle.main.preferredLocalizations
+        if let first = candidates.first {
+            return mapped(first)
+        }
+        return mapped(Locale.current.identifier)
+    }
+
+    static func mapped(_ raw: String) -> String {
+        let id = raw.lowercased().replacingOccurrences(of: "_", with: "-")
+        if id == "en" || id.hasPrefix("en-") {
+            return "en"
+        }
+        if id.hasPrefix("zh-hant") || id.hasPrefix("zh-tw") || id.hasPrefix("zh-hk") || id.hasPrefix("zh-mo") {
             return "zh-Hant"
         }
-        if locale.language.languageCode?.identifier == "zh" {
-            let script = locale.language.script?.identifier
-            if script == "Hant" { return "zh-Hant" }
+        if id.hasPrefix("zh") {
+            return "zh-Hant"
         }
-        return locale.language.languageCode?.identifier == "zh" ? "zh-Hant" : "en"
+        return "en"
     }
 }

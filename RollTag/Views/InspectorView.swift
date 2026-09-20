@@ -21,7 +21,7 @@ struct InspectorView: View {
                     .disabled(!model.canTagWithAI)
                     .help(String(localized: "ai.tag.help"))
                 }
-                TagPickerView(model: model, locale: model.localeID)
+                TagPickerView(model: model)
                 if model.selectedFootage.count == 1, let footage = model.selectedFootage.first {
                     notes(footage)
                 }
@@ -64,7 +64,7 @@ struct InspectorView: View {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(timeText)
                             if let source = footage.capturedAtSource {
-                                Text(String(localized: String.LocalizationValue("inspector.capturedAtSource.\(source.rawValue)")))
+                                Text(captureSourceText(source))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -119,6 +119,17 @@ struct InspectorView: View {
             .scrollContentBackground(.hidden)
             .padding(6)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+    }
+
+    private func captureSourceText(_ source: CaptureTimeSource) -> String {
+        switch source {
+        case .header:
+            String(localized: "inspector.capturedAtSource.header")
+        case .djiFilename:
+            String(localized: "inspector.capturedAtSource.djiFilename")
+        case .fileDate:
+            String(localized: "inspector.capturedAtSource.fileDate")
         }
     }
 

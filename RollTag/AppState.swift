@@ -56,7 +56,8 @@ final class AppModel {
     let playback = PreviewPlayback()
 
     let catalog: TagCatalog
-    let localeID: String
+
+    var localeID: String { TagCatalogLoader.localeID() }
 
     private let store: PreferenceStore
     private let sidecar = SidecarClient()
@@ -69,7 +70,6 @@ final class AppModel {
     init(store: PreferenceStore = PreferenceStore(), catalog: TagCatalog = TagCatalogLoader.load()) {
         self.store = store
         self.catalog = catalog
-        self.localeID = TagCatalogLoader.localeID()
     }
 
     func selectLibrarySort(_ sort: LibrarySort) {

@@ -2,8 +2,10 @@ import SwiftUI
 
 struct TagPickerView: View {
     @Bindable var model: AppModel
-    let locale: String
+    @Environment(\.locale) private var swiftLocale
     @State private var customText = ""
+
+    private var locale: String { TagCatalogLoader.localeID(from: swiftLocale) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
