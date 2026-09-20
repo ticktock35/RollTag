@@ -73,6 +73,18 @@ struct SettingsView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
+            Picker(String(localized: "settings.ai.captureTime"), selection: Binding(
+                get: { model.preference.ai.skipImplausibleCaptureDates },
+                set: { model.updateSkipImplausibleCaptureDates($0) }
+            )) {
+                Text(String(localized: "settings.ai.captureTime.skipImplausible")).tag(true)
+                Text(String(localized: "settings.ai.captureTime.preferHeader")).tag(false)
+            }
+            .pickerStyle(.radioGroup)
+            Text(String(localized: "settings.ai.captureTime.detail"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Picker(String(localized: "settings.ai.active"), selection: Binding(
                 get: { model.preference.ai.selectedProvider },
                 set: { model.selectAIProvider($0) }

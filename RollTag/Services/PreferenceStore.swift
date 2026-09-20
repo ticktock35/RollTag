@@ -73,6 +73,12 @@ struct PreferenceStore {
         return next
     }
 
+    func updateSkipImplausibleCaptureDates(_ skip: Bool, in file: PreferenceFile) -> PreferenceFile {
+        var next = file
+        next.ai.skipImplausibleCaptureDates = skip
+        return next
+    }
+
     func removeWarehouse(id: UUID, from file: PreferenceFile) -> PreferenceFile {
         var next = file
         next.warehouses.removeAll { $0.id == id }

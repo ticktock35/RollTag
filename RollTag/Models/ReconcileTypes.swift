@@ -27,10 +27,28 @@ struct FootageSnapshot: Equatable, Sendable {
     var height: Int?
     var capturedAt: Date?
     var needsReanalysis: Bool
+    var capturedAtLocal: String? = nil
+    var capturedAtHasTimeZone: Bool = false
+    var capturedAtSource: CaptureTimeSource? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    var altitude: Double? = nil
 
     var directoryPath: String {
         let dir = (relativePath as NSString).deletingLastPathComponent
         return dir == "." ? "" : dir
+    }
+
+    var captureMetadata: MediaMetadataSnapshot {
+        MediaMetadataSnapshot(
+            latitude: latitude,
+            longitude: longitude,
+            altitude: altitude,
+            capturedAt: capturedAt,
+            capturedAtLocal: capturedAtLocal,
+            capturedAtHasTimeZone: capturedAtHasTimeZone,
+            capturedAtSource: capturedAtSource
+        )
     }
 }
 

@@ -59,6 +59,23 @@ struct InspectorView: View {
                         Text(duration, format: .number.precision(.fractionLength(1)))
                     }
                 }
+                if let timeText = footage.captureMetadata.inspectorTimeText() {
+                    LabeledContent(String(localized: "inspector.capturedAt")) {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(timeText)
+                            if let source = footage.capturedAtSource {
+                                Text(String(localized: String.LocalizationValue("inspector.capturedAtSource.\(source.rawValue)")))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                if footage.captureMetadata.hasGPS, let latitude = footage.latitude, let longitude = footage.longitude {
+                    LabeledContent(String(localized: "inspector.gps")) {
+                        Text(gpsText(latitude: latitude, longitude: longitude, altitude: footage.altitude))
+                    }
+                }
                 if let width = footage.width, let height = footage.height, width > 0, height > 0 {
                     LabeledContent(String(localized: "inspector.dimensions")) {
                         Text("\(width) × \(height)")
@@ -103,5 +120,13 @@ struct InspectorView: View {
             .padding(6)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
+    }
+
+    private func gpsText(latitude: Double, longitude: Double, altitude: Double?) -> String {
+        var text = String(format: "%.4f°, %.4f°", locale: Locale(identifier: "en_US_POSIX"), latitude, longitude)
+        if let altitude {
+            text += String(format: " · %.0f m", locale: Locale(identifier: "en_US_POSIX"), altitude)
+        }
+        return text
     }
 }

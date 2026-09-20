@@ -56,6 +56,14 @@ final class CustomTagTests: XCTestCase {
         XCTAssertEqual(TagAssignment.uniqued(tags).first?.source, "user")
     }
 
+    func testPathLosesToUserButBeatsAI() {
+        let tags = [
+            TagAssignment(category: TagAssignment.customCategory, value: "clubmed", source: "ai"),
+            TagAssignment.path(category: TagAssignment.customCategory, value: "clubmed"),
+        ]
+        XCTAssertEqual(TagAssignment.uniqued(tags).first?.source, "path")
+    }
+
     func testAddingUserTagReplacesAISource() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-dup-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

@@ -188,14 +188,10 @@ enum ThumbnailService {
     private static func analyzeImage(url: URL) -> MediaAnalysis {
         var width: Int?
         var height: Int?
-        var capturedAt: Date?
         if let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
             width = intValue(properties[kCGImagePropertyPixelWidth])
             height = intValue(properties[kCGImagePropertyPixelHeight])
-            capturedAt = exifDate(from: properties) ?? fileDate(url)
-        } else {
-            capturedAt = fileDate(url)
         }
         return MediaAnalysis(
             thumbnail: nil,
@@ -203,7 +199,7 @@ enum ThumbnailService {
             duration: nil,
             width: width,
             height: height,
-            capturedAt: capturedAt
+            capturedAt: nil
         )
     }
 
@@ -215,7 +211,7 @@ enum ThumbnailService {
             duration: duration,
             width: nil,
             height: nil,
-            capturedAt: fileDate(url)
+            capturedAt: nil
         )
     }
 
@@ -227,7 +223,7 @@ enum ThumbnailService {
             duration: duration,
             width: nil,
             height: nil,
-            capturedAt: fileDate(url)
+            capturedAt: nil
         )
     }
 
@@ -263,22 +259,6 @@ enum ThumbnailService {
         ) else { return }
         CGImageDestinationAddImage(destination, cg, [kCGImageDestinationLossyCompressionQuality: 0.68] as CFDictionary)
         CGImageDestinationFinalize(destination)
-    }
-
-    private static func fileDate(_ url: URL) -> Date? {
-        (try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey]))?.creationDate
-            ?? (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-    }
-
-    static func exifDate(from properties: [CFString: Any]) -> Date? {
-        let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any]
-        let raw = (exif?[kCGImagePropertyExifDateTimeOriginal] as? String)
-            ?? (exif?[kCGImagePropertyExifDateTimeDigitized] as? String)
-        guard let raw else { return nil }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.date(from: raw)
     }
 
     private static func intValue(_ value: Any?) -> Int? {

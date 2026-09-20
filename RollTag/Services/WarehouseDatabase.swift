@@ -47,6 +47,7 @@ final class WarehouseDatabase {
         let tags = try allTags()
         return rows.map { row in
             let id = UUID(uuidString: row["id"] ?? "") ?? UUID()
+            let capture = decodeCapture(row["metadata_json"])
             return Footage(
                 id: id,
                 warehouseID: warehouseID,
@@ -65,7 +66,13 @@ final class WarehouseDatabase {
                 parentID: row["parent_id"].flatMap(UUID.init(uuidString:)),
                 userNotes: row["user_notes"] ?? "",
                 tags: tags[id] ?? [],
-                capturedAt: decodeCapturedAt(row["metadata_json"])
+                capturedAt: capture.capturedAt,
+                capturedAtLocal: capture.capturedAtLocal,
+                capturedAtHasTimeZone: capture.capturedAtHasTimeZone,
+                capturedAtSource: capture.capturedAtSource,
+                latitude: capture.latitude,
+                longitude: capture.longitude,
+                altitude: capture.altitude
             )
         }
     }
@@ -107,7 +114,7 @@ final class WarehouseDatabase {
                 now,
                 snapshot.parentID?.uuidString as Any,
                 snapshot.userNotes,
-                encodeMetadata(capturedAt: snapshot.capturedAt)
+                encodeMetadata(snapshot.captureMetadata)
             ]
         )
         try replaceTags(footageID: snapshot.id, tags: snapshot.tags)
@@ -136,7 +143,7 @@ final class WarehouseDatabase {
                 Date().timeIntervalSince1970,
                 snapshot.parentID?.uuidString as Any,
                 snapshot.userNotes,
-                encodeMetadata(capturedAt: snapshot.capturedAt),
+                encodeMetadata(snapshot.captureMetadata),
                 snapshot.id.uuidString
             ]
         )
@@ -147,15 +154,25 @@ final class WarehouseDatabase {
         try execute("UPDATE footage SET user_notes = ?, updated_at = ? WHERE id = ?;", params: [notes, Date().timeIntervalSince1970, id.uuidString])
     }
 
-    func updateAnalysis(id: UUID, phash: String?, duration: Double?, width: Int?, height: Int?, capturedAt: Date?) throws {
+    func updateAnalysis(id: UUID, phash: String?, duration: Double?, width: Int?, height: Int?) throws {
         try execute(
-            "UPDATE footage SET phash = ?, duration = ?, width = ?, height = ?, metadata_json = ?, updated_at = ? WHERE id = ?;",
+            "UPDATE footage SET phash = ?, duration = ?, width = ?, height = ?, updated_at = ? WHERE id = ?;",
             params: [
                 phash as Any,
                 duration as Any,
                 width as Any,
                 height as Any,
-                encodeMetadata(capturedAt: capturedAt),
+                Date().timeIntervalSince1970,
+                id.uuidString
+            ]
+        )
+    }
+
+    func updateCaptureMetadata(id: UUID, capture: MediaMetadataSnapshot) throws {
+        try execute(
+            "UPDATE footage SET metadata_json = ?, updated_at = ? WHERE id = ?;",
+            params: [
+                encodeMetadata(capture) as Any,
                 Date().timeIntervalSince1970,
                 id.uuidString
             ]
@@ -363,18 +380,60 @@ final class WarehouseDatabase {
         }
     }
 
-    private func encodeMetadata(capturedAt: Date?) -> String? {
-        guard let capturedAt else { return nil }
-        let data = try? JSONSerialization.data(withJSONObject: ["capturedAt": capturedAt.timeIntervalSince1970])
-        return data.flatMap { String(data: $0, encoding: .utf8) }
+    private func encodeMetadata(_ capture: MediaMetadataSnapshot) -> String? {
+        var object: [String: Any] = [:]
+        if let capturedAt = capture.capturedAt {
+            object["capturedAt"] = capturedAt.timeIntervalSince1970
+        }
+        if let capturedAtLocal = capture.capturedAtLocal, !capturedAtLocal.isEmpty {
+            object["capturedAtLocal"] = capturedAtLocal
+        }
+        if capture.capturedAtHasTimeZone {
+            object["capturedAtHasTimeZone"] = true
+        }
+        if let source = capture.capturedAtSource {
+            object["capturedAtSource"] = source.rawValue
+        }
+        if let latitude = capture.latitude {
+            object["latitude"] = latitude
+        }
+        if let longitude = capture.longitude {
+            object["longitude"] = longitude
+        }
+        if let altitude = capture.altitude {
+            object["altitude"] = altitude
+        }
+        guard !object.isEmpty,
+              let data = try? JSONSerialization.data(withJSONObject: object)
+        else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
-    private func decodeCapturedAt(_ raw: String?) -> Date? {
+    private func decodeCapture(_ raw: String?) -> MediaMetadataSnapshot {
         guard let raw, let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let value = object["capturedAt"] as? Double
-        else { return nil }
-        return Date(timeIntervalSince1970: value)
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return MediaMetadataSnapshot() }
+        var snapshot = MediaMetadataSnapshot()
+        snapshot.capturedAt = doubleValue(object["capturedAt"]).map(Date.init(timeIntervalSince1970:))
+        snapshot.capturedAtLocal = object["capturedAtLocal"] as? String
+        snapshot.capturedAtHasTimeZone = (object["capturedAtHasTimeZone"] as? Bool)
+            ?? ((object["capturedAtHasTimeZone"] as? NSNumber)?.boolValue ?? false)
+        if let rawSource = object["capturedAtSource"] as? String {
+            snapshot.capturedAtSource = CaptureTimeSource(rawValue: rawSource)
+        }
+        snapshot.latitude = doubleValue(object["latitude"])
+        snapshot.longitude = doubleValue(object["longitude"])
+        snapshot.altitude = doubleValue(object["altitude"])
+        return snapshot
+    }
+
+    private func doubleValue(_ value: Any?) -> Double? {
+        switch value {
+        case let number as NSNumber: return number.doubleValue
+        case let number as Double: return number
+        case let number as Int: return Double(number)
+        default: return nil
+        }
     }
 
     private func execute(_ sql: String, params: [Any] = []) throws {
@@ -483,7 +542,13 @@ extension Footage {
             width: width,
             height: height,
             capturedAt: capturedAt,
-            needsReanalysis: false
+            needsReanalysis: false,
+            capturedAtLocal: capturedAtLocal,
+            capturedAtHasTimeZone: capturedAtHasTimeZone,
+            capturedAtSource: capturedAtSource,
+            latitude: latitude,
+            longitude: longitude,
+            altitude: altitude
         )
     }
 }

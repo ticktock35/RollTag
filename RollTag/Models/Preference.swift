@@ -108,9 +108,40 @@ struct AIProviderSettings: Codable, Equatable {
 struct AIPreference: Codable, Equatable {
     var selectedProvider: AIProvider?
     var providers: [AIProvider: AIProviderSettings]
+    var skipImplausibleCaptureDates: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case selectedProvider
+        case providers
+        case skipImplausibleCaptureDates
+    }
 
     static var empty: AIPreference {
-        AIPreference(selectedProvider: nil, providers: [:])
+        AIPreference(selectedProvider: nil, providers: [:], skipImplausibleCaptureDates: true)
+    }
+
+    init(
+        selectedProvider: AIProvider?,
+        providers: [AIProvider: AIProviderSettings],
+        skipImplausibleCaptureDates: Bool = true
+    ) {
+        self.selectedProvider = selectedProvider
+        self.providers = providers
+        self.skipImplausibleCaptureDates = skipImplausibleCaptureDates
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        selectedProvider = try container.decodeIfPresent(AIProvider.self, forKey: .selectedProvider)
+        providers = try container.decodeIfPresent([AIProvider: AIProviderSettings].self, forKey: .providers) ?? [:]
+        skipImplausibleCaptureDates = try container.decodeIfPresent(Bool.self, forKey: .skipImplausibleCaptureDates) ?? true
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(selectedProvider, forKey: .selectedProvider)
+        try container.encode(providers, forKey: .providers)
+        try container.encode(skipImplausibleCaptureDates, forKey: .skipImplausibleCaptureDates)
     }
 
     func settings(for provider: AIProvider) -> AIProviderSettings {

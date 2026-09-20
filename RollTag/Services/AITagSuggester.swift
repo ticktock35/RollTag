@@ -44,15 +44,16 @@ enum AITagSuggester {
         if let duration = footage.duration, duration.isFinite, duration > 0 {
             payload["duration_seconds"] = duration
         }
-        if let capturedAt = footage.capturedAt ?? live.capturedAt {
-            payload["captured_at"] = iso8601.string(from: capturedAt)
+        let capture = merge(stored: footage.captureMetadata, live: live)
+        if let capturedAt = capture.capturedAtForAI() {
+            payload["captured_at"] = capturedAt
         }
-        if let latitude = live.latitude, let longitude = live.longitude {
+        if let latitude = capture.latitude, let longitude = capture.longitude {
             var gps: [String: Any] = [
                 "latitude": latitude,
                 "longitude": longitude,
             ]
-            if let altitude = live.altitude {
+            if let altitude = capture.altitude {
                 gps["altitude"] = altitude
             }
             payload["gps"] = gps
@@ -60,12 +61,21 @@ enum AITagSuggester {
         return payload
     }
 
-    private static let iso8601: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        formatter.timeZone = TimeZone.current
-        return formatter
-    }()
+    private static func merge(stored: MediaMetadataSnapshot, live: MediaMetadataSnapshot) -> MediaMetadataSnapshot {
+        var next = stored
+        if next.capturedAt == nil && next.capturedAtLocal == nil {
+            next.capturedAt = live.capturedAt
+            next.capturedAtLocal = live.capturedAtLocal
+            next.capturedAtHasTimeZone = live.capturedAtHasTimeZone
+            next.capturedAtSource = live.capturedAtSource
+        }
+        if !next.hasGPS {
+            next.latitude = live.latitude
+            next.longitude = live.longitude
+            next.altitude = live.altitude
+        }
+        return next
+    }
 
     static func assignments(
         from raw: [[String: String]],

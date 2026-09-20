@@ -25,6 +25,19 @@ struct TagAssignment: Codable, Hashable, Identifiable, Sendable {
         TagAssignment(category: category, value: value, source: "ai")
     }
 
+    static func path(category: String, value: String) -> TagAssignment {
+        TagAssignment(category: category, value: value, source: "path")
+    }
+
+    static func sourceRank(_ source: String) -> Int {
+        switch source {
+        case "user": return 0
+        case "path": return 1
+        case "ai": return 2
+        default: return 3
+        }
+    }
+
     static func custom(_ raw: String) -> TagAssignment? {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
@@ -47,7 +60,7 @@ struct TagAssignment: Codable, Hashable, Identifiable, Sendable {
         for tag in tags {
             let key = tag.identityKey
             if let existing = best[key] {
-                if tag.source == "user", existing.source != "user" {
+                if sourceRank(tag.source) < sourceRank(existing.source) {
                     best[key] = tag
                 }
             } else {
@@ -77,7 +90,13 @@ struct Footage: Identifiable, Hashable {
     var parentID: UUID?
     var userNotes: String
     var tags: [TagAssignment]
-    var capturedAt: Date?
+    var capturedAt: Date? = nil
+    var capturedAtLocal: String? = nil
+    var capturedAtHasTimeZone: Bool = false
+    var capturedAtSource: CaptureTimeSource? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    var altitude: Double? = nil
 
     var directoryPath: String {
         let dir = (relativePath as NSString).deletingLastPathComponent
@@ -90,6 +109,33 @@ struct Footage: Identifiable, Hashable {
 
     var isTooSmallToPreview: Bool {
         mediaKind == .video && size < MediaConstants.minimumPlayableVideoBytes
+    }
+
+    var canAITag: Bool {
+        (mediaKind == .video || mediaKind == .image) && !isTooSmallToPreview
+    }
+
+    var captureMetadata: MediaMetadataSnapshot {
+        get {
+            MediaMetadataSnapshot(
+                latitude: latitude,
+                longitude: longitude,
+                altitude: altitude,
+                capturedAt: capturedAt,
+                capturedAtLocal: capturedAtLocal,
+                capturedAtHasTimeZone: capturedAtHasTimeZone,
+                capturedAtSource: capturedAtSource
+            )
+        }
+        set {
+            latitude = newValue.latitude
+            longitude = newValue.longitude
+            altitude = newValue.altitude
+            capturedAt = newValue.capturedAt
+            capturedAtLocal = newValue.capturedAtLocal
+            capturedAtHasTimeZone = newValue.capturedAtHasTimeZone
+            capturedAtSource = newValue.capturedAtSource
+        }
     }
 
     func absoluteURL(warehouseRoot: URL) -> URL {

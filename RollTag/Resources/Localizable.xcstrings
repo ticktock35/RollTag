@@ -128,6 +128,22 @@
         }
       }
     },
+    "ai.doneSkipped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI tagged %lld, skipped %lld, failed %lld"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 已打 %lld 支，跳過 %lld 支，失敗 %lld 支"
+          }
+        }
+      }
+    },
     "ai.doneOne" : {
       "localizations" : {
         "en" : {
@@ -156,6 +172,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI 打標失敗。"
+          }
+        }
+      }
+    },
+    "ai.skipped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skipped this file (audio, incomplete, or unreadable)."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已跳過（音訊、不完整或解不開）。"
           }
         }
       }
@@ -861,6 +893,70 @@
         }
       }
     },
+    "inspector.capturedAt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Captured"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拍攝時間"
+          }
+        }
+      }
+    },
+    "inspector.capturedAtSource.djiFilename" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From DJI filename"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自 DJI 檔名"
+          }
+        }
+      }
+    },
+    "inspector.capturedAtSource.fileDate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From file date"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自檔案日期"
+          }
+        }
+      }
+    },
+    "inspector.capturedAtSource.header" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From file header"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自檔頭"
+          }
+        }
+      }
+    },
     "inspector.dimensions" : {
       "localizations" : {
         "en" : {
@@ -921,6 +1017,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目錄"
+          }
+        }
+      }
+    },
+    "inspector.gps" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS"
           }
         }
       }
@@ -1394,13 +1506,77 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keys stay on this Mac. After you add a Gemini or OpenAI key, AI tagging appears once you select clips. Import never runs automatically."
+            "value" : "Keys stay on this Mac. After you add a Gemini or OpenAI key, AI tagging appears once you select a video or photo. Import never runs automatically."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Key 只留在這台 Mac。填了 Gemini 或 OpenAI key 之後，選了影片才會出現 AI 打標。匯入不會自動跑。"
+            "value" : "Key 只留在這台 Mac。填了 Gemini 或 OpenAI key 之後，選了影片或照片才會出現 AI 打標。匯入不會自動跑。"
+          }
+        }
+      }
+    },
+    "settings.ai.captureTime" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture time"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拍攝時間"
+          }
+        }
+      }
+    },
+    "settings.ai.captureTime.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Header times before 2015 or after tomorrow are skipped by default, then DJI filenames, then the file date."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預設略過早於 2015 或晚於明天的檔頭時間，再試 DJI 檔名，最後才用檔案日期。"
+          }
+        }
+      }
+    },
+    "settings.ai.captureTime.preferHeader" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the file header when present"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有檔頭就用檔頭"
+          }
+        }
+      }
+    },
+    "settings.ai.captureTime.skipImplausible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip header times that do not look like a shoot date"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "略過不像拍攝日的檔頭時間"
           }
         }
       }

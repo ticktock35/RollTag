@@ -313,6 +313,11 @@ final class AppModel {
         persistPreference()
     }
 
+    func updateSkipImplausibleCaptureDates(_ skip: Bool) {
+        preference = store.updateSkipImplausibleCaptureDates(skip, in: preference)
+        persistPreference()
+    }
+
     func removeWarehouse(id: UUID) {
         preference = store.removeWarehouse(id: id, from: preference)
         databases[id] = nil
@@ -348,7 +353,7 @@ final class AppModel {
     }
 
     var showsAITagging: Bool {
-        preference.ai.taggingRoute() != nil && !selectedFootage.isEmpty
+        preference.ai.taggingRoute() != nil && selectedFootage.contains(where: \.canAITag)
     }
 
     var canTagWithAI: Bool {
@@ -394,6 +399,7 @@ final class AppModel {
         let items = warehouses.flatMap(\.footage).filter { ids.contains($0.id) }
         var tagged = 0
         var failed = 0
+        var skipped = 0
         var lastError = ""
 
         for (index, footage) in items.enumerated() {
@@ -409,6 +415,11 @@ final class AppModel {
                 force: true
             )
 
+            guard footage.canAITag else {
+                skipped += 1
+                continue
+            }
+
             guard let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }),
                   warehouse.isOnline
             else {
@@ -419,13 +430,16 @@ final class AppModel {
             let url = footage.absoluteURL(warehouseRoot: warehouse.preference.url)
             let frames = await FrameExtractor.jpegStills(url: url)
             guard !frames.isEmpty else {
-                failed += 1
+                skipped += 1
                 lastError = String(localized: "ai.noFrames")
                 continue
             }
 
             do {
-                let live = await MediaMetadata.read(url: url)
+                let live = await MediaMetadata.read(
+                    url: url,
+                    skipImplausibleHeader: preference.ai.skipImplausibleCaptureDates
+                )
                 let context = AITagSuggester.contextPayload(
                     footage: footage,
                     warehouseName: warehouse.preference.name,
@@ -437,13 +451,26 @@ final class AppModel {
                     catalog: catalogPayload,
                     context: context
                 )
-                let tags = AITagSuggester.assignments(
+                let warehouseCustoms = warehouse.footage.flatMap(\.tags).filter(\.isCustom).map(\.value)
+                let pathTags = PathTagMatcher.assignments(
+                    relativePath: footage.relativePath,
+                    catalog: catalog,
+                    customValues: warehouseCustoms
+                )
+                let aiTags = AITagSuggester.assignments(
                     from: payload,
                     catalog: catalog,
                     customValues: customValues
                 )
-                let existing = Set(footage.tags.map(\.identityKey))
-                let novel = tags.filter { !existing.contains($0.identityKey) }
+                let incoming = TagAssignment.uniqued(pathTags + aiTags)
+                let existingByKey = Dictionary(
+                    footage.tags.map { ($0.identityKey, $0) },
+                    uniquingKeysWith: { TagAssignment.sourceRank($0.source) <= TagAssignment.sourceRank($1.source) ? $0 : $1 }
+                )
+                let novel = incoming.filter { tag in
+                    guard let current = existingByKey[tag.identityKey] else { return true }
+                    return TagAssignment.sourceRank(tag.source) < TagAssignment.sourceRank(current.source)
+                }
                 if !novel.isEmpty, let db = databases[footage.warehouseID] {
                     try db.addTags(novel, to: [footage.id])
                 }
@@ -455,13 +482,27 @@ final class AppModel {
         }
 
         reloadFootage()
-        if items.count == 1 {
-            statusMessage = failed == 0
-                ? String(localized: "ai.doneOne")
-                : (lastError.isEmpty ? String(localized: "ai.failed") : lastError)
-        } else {
-            statusMessage = String(format: String(localized: "ai.done"), locale: .current, tagged, failed)
+        statusMessage = aiStatusMessage(
+            total: items.count,
+            tagged: tagged,
+            skipped: skipped,
+            failed: failed,
+            lastError: lastError
+        )
+    }
+
+    private func aiStatusMessage(total: Int, tagged: Int, skipped: Int, failed: Int, lastError: String) -> String {
+        if total == 1 {
+            if tagged == 1 { return String(localized: "ai.doneOne") }
+            if skipped == 1 {
+                return lastError.isEmpty ? String(localized: "ai.skipped") : lastError
+            }
+            return lastError.isEmpty ? String(localized: "ai.failed") : lastError
         }
+        if skipped == 0 {
+            return String(format: String(localized: "ai.done"), locale: .current, tagged, failed)
+        }
+        return String(format: String(localized: "ai.doneSkipped"), locale: .current, tagged, skipped, failed)
     }
 
     private func suggestWithFallback(
@@ -801,6 +842,7 @@ final class AppModel {
         for record in pending where record.needsReanalysis {
             try? FileManager.default.removeItem(at: thumbs.appendingPathComponent("\(record.id.uuidString).jpg"))
         }
+        try await refreshCaptureMetadata(db: db, outcome: outcome, root: root, warehouseName: warehouseName, warehouseID: warehouseID)
         guard !pending.isEmpty else { return }
         var submitted = 0
         var completed = 0
@@ -826,8 +868,7 @@ final class AppModel {
                     phash: analysis.phash,
                     duration: analysis.duration,
                     width: analysis.width,
-                    height: analysis.height,
-                    capturedAt: analysis.capturedAt
+                    height: analysis.height
                 )
                 completed += 1
                 publishProgress(
@@ -858,6 +899,55 @@ final class AppModel {
             ),
             force: true
         )
+    }
+
+    private func refreshCaptureMetadata(
+        db: WarehouseDatabase,
+        outcome: ReconcileOutcome,
+        root: URL,
+        warehouseName: String,
+        warehouseID: UUID
+    ) async throws {
+        let pending = outcome.records.filter { $0.status == .available }
+        guard !pending.isEmpty else { return }
+        let skipImplausible = preference.ai.skipImplausibleCaptureDates
+        var submitted = 0
+        var completed = 0
+        try await withThrowingTaskGroup(of: (Int, UUID, String, MediaMetadataSnapshot).self) { group in
+            func submitMore() {
+                while submitted < pending.count, submitted - completed < ThumbnailService.analyzeConcurrency {
+                    let index = submitted
+                    let record = pending[index]
+                    submitted += 1
+                    let source = root.appendingPathComponent(record.relativePath)
+                    group.addTask {
+                        let capture = await MediaMetadata.read(url: source, skipImplausibleHeader: skipImplausible)
+                        return (index, record.id, record.relativePath, capture)
+                    }
+                }
+            }
+
+            submitMore()
+            for try await (index, id, path, capture) in group {
+                try db.updateCaptureMetadata(id: id, capture: capture)
+                completed += 1
+                publishProgress(
+                    ScanProgress(
+                        warehouseName: warehouseName,
+                        warehouseID: warehouseID,
+                        phase: .analyzing,
+                        currentFile: path,
+                        completed: completed,
+                        total: pending.count
+                    ),
+                    force: index == 0 || completed == pending.count
+                )
+                if completed == pending.count || completed % 128 == 0 {
+                    reloadFootage()
+                }
+                submitMore()
+            }
+        }
     }
 
     private func publishProgress(_ progress: ScanProgress, force: Bool = false) {
