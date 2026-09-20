@@ -1,0 +1,291 @@
+{
+  "categories": [
+    {
+      "id": "nature",
+      "names": { "zh-Hant": "自然", "en": "Nature" },
+      "tags": [
+        { "id": "mountain", "names": { "zh-Hant": "山", "en": "Mountain" } },
+        { "id": "ocean", "names": { "zh-Hant": "海", "en": "Ocean" } },
+        { "id": "lake", "names": { "zh-Hant": "湖", "en": "Lake" } },
+        { "id": "river", "names": { "zh-Hant": "河", "en": "River" } },
+        { "id": "forest", "names": { "zh-Hant": "森林", "en": "Forest" } },
+        { "id": "meadow", "names": { "zh-Hant": "草原", "en": "Meadow" } },
+        { "id": "desert", "names": { "zh-Hant": "沙漠", "en": "Desert" } },
+        { "id": "sky", "names": { "zh-Hant": "天空", "en": "Sky" } },
+        { "id": "clouds", "names": { "zh-Hant": "雲", "en": "Clouds" } },
+        { "id": "flowers", "names": { "zh-Hant": "花", "en": "Flowers" } },
+        { "id": "trees", "names": { "zh-Hant": "樹", "en": "Trees" } },
+        { "id": "sunrise", "names": { "zh-Hant": "日出", "en": "Sunrise" } },
+        { "id": "sunset", "names": { "zh-Hant": "日落", "en": "Sunset" } },
+        { "id": "snowscape", "names": { "zh-Hant": "雪景", "en": "Snowscape" } },
+        { "id": "underwater", "names": { "zh-Hant": "水下", "en": "Underwater" } }
+      ]
+    },
+    {
+      "id": "urban",
+      "names": { "zh-Hant": "城市", "en": "Urban" },
+      "tags": [
+        { "id": "skyline", "names": { "zh-Hant": "天際線", "en": "Skyline" } },
+        { "id": "street", "names": { "zh-Hant": "街道", "en": "Street" } },
+        { "id": "alley", "names": { "zh-Hant": "巷弄", "en": "Alley" } },
+        { "id": "traffic", "names": { "zh-Hant": "交通", "en": "Traffic" } },
+        { "id": "nightscape", "names": { "zh-Hant": "夜景", "en": "Nightscape" } },
+        { "id": "construction", "names": { "zh-Hant": "工地", "en": "Construction" } },
+        { "id": "market", "names": { "zh-Hant": "市場", "en": "Market" } },
+        { "id": "rooftop", "names": { "zh-Hant": "屋頂", "en": "Rooftop" } },
+        { "id": "metro", "names": { "zh-Hant": "捷運", "en": "Metro" } },
+        { "id": "neon", "names": { "zh-Hant": "霓虹", "en": "Neon" } }
+      ]
+    },
+    {
+      "id": "lifestyle",
+      "names": { "zh-Hant": "生活", "en": "Lifestyle" },
+      "tags": [
+        { "id": "homeLife", "names": { "zh-Hant": "居家", "en": "Home" } },
+        { "id": "dining", "names": { "zh-Hant": "用餐", "en": "Dining" } },
+        { "id": "commute", "names": { "zh-Hant": "通勤", "en": "Commute" } },
+        { "id": "family", "names": { "zh-Hant": "親子", "en": "Family" } },
+        { "id": "friends", "names": { "zh-Hant": "朋友", "en": "Friends" } },
+        { "id": "workday", "names": { "zh-Hant": "工作日常", "en": "Workday" } },
+        { "id": "leisure", "names": { "zh-Hant": "休閒", "en": "Leisure" } },
+        { "id": "festival", "names": { "zh-Hant": "節日", "en": "Festival" } },
+        { "id": "ceremony", "names": { "zh-Hant": "儀式", "en": "Ceremony" } }
+      ]
+    },
+    {
+      "id": "travel",
+      "names": { "zh-Hant": "旅行", "en": "Travel" },
+      "tags": [
+        { "id": "departure", "names": { "zh-Hant": "出發", "en": "Departure" } },
+        { "id": "onTheRoad", "names": { "zh-Hant": "路上", "en": "On the Road" } },
+        { "id": "arrival", "names": { "zh-Hant": "抵達", "en": "Arrival" } },
+        { "id": "landmark", "names": { "zh-Hant": "地標", "en": "Landmark" } },
+        { "id": "lodging", "names": { "zh-Hant": "住宿", "en": "Lodging" } },
+        { "id": "localLife", "names": { "zh-Hant": "在地生活", "en": "Local Life" } },
+        { "id": "luggage", "names": { "zh-Hant": "行李", "en": "Luggage" } },
+        { "id": "windowView", "names": { "zh-Hant": "窗口風景", "en": "Window View" } }
+      ]
+    },
+    {
+      "id": "food",
+      "names": { "zh-Hant": "飲食", "en": "Food" },
+      "tags": [
+        { "id": "prep", "names": { "zh-Hant": "備料", "en": "Prep" } },
+        { "id": "cooking", "names": { "zh-Hant": "烹煮", "en": "Cooking" } },
+        { "id": "plating", "names": { "zh-Hant": "擺盤", "en": "Plating" } },
+        { "id": "eating", "names": { "zh-Hant": "吃", "en": "Eating" } },
+        { "id": "drink", "names": { "zh-Hant": "飲料", "en": "Drink" } },
+        { "id": "ingredients", "names": { "zh-Hant": "食材", "en": "Ingredients" } },
+        { "id": "steam", "names": { "zh-Hant": "蒸汽質地", "en": "Steam" } }
+      ]
+    },
+    {
+      "id": "business",
+      "names": { "zh-Hant": "商務", "en": "Business" },
+      "tags": [
+        { "id": "meeting", "names": { "zh-Hant": "開會", "en": "Meeting" } },
+        { "id": "officeCommute", "names": { "zh-Hant": "通勤辦公", "en": "Office Commute" } },
+        { "id": "handshake", "names": { "zh-Hant": "握手", "en": "Handshake" } },
+        { "id": "screen", "names": { "zh-Hant": "螢幕", "en": "Screen" } },
+        { "id": "factory", "names": { "zh-Hant": "工廠", "en": "Factory" } },
+        { "id": "warehouse", "names": { "zh-Hant": "倉儲", "en": "Warehouse" } },
+        { "id": "signage", "names": { "zh-Hant": "招牌", "en": "Signage" } }
+      ]
+    },
+    {
+      "id": "sport",
+      "names": { "zh-Hant": "運動休閒", "en": "Sport" },
+      "tags": [
+        { "id": "running", "names": { "zh-Hant": "跑步", "en": "Running" } },
+        { "id": "ball", "names": { "zh-Hant": "球類", "en": "Ball Sports" } },
+        { "id": "waterSport", "names": { "zh-Hant": "水上", "en": "Water Sport" } },
+        { "id": "outdoors", "names": { "zh-Hant": "戶外", "en": "Outdoors" } },
+        { "id": "fitness", "names": { "zh-Hant": "健身", "en": "Fitness" } },
+        { "id": "kidsPlay", "names": { "zh-Hant": "兒童遊戲", "en": "Kids Play" } },
+        { "id": "spectators", "names": { "zh-Hant": "觀眾", "en": "Spectators" } }
+      ]
+    },
+    {
+      "id": "transport",
+      "names": { "zh-Hant": "交通", "en": "Transport" },
+      "tags": [
+        { "id": "car", "names": { "zh-Hant": "汽車", "en": "Car" } },
+        { "id": "scooter", "names": { "zh-Hant": "機車", "en": "Scooter" } },
+        { "id": "train", "names": { "zh-Hant": "火車", "en": "Train" } },
+        { "id": "plane", "names": { "zh-Hant": "飛機", "en": "Plane" } },
+        { "id": "boat", "names": { "zh-Hant": "船", "en": "Boat" } },
+        { "id": "bicycle", "names": { "zh-Hant": "腳踏車", "en": "Bicycle" } },
+        { "id": "trafficFlow", "names": { "zh-Hant": "車流", "en": "Traffic Flow" } },
+        { "id": "driversView", "names": { "zh-Hant": "駕駛視角", "en": "Driver View" } }
+      ]
+    },
+    {
+      "id": "animals",
+      "names": { "zh-Hant": "動物", "en": "Animals" },
+      "tags": [
+        { "id": "pet", "names": { "zh-Hant": "寵物", "en": "Pet" } },
+        { "id": "bird", "names": { "zh-Hant": "鳥", "en": "Bird" } },
+        { "id": "insect", "names": { "zh-Hant": "蟲", "en": "Insect" } },
+        { "id": "marine", "names": { "zh-Hant": "海洋生物", "en": "Marine" } },
+        { "id": "livestock", "names": { "zh-Hant": "家畜", "en": "Livestock" } },
+        { "id": "wildlife", "names": { "zh-Hant": "野生", "en": "Wildlife" } }
+      ]
+    },
+    {
+      "id": "broll",
+      "names": { "zh-Hant": "抽象空鏡", "en": "Abstract / B-roll" },
+      "tags": [
+        { "id": "lightShadow", "names": { "zh-Hant": "光影", "en": "Light and Shadow" } },
+        { "id": "reflection", "names": { "zh-Hant": "倒影", "en": "Reflection" } },
+        { "id": "foregroundBlur", "names": { "zh-Hant": "模糊前景", "en": "Foreground Blur" } },
+        { "id": "texture", "names": { "zh-Hant": "紋理", "en": "Texture" } },
+        { "id": "smoke", "names": { "zh-Hant": "煙", "en": "Smoke" } },
+        { "id": "dust", "names": { "zh-Hant": "塵", "en": "Dust" } },
+        { "id": "emptyScene", "names": { "zh-Hant": "空景", "en": "Empty Scene" } },
+        { "id": "transition", "names": { "zh-Hant": "轉場可用", "en": "Transition" } }
+      ]
+    },
+    {
+      "id": "mood",
+      "names": { "zh-Hant": "情緒", "en": "Mood" },
+      "tags": [
+        { "id": "calm", "names": { "zh-Hant": "平靜", "en": "Calm" } },
+        { "id": "energetic", "names": { "zh-Hant": "有活力", "en": "Energetic" } },
+        { "id": "tense", "names": { "zh-Hant": "緊繃", "en": "Tense" } },
+        { "id": "joyful", "names": { "zh-Hant": "喜悅", "en": "Joyful" } },
+        { "id": "melancholic", "names": { "zh-Hant": "憂傷", "en": "Melancholic" } },
+        { "id": "romantic", "names": { "zh-Hant": "浪漫", "en": "Romantic" } },
+        { "id": "dramatic", "names": { "zh-Hant": "戲劇", "en": "Dramatic" } },
+        { "id": "playful", "names": { "zh-Hant": "俏皮", "en": "Playful" } },
+        { "id": "lonely", "names": { "zh-Hant": "孤寂", "en": "Lonely" } },
+        { "id": "hopeful", "names": { "zh-Hant": "希望", "en": "Hopeful" } },
+        { "id": "warmHearted", "names": { "zh-Hant": "溫馨", "en": "Warm" } },
+        { "id": "epic", "names": { "zh-Hant": "史詩", "en": "Epic" } },
+        { "id": "uneasy", "names": { "zh-Hant": "不安", "en": "Uneasy" } },
+        { "id": "nostalgic", "names": { "zh-Hant": "懷舊", "en": "Nostalgic" } },
+        { "id": "sacred", "names": { "zh-Hant": "神聖", "en": "Sacred" } },
+        { "id": "light", "names": { "zh-Hant": "輕快", "en": "Light" } }
+      ]
+    },
+    {
+      "id": "style",
+      "names": { "zh-Hant": "風格色調", "en": "Style" },
+      "tags": [
+        { "id": "warmTone", "names": { "zh-Hant": "暖", "en": "Warm" } },
+        { "id": "coolTone", "names": { "zh-Hant": "冷", "en": "Cool" } },
+        { "id": "naturalTone", "names": { "zh-Hant": "自然色", "en": "Natural" } },
+        { "id": "vivid", "names": { "zh-Hant": "鮮豔", "en": "Vivid" } },
+        { "id": "bold", "names": { "zh-Hant": "大膽", "en": "Bold" } },
+        { "id": "dramaticGrade", "names": { "zh-Hant": "戲劇色調", "en": "Dramatic Grade" } },
+        { "id": "blackAndWhite", "names": { "zh-Hant": "黑白", "en": "Black and White" } }
+      ]
+    },
+    {
+      "id": "weather",
+      "names": { "zh-Hant": "天氣", "en": "Weather" },
+      "tags": [
+        { "id": "sunny", "names": { "zh-Hant": "晴", "en": "Sunny" } },
+        { "id": "cloudy", "names": { "zh-Hant": "多雲", "en": "Cloudy" } },
+        { "id": "overcast", "names": { "zh-Hant": "陰", "en": "Overcast" } },
+        { "id": "rain", "names": { "zh-Hant": "雨", "en": "Rain" } },
+        { "id": "storm", "names": { "zh-Hant": "暴風雨", "en": "Storm" } },
+        { "id": "snow", "names": { "zh-Hant": "雪", "en": "Snow" } },
+        { "id": "fog", "names": { "zh-Hant": "霧", "en": "Fog" } },
+        { "id": "goldenHour", "names": { "zh-Hant": "黃金時刻", "en": "Golden Hour" } },
+        { "id": "blueHour", "names": { "zh-Hant": "藍調時刻", "en": "Blue Hour" } },
+        { "id": "typhoon", "names": { "zh-Hant": "颱風", "en": "Typhoon" } },
+        { "id": "humid", "names": { "zh-Hant": "潮濕", "en": "Humid" } },
+        { "id": "dry", "names": { "zh-Hant": "乾燥", "en": "Dry" } },
+        { "id": "haze", "names": { "zh-Hant": "霾", "en": "Haze" } },
+        { "id": "rainbow", "names": { "zh-Hant": "彩虹", "en": "Rainbow" } },
+        { "id": "frost", "names": { "zh-Hant": "霜", "en": "Frost" } },
+        { "id": "hail", "names": { "zh-Hant": "冰雹", "en": "Hail" } }
+      ]
+    },
+    {
+      "id": "place",
+      "names": { "zh-Hant": "地點", "en": "Place" },
+      "tags": [
+        { "id": "city", "names": { "zh-Hant": "城市", "en": "City" } },
+        { "id": "street", "names": { "zh-Hant": "街道", "en": "Street" } },
+        { "id": "indoor", "names": { "zh-Hant": "室內", "en": "Indoor" } },
+        { "id": "home", "names": { "zh-Hant": "家", "en": "Home" } },
+        { "id": "nature", "names": { "zh-Hant": "自然", "en": "Nature" } },
+        { "id": "forest", "names": { "zh-Hant": "森林", "en": "Forest" } },
+        { "id": "mountain", "names": { "zh-Hant": "山", "en": "Mountain" } },
+        { "id": "ocean", "names": { "zh-Hant": "海", "en": "Ocean" } },
+        { "id": "river", "names": { "zh-Hant": "河", "en": "River" } },
+        { "id": "rural", "names": { "zh-Hant": "鄉間", "en": "Rural" } },
+        { "id": "airport", "names": { "zh-Hant": "機場", "en": "Airport" } },
+        { "id": "station", "names": { "zh-Hant": "車站", "en": "Station" } },
+        { "id": "market", "names": { "zh-Hant": "市場", "en": "Market" } },
+        { "id": "temple", "names": { "zh-Hant": "寺廟教堂", "en": "Temple" } },
+        { "id": "office", "names": { "zh-Hant": "辦公室", "en": "Office" } },
+        { "id": "factory", "names": { "zh-Hant": "工廠", "en": "Factory" } },
+        { "id": "school", "names": { "zh-Hant": "學校", "en": "School" } },
+        { "id": "restaurant", "names": { "zh-Hant": "餐廳", "en": "Restaurant" } },
+        { "id": "rooftop", "names": { "zh-Hant": "屋頂", "en": "Rooftop" } },
+        { "id": "underwater", "names": { "zh-Hant": "水下", "en": "Underwater" } }
+      ]
+    },
+    {
+      "id": "time",
+      "names": { "zh-Hant": "時間", "en": "Time" },
+      "tags": [
+        { "id": "dawn", "names": { "zh-Hant": "黎明", "en": "Dawn" } },
+        { "id": "morning", "names": { "zh-Hant": "早晨", "en": "Morning" } },
+        { "id": "noon", "names": { "zh-Hant": "正午", "en": "Noon" } },
+        { "id": "afternoon", "names": { "zh-Hant": "午後", "en": "Afternoon" } },
+        { "id": "dusk", "names": { "zh-Hant": "黃昏", "en": "Dusk" } },
+        { "id": "night", "names": { "zh-Hant": "夜晚", "en": "Night" } },
+        { "id": "midnight", "names": { "zh-Hant": "午夜", "en": "Midnight" } }
+      ]
+    },
+    {
+      "id": "shot",
+      "names": { "zh-Hant": "鏡頭", "en": "Shot" },
+      "tags": [
+        { "id": "wide", "names": { "zh-Hant": "廣角", "en": "Wide" } },
+        { "id": "medium", "names": { "zh-Hant": "中景", "en": "Medium" } },
+        { "id": "closeUp", "names": { "zh-Hant": "特寫", "en": "Close-up" } },
+        { "id": "extremeCloseUp", "names": { "zh-Hant": "大特寫", "en": "Extreme Close-up" } },
+        { "id": "headshot", "names": { "zh-Hant": "臉部特寫", "en": "Headshot" } },
+        { "id": "waistUp", "names": { "zh-Hant": "半身", "en": "Waist-up" } },
+        { "id": "tracking", "names": { "zh-Hant": "跟拍", "en": "Tracking" } },
+        { "id": "aerial", "names": { "zh-Hant": "空拍", "en": "Aerial" } },
+        { "id": "handheld", "names": { "zh-Hant": "手持", "en": "Handheld" } },
+        { "id": "static", "names": { "zh-Hant": "固定", "en": "Static" } },
+        { "id": "lockdown", "names": { "zh-Hant": "鎖定", "en": "Lockdown" } },
+        { "id": "pan", "names": { "zh-Hant": "橫搖", "en": "Pan" } },
+        { "id": "pov", "names": { "zh-Hant": "主觀鏡頭", "en": "POV" } },
+        { "id": "highAngle", "names": { "zh-Hant": "俯角", "en": "High Angle" } },
+        { "id": "lowAngle", "names": { "zh-Hant": "仰角", "en": "Low Angle" } },
+        { "id": "macro", "names": { "zh-Hant": "微距", "en": "Macro" } },
+        { "id": "slowMo", "names": { "zh-Hant": "慢動作", "en": "Slow Motion" } },
+        { "id": "timelapse", "names": { "zh-Hant": "縮時", "en": "Timelapse" } },
+        { "id": "realtime", "names": { "zh-Hant": "即時", "en": "Realtime" } }
+      ]
+    },
+    {
+      "id": "people",
+      "names": { "zh-Hant": "人物", "en": "People" },
+      "tags": [
+        { "id": "none", "names": { "zh-Hant": "無人", "en": "None" } },
+        { "id": "one", "names": { "zh-Hant": "一人", "en": "One" } },
+        { "id": "two", "names": { "zh-Hant": "兩人", "en": "Two" } },
+        { "id": "group", "names": { "zh-Hant": "一群", "en": "Group" } },
+        { "id": "portrait", "names": { "zh-Hant": "人像", "en": "Portrait" } },
+        { "id": "crowd", "names": { "zh-Hant": "人群", "en": "Crowd" } },
+        { "id": "silhouette", "names": { "zh-Hant": "剪影", "en": "Silhouette" } },
+        { "id": "hands", "names": { "zh-Hant": "手部", "en": "Hands" } },
+        { "id": "distant", "names": { "zh-Hant": "遠景人物", "en": "Distant" } },
+        { "id": "infant", "names": { "zh-Hant": "嬰幼兒", "en": "Infant" } },
+        { "id": "child", "names": { "zh-Hant": "小孩", "en": "Child" } },
+        { "id": "teen", "names": { "zh-Hant": "青少年", "en": "Teen" } },
+        { "id": "youngAdult", "names": { "zh-Hant": "青年", "en": "Young Adult" } },
+        { "id": "adult", "names": { "zh-Hant": "成人", "en": "Adult" } },
+        { "id": "senior", "names": { "zh-Hant": "長輩", "en": "Senior" } }
+      ]
+    }
+  ]
+}

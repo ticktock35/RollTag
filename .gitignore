@@ -1,0 +1,15 @@
+.DS_Store
+DerivedData/
+build/
+.swiftpm/
+.idea/
+xcuserdata/
+*.xcuserstate
+__pycache__/
+*.pyc
+.venv/
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
