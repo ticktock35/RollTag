@@ -22,7 +22,7 @@ This version does not: DaVinci integration, a NAS assumption, Linux/Windows, or 
 
 **Start a new DaVinci project without re-indexing the library.** Media Pool search only sees what that project has imported. A Super Bin of every trip is possible, but it is slow to build and easy to let rot. RollTag’s search sits on the warehouse: same tags, same drive, every job. Find the clip here, then import just that file (or a trim) into the new timeline.
 
-**AI for the untagged pile, not for import.** If you would rather not label every clip yourself, select Untagged (or a folder’s worth of videos and photos) and press ⌥⌘T. Gemini then OpenAI suggest only from the catalog. Folder names can attach tags you already use (`clubmed` matches `Club Med Ria`). Audio, 1 KB empties, and unreadable files are skipped. Import never burns tokens in the background.
+**AI for the untagged pile, not for import.** If you would rather not label every clip yourself, right-click Untagged and choose AI Batch Tag, or select videos and photos in the grid and right-click the same command. Gemini then OpenAI suggest only from the catalog. Folder names can attach tags you already use (`clubmed` matches `Club Med Ria`). Audio, 1 KB empties, and unreadable files are skipped. Import never burns tokens in the background. Already tagged clips can be sent again from the inspector or the grid menu. **AI tags can be wrong — review them.**
 
 **Two copies of the same clip.** Backup + camera dump often mean the same bytes twice. Duplicates compares them side by side. Keep one (A / D), merge tags, Enter sends the rest to Trash. Keep-all (S) when both paths are intentional.
 
@@ -76,11 +76,33 @@ The left sidebar has smart lists (All, Tagged, Untagged, Missing, Duplicates) an
 
 Select a clip: player on the left (video/audio scrub; photos show a still), inspector on the right (path, capture time, GPS if present, tags). Hover a grid cell to preview video/audio. Space plays/pauses and P or Esc toggles fullscreen by default; in fullscreen [ or , is previous and ] or . is next. Change keys in Settings → Shortcuts. ⌘/ lists every shortcut.
 
-### Tag
+### Tag by hand
 
-Tag by hand or with AI. Check the folders you want to finish first, open Untagged, then ⌘A. For a run of similar clips, select them together so one pass covers the group — faster than one file at a time, and you are already looking at the footage. The inspector accepts preset facets (theme, mood, place, shot, …) or custom words (`clubmed`, a person’s name). Non-English custom tags also get Getty/Pond5 English keywords from the bundled CC-CEDICT word list (chair, forest, hamburger), then your glossary, then romanization. Add your own pairs in Settings → Glossary so tagging and search use both sides. Single clip and batch use the same controls. Click a chip to remove it. Search uses these tags later, on every job that opens this warehouse.
+1. Select one clip, or several similar ones (same scene or burst). Check the folders you want to finish first, open Untagged, then ⌘A if you want the whole pile.
+2. In the inspector on the right, open a preset category (theme, mood, place, shot, people, …) and click a facet; or type a custom word (`clubmed`, a person’s name) and press Return. Commas add several at once.
+3. Click a chip to remove it. Single clip and batch use the same controls.
 
-For AI tagging, add a Gemini or OpenAI API key in Settings (⌘,). After you select a **video or photo**, the inspector and Tag menu show the action (⌥⌘T). Import never runs AI by itself. Audio, tiny files, and unreadable files are skipped. When the model succeeds, RollTag writes catalog tags, short visible non-English custom labels, and Getty/Pond5 English keywords (lowercase, space-separated), plus this warehouse’s existing place/custom tags that match folder names. A Done / Cancel prompt follows: Done or Return keeps the tags and remembers what the model tagged versus what you left, so later passes can follow that; Cancel or Esc discards that batch.
+Non-English custom tags also get Getty/Pond5 English keywords from the bundled CC-CEDICT word list (chair, forest, hamburger), then your glossary, then romanization. Add your own pairs in Settings → Glossary. Search uses these tags later, on every job that opens this warehouse.
+
+### AI tag
+
+**AI tags can be wrong** — people count, place, mood, and keywords may not match the footage. Review the chips and click off anything that is off. Inspector / ⌥⌘T wait for Done; right-click batch keeps tags immediately, so check afterwards.
+
+1. Add a Gemini or OpenAI API key in Settings → AI (⌘,). Import never runs AI by itself.
+2. Select a **video or photo** (already tagged ones can be sent again). Audio, tiny files, and unreadable files are skipped.
+3. Press **AI tag** in the inspector or ⌥⌘T. After the model returns, Done or Return keeps the tags; Cancel or Esc discards that batch.
+4. Or right-click **Untagged** in the sidebar, or one or more items in the media grid, and choose **AI Batch Tag**. That run is one file at a time and keeps tags immediately — no confirmation.
+
+When the model succeeds, RollTag writes catalog tags, short visible non-English custom labels, and Getty/Pond5 English keywords (lowercase, space-separated), plus this warehouse’s existing place/custom tags that match folder names.
+
+### Get an API key
+
+This version only sends tagging to **Gemini** or **OpenAI**. You need at least one key. Keys stay in `~/rolltag/config.json` on this Mac — do not share that file. The provider bills usage on their side.
+
+- **Gemini:** sign in with a Google account at [Google AI Studio API keys](https://aistudio.google.com/api-keys), create a key, paste it under Gemini in Settings. Official steps: [Using Gemini API keys](https://ai.google.dev/gemini-api/docs/api-key).
+- **OpenAI:** sign in at [OpenAI API keys](https://platform.openai.com/api-keys), create a secret key, paste it under OpenAI in Settings. You may need billing enabled on the OpenAI account.
+
+Settings → AI also has these two links. Twelve Labs, DashScope, and Claude can store a key but are not wired for tagging in this version.
 
 ### Duplicates and trim
 
@@ -120,7 +142,7 @@ RollTag 把倉庫登記在本機，**metadata 寫在那顆硬碟的 `.rolltag/` 
 
 **開新的 DaVinci 案子，不必重做素材庫索引。** Media Pool 搜尋只看這個專案已經匯入的東西。把每次旅行都丟進 Super Bin 做得到，但建立慢、也容易過期。RollTag 的搜尋綁在倉庫：同一顆碟、同一套標，每個案子都能用。在這裡找到再把那一支（或 trim 過的）匯進新時間軸。
 
-**AI 打未打標的一堆，不是匯入就跑。** 不想一支支手打時，點「未打標」（或一次選一層影片／照片），⌥⌘T。Gemini 失敗再 OpenAI，只能從現有分類選。資料夾名可套你已經在用的標（`clubmed` 對得上 `Club Med Ria`）。音訊、1 KB 空檔、解不開的會跳過。匯入不會在背景燒 token。
+**AI 打未打標的一堆，不是匯入就跑。** 不想一支支手打時，在「未打標」按右鍵「AI 批次打標」，或在格線選影片／照片後右鍵同一選單；也可 ⌥⌘T。Gemini 失敗再 OpenAI，只能從現有分類選。資料夾名可套你已經在用的標（`clubmed` 對得上 `Club Med Ria`）。音訊、1 KB 空檔、解不開的會跳過。匯入不會在背景燒 token。**AI 打的標可能錯，請自己檢查。**
 
 **同一段拷了兩份。** 相機倒出加上備份，常常位元組一樣。重複檔並排比較，A／D 留一個、標籤合併，Enter 把其他丟進垃圾桶。兩邊都要留就按 S。
 
@@ -174,11 +196,33 @@ xcodebuild -scheme RollTag -destination 'platform=macOS' test
 
 點一支：右上左欄播放（影片／音訊可拉時間軸；照片看大圖），右欄看路徑、拍攝時間、GPS（有才顯示）與標籤。格線 hover 可預覽影片／音訊。預設空白鍵播放／暫停、P 或 Esc 進出全螢幕；全螢幕時 [ 或 , 上一則、] 或 . 下一則，可在設定「快捷鍵」改。⌘/ 看全部快捷鍵。
 
-### 打標
+### 手打標
 
-可手打，也可 AI。先勾要處理的重點目錄，再進「未打標」、⌘A。同一組相似的影片建議一起選、一次打，比一支支快，而且審素材的同時標就打完了。右側可打預設分類（主題、情緒、地點、鏡頭等）或自訂字（例如 `clubmed`）。打中文等非英語標時，會從內建 CC-CEDICT 詞庫補 Getty／Pond5 英文關鍵字（椅子、森林、漢堡這類日常詞也在裡面），對不上才羅馬拼音。常用人名、品牌可在設定「字詞對應」裡自己加，打標與搜尋兩邊都會用到。單支與批次同一套。點 chip 可拿掉。搜尋吃這些標，之後每個案子都能再用。
+1. 在格線選一支，或把同一組相似的一次選起來。可先勾重點目錄，再進「未打標」、⌘A 全選目前範圍。
+2. 右側打開預設分類（主題、情緒、地點、鏡頭、人物等）點細項；或在輸入框打自訂字（例如 `clubmed`、人名）後按 Return／加入。逗號、頓號可一次加多個。
+3. 點 chip 拿掉。單支與批次同一套。
 
-AI 打標要先在設定（⌘,）填 Gemini 或 OpenAI 的 API key。選了**影片或照片**之後，右側與標籤選單才出現按鈕（⌥⌘T）。匯入不會自動跑。音訊、空檔、解不開的會跳過。模型成功時會寫清單標、畫面裡看得清楚的短中文自訂詞，以及 Getty／Pond5 格式的英文關鍵字（小寫、空白分詞），也會把這個倉庫裡已有的地點／自訂標從資料夾名套上去。接著右側會問要不要留下：完成或 Enter 保留，並記住這次 AI 打了什麼、你留下什麼，下次打標會當短範例；取消或 Esc 拿掉這次標。
+打中文等非英語標時，會從內建 CC-CEDICT 詞庫補 Getty／Pond5 英文關鍵字（椅子、森林、漢堡這類日常詞也在裡面），對不上才羅馬拼音。常用人名、品牌可在設定「字詞對應」裡自己加。搜尋吃這些標，之後每個案子都能再用。
+
+### AI 打標
+
+**AI 打的標可能錯誤**——人數、地點、情緒、關鍵字都可能不對。請自己看過，不對的點掉。檢查器／⌥⌘T 打完會等你按「完成」；右鍵批次打完就留下，更要事後檢查。
+
+1. 先到設定 → AI（⌘,）填 Gemini 或 OpenAI 的 API key。匯入不會自動跑。
+2. 選**影片或照片**（已打過標的也可再送）。音訊、空檔、解不開的會跳過。
+3. 按右側「AI 打標」或 ⌥⌘T。模型回來後：完成或 Enter 保留；取消或 Esc 拿掉這次標。
+4. 或在側欄「未打標」、或媒體區選一支／多支後按右鍵「AI 批次打標」。一支一支送，打完就留下，不必確認。
+
+模型成功時會寫清單標、畫面裡看得清楚的短中文自訂詞，以及 Getty／Pond5 格式的英文關鍵字（小寫、空白分詞），也會把這個倉庫裡已有的地點／自訂標從資料夾名套上去。
+
+### 如何取得 API key
+
+這一版打標只送 **Gemini** 或 **OpenAI**，至少要有一把 key。Key 存在這台 Mac 的 `~/rolltag/config.json`，不要分享那個檔。用量由各平台計費。
+
+- **Gemini：** 用 Google 帳號到 [Google AI Studio 的 API keys](https://aistudio.google.com/api-keys) 建立，貼到設定裡 Gemini 那一欄。官方說明：[Using Gemini API keys](https://ai.google.dev/gemini-api/docs/api-key)。
+- **OpenAI：** 到 [OpenAI API keys](https://platform.openai.com/api-keys) 建立 secret key，貼到設定裡 OpenAI 那一欄。帳號可能要先開計費。
+
+設定 → AI 也有這兩個連結。Twelve Labs、DashScope、Claude 可以存 key，這一版打標尚未接。
 
 ### 重複檔與切段
 

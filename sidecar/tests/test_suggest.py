@@ -70,6 +70,13 @@ class SuggestTests(unittest.TestCase):
         self.assertIn("keywords", prompt)
         self.assertIn("Getty/Pond5", prompt)
 
+    def test_prompt_requires_exact_people_count(self):
+        prompt = build_prompt({"categories": []})
+        self.assertIn("people/none", prompt)
+        self.assertIn("people/one", prompt)
+        self.assertIn("people/two", prompt)
+        self.assertIn("exactly one", prompt)
+
     def test_parse_keywords(self):
         from rolltag_sidecar.suggest import parse_keywords
 

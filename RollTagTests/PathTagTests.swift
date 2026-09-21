@@ -86,6 +86,8 @@ final class PathTagTests: XCTestCase {
         var video = tiny
         video.size = 12_000_000
         XCTAssertTrue(video.canAITag)
+        video.tags = [.ai(category: "mood", value: "calm"), .user(category: "custom", value: "clubmed")]
+        XCTAssertTrue(video.canAITag)
     }
 
     private func clip(filename: String) -> Footage {

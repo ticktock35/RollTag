@@ -282,6 +282,55 @@ final class FootageFilterTests: XCTestCase {
         XCTAssertFalse(WarehouseFolderTree.contains(directoryPath: "malaysia備份", folder: "malaysia"))
     }
 
+    func testAlreadyTaggedVideoStillCanAITag() {
+        var tagged = clip(relativePath: "done.mov", tags: [.ai(category: "mood", value: "calm")])
+        tagged.size = 12_000_000
+        XCTAssertTrue(tagged.canAITag)
+    }
+
+    func testAITaggableIDsForUntaggedSkipTaggedAudioTinyAndOutOfScope() {
+        let warehouseID = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        var untaggedVideo = clip(relativePath: "malaysia/a.mov")
+        untaggedVideo.size = 12_000_000
+        var taggedVideo = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "malaysia/b.mov", tags: [.user(category: "mood", value: "calm")])
+        taggedVideo.size = 12_000_000
+        var photo = clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "malaysia/c.heic")
+        photo.size = 20_000
+        var audio = clip(id: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE", relativePath: "malaysia/d.mp3")
+        audio.size = 1_000_000
+        var tiny = clip(id: "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF", relativePath: "malaysia/e.mov")
+        tiny.size = 1024
+        var outside = clip(id: "11111111-1111-1111-1111-111111111111", relativePath: "other/f.mov")
+        outside.size = 12_000_000
+        let warehouse = WarehouseRuntime(
+            preference: WarehousePreference(id: warehouseID, name: "W", path: "/tmp", bookmark: nil),
+            isOnline: true,
+            isReconciling: false,
+            footage: [untaggedVideo, taggedVideo, photo, audio, tiny, outside],
+            groups: []
+        )
+        let ids = FootageFilter.aiTaggableIDs(
+            warehouses: [warehouse],
+            selection: .collection(.untagged),
+            folderScopes: [FolderRef(warehouseID: warehouseID, relativePath: "malaysia")]
+        )
+        XCTAssertEqual(Set(ids), [untaggedVideo.id, photo.id])
+    }
+
+    func testSilentAITargetUsesSelectionWhenClickedItemIsSelected() {
+        let clicked = UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!
+        let other = UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!
+        let outside = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        XCTAssertEqual(
+            Set(FootageFilter.silentAITargetIDs(clicked: clicked, selectedIDs: [clicked, other])),
+            [clicked, other]
+        )
+        XCTAssertEqual(
+            FootageFilter.silentAITargetIDs(clicked: outside, selectedIDs: [clicked, other]),
+            [outside]
+        )
+    }
+
     func testTinyVideoIsTooSmallToPreview() {
         var tiny = clip(tags: [])
         tiny.size = 1024

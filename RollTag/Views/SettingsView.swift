@@ -146,6 +146,14 @@ struct SettingsView: View {
                 .font(.title2.weight(.semibold))
             Text(String(localized: "settings.ai.detail"))
                 .foregroundStyle(.secondary)
+            HStack(spacing: 16) {
+                Link(String(localized: "settings.ai.keys.gemini"), destination: URL(string: "https://aistudio.google.com/api-keys")!)
+                Link(String(localized: "settings.ai.keys.openai"), destination: URL(string: "https://platform.openai.com/api-keys")!)
+            }
+            .font(.callout)
+            Text(String(localized: "settings.ai.keys.warn"))
+                .font(.callout)
+                .foregroundStyle(.secondary)
             Text(String(localized: "settings.ai.priority"))
                 .font(.callout)
                 .foregroundStyle(.secondary)

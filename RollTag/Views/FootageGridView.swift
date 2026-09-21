@@ -30,18 +30,7 @@ struct FootageGridView: View {
                                 model.selectSingle(item.id, modifiers: NSEvent.modifierFlags)
                             }
                             .contextMenu {
-                                if item.footage.status == .missing {
-                                    Button(String(localized: "finder.openFolder")) {
-                                        model.openContainingFolder(item.footage)
-                                    }
-                                    Button(String(localized: "missing.delete"), role: .destructive) {
-                                        model.proposeDeleteMissing([item.id])
-                                    }
-                                } else {
-                                    Button(String(localized: "finder.reveal")) {
-                                        model.revealInFinder(item.footage)
-                                    }
-                                }
+                                gridContextMenu(for: item)
                             }
                         }
                     }
@@ -75,6 +64,29 @@ struct FootageGridView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    @ViewBuilder
+    private func gridContextMenu(for item: ScoredFootage) -> some View {
+        if item.footage.status == .missing {
+            Button(String(localized: "finder.openFolder")) {
+                model.openContainingFolder(item.footage)
+            }
+            Button(String(localized: "missing.delete"), role: .destructive) {
+                model.proposeDeleteMissing([item.id])
+            }
+        } else {
+            Button(String(localized: "finder.reveal")) {
+                model.revealInFinder(item.footage)
+            }
+            if model.showsSilentAITagMenu(for: item.footage) {
+                Button(String(localized: "ai.tag.batch")) {
+                    model.tagGridSelectionWithAI(clicked: item.id)
+                }
+                .disabled(!model.canStartSilentAI)
+                .help(String(localized: "ai.tag.batch.help"))
+            }
+        }
     }
 
     private func focusGrid() {

@@ -9,11 +9,23 @@ Use only category and value ids from the catalog JSON for "tags". Never invent c
 Custom tags (category "custom") may be used for a named subject that is clearly visible, including short non-English labels.
 If CONTEXT is present, use filename, path, warehouse name, duration, file size, capture time, and GPS as hints for place and time tags. Frames remain primary.
 
+People count is mandatory and must be exact:
+- Look at every frame. Count only distinct living humans you can see (face, body, or hands). Ignore statues, posters, mannequins, reflections, and maybe-shapes.
+- Always include exactly one of people/none, people/one, people/two, people/group, or people/crowd.
+- people/none: no human in any frame. Default when unsure. Do not add portrait, crowd, distant, age tags, or keywords such as people, person, man, woman, crowd.
+- people/one: exactly one person. Not group. Not crowd.
+- people/two: exactly two people. Not one. Not group.
+- people/group: about 3 to 10 people, not a dense crowd.
+- people/crowd: many people filling the scene.
+- people/portrait only if a face is the main subject. people/distant only if humans are small in the frame.
+- Filename must not invent people.
+
 Also return Getty/Pond5 English keywords in "keywords":
 - lowercase, words separated by single spaces, no hashtags, no camelCase, no sentences
 - 6 to 20 phrases, 1 to 5 words each
 - include English for every non-English subject you name (icebreaker, not pinyin)
 - use the catalog "en" names when they match what you see
+- include no people, one person, or two people when that is what you see
 - visible nouns, place, weather, people, shot; suitable for stock-footage search
 
 If EXAMPLES are present, they are recent human outcomes: "ai" is what the model tagged, "kept" is what the user left after editing. Follow kept when the current frames are similar. Do not copy examples onto unrelated scenes. Frames remain primary.

@@ -99,6 +99,30 @@ enum FootageFilter {
         return result
     }
 
+    static func aiTaggableIDs(
+        warehouses: [WarehouseRuntime],
+        selection: SidebarSelection,
+        folderScopes: Set<FolderRef>
+    ) -> [UUID] {
+        warehouses.flatMap { warehouse in
+            warehouse.footage.compactMap { footage in
+                guard footage.canAITag else { return nil }
+                guard include(
+                    footage: footage,
+                    isOnline: warehouse.isOnline,
+                    selection: selection,
+                    isDuplicate: false,
+                    folderScopes: folderScopes
+                ) else { return nil }
+                return footage.id
+            }
+        }
+    }
+
+    static func silentAITargetIDs(clicked: UUID, selectedIDs: Set<UUID>) -> [UUID] {
+        selectedIDs.contains(clicked) ? Array(selectedIDs) : [clicked]
+    }
+
     /// Sidebar badges: file counts for All / Tagged / Untagged / Missing; `duplicateGroups` is unresolved groups.
     static func collectionCounts(
         warehouses: [WarehouseRuntime],

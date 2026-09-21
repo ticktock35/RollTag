@@ -430,18 +430,66 @@
         }
       }
     },
-    "ai.tag.help" : {
+    "ai.tag.batch" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Extract frames and send to Gemini, then GPT-4.1-mini if needed."
+            "value" : "AI Batch Tag"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "抽幀後先送 Gemini，沒有或失敗再送 gpt-4.1-mini。"
+            "value" : "AI 批次打標"
+          }
+        }
+      }
+    },
+    "ai.tag.batch.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag the clicked clip, or every selected video and photo, one by one. Tags are kept immediately."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對這支或目前選取裡可打標的影片與照片，一支一支送 AI，打完就留下，不必確認。"
+          }
+        }
+      }
+    },
+    "ai.tag.batch.untagged.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag every taggable untagged video and photo in the current folder scope, one by one. Tags are kept immediately."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對目前範圍內所有可打標的未打標影片與照片，一支一支送 AI，打完就留下，不必確認。"
+          }
+        }
+      }
+    },
+    "ai.tag.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extract frames and send to Gemini, then GPT-4.1-mini if needed. Already tagged clips can be tagged again."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抽幀後先送 Gemini，沒有或失敗再送 gpt-4.1-mini。已打過標的也可再打。"
           }
         }
       }
@@ -2141,6 +2189,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Key 只留在這台 Mac。填了 Gemini 或 OpenAI key 之後，選了影片或照片才會出現 AI 打標。匯入不會自動跑。"
+          }
+        }
+      }
+    },
+    "settings.ai.keys.gemini" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get a Gemini API key"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得 Gemini API key"
+          }
+        }
+      }
+    },
+    "settings.ai.keys.openai" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get an OpenAI API key"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得 OpenAI API key"
+          }
+        }
+      }
+    },
+    "settings.ai.keys.warn" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI tags can be wrong (people, place, keywords). Review them and click off anything that does not match. The provider bills usage."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 打的標可能錯誤（人數、地點、關鍵字都可能不對）。請自己看過，不對的點掉。用量由各平台計費。"
           }
         }
       }

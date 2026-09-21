@@ -15,6 +15,10 @@ final class TagCatalogTests: XCTestCase {
         XCTAssertEqual(nature?.tags.first { $0.id == "ocean" }?.localizedName(locale: "en"), "Ocean")
         XCTAssertEqual(nature?.localizedName(locale: "zh-Hant"), "自然")
         XCTAssertEqual(nature?.tags.first { $0.id == "ocean" }?.localizedName(locale: "zh-Hant"), "海")
+        let people = catalog.categories.first { $0.id == "people" }
+        XCTAssertEqual(people?.tags.first { $0.id == "none" }?.localizedName(locale: "en"), "No people")
+        XCTAssertEqual(people?.tags.first { $0.id == "one" }?.localizedName(locale: "en"), "One person")
+        XCTAssertEqual(people?.tags.first { $0.id == "two" }?.localizedName(locale: "en"), "Two people")
     }
 
     func testTraditionalChineseLocalesStayChinese() {

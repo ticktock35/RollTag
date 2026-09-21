@@ -7,10 +7,7 @@ struct SidebarView: View {
         List(selection: $model.sidebarSelection) {
             Section(String(localized: "sidebar.library")) {
                 ForEach(SmartCollection.allCases) { collection in
-                    Label(String(localized: String.LocalizationValue(collection.localizationKey)), systemImage: icon(for: collection))
-                        .badge(badge(for: collection))
-                        .tag(SidebarSelection.collection(collection))
-                        .help(help(for: collection))
+                    collectionRow(collection)
                 }
             }
 
@@ -72,6 +69,25 @@ struct SidebarView: View {
             .buttonStyle(.borderless)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
+        }
+    }
+
+    @ViewBuilder
+    private func collectionRow(_ collection: SmartCollection) -> some View {
+        let row = Label(String(localized: String.LocalizationValue(collection.localizationKey)), systemImage: icon(for: collection))
+            .badge(badge(for: collection))
+            .tag(SidebarSelection.collection(collection))
+            .help(help(for: collection))
+        if collection == .untagged {
+            row.contextMenu {
+                Button(String(localized: "ai.tag.batch")) {
+                    model.tagUntaggedWithAI()
+                }
+                .disabled(!model.canBatchAITagUntagged)
+                .help(String(localized: "ai.tag.batch.untagged.help"))
+            }
+        } else {
+            row
         }
     }
 

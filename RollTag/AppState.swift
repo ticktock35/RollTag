@@ -536,12 +536,40 @@ final class AppModel {
         return TagAssignment.uniqued(tags).sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
     }
 
+    var hasAITaggingRoute: Bool {
+        preference.ai.taggingRoute() != nil
+    }
+
     var showsAITagging: Bool {
-        preference.ai.taggingRoute() != nil && selectedFootage.contains(where: \.canAITag)
+        hasAITaggingRoute && selectedFootage.contains(where: \.canAITag)
     }
 
     var canTagWithAI: Bool {
-        showsAITagging && !isBusy && !pendingAIConfirmation
+        showsAITagging && canStartSilentAI
+    }
+
+    var canStartSilentAI: Bool {
+        hasAITaggingRoute && !isBusy && !pendingAIConfirmation
+    }
+
+    var scopedUntaggedAITaggableIDs: [UUID] {
+        FootageFilter.aiTaggableIDs(
+            warehouses: warehouses,
+            selection: .collection(.untagged),
+            folderScopes: workFolders
+        )
+    }
+
+    var canBatchAITagUntagged: Bool {
+        canStartSilentAI && !scopedUntaggedAITaggableIDs.isEmpty
+    }
+
+    func showsSilentAITagMenu(for footage: Footage) -> Bool {
+        guard hasAITaggingRoute, footage.status != .missing else { return false }
+        if selectedIDs.contains(footage.id) {
+            return selectedFootage.contains(where: \.canAITag)
+        }
+        return footage.canAITag
     }
 
     func addTags(_ tags: [TagAssignment]) {
@@ -552,11 +580,20 @@ final class AppModel {
     }
 
     func tagSelectedWithAI() {
-        Task { await tagWithAI(ids: selectedFootage.map(\.id)) }
+        Task { await tagWithAI(ids: selectedFootage.map(\.id), requireConfirmation: true) }
     }
 
-    func tagWithAI(ids: [UUID]) async {
-        guard !ids.isEmpty, !isBusy else { return }
+    func tagUntaggedWithAI() {
+        Task { await tagWithAI(ids: scopedUntaggedAITaggableIDs, requireConfirmation: false) }
+    }
+
+    func tagGridSelectionWithAI(clicked id: UUID) {
+        let ids = FootageFilter.silentAITargetIDs(clicked: id, selectedIDs: selectedIDs)
+        Task { await tagWithAI(ids: ids, requireConfirmation: false) }
+    }
+
+    func tagWithAI(ids: [UUID], requireConfirmation: Bool = true) async {
+        guard !ids.isEmpty, !isBusy, !pendingAIConfirmation else { return }
         let routes = preference.ai.taggingRoutes()
         guard !routes.isEmpty else {
             statusMessage = String(localized: "ai.missingKey")
@@ -682,7 +719,7 @@ final class AppModel {
             failed: failed,
             lastError: lastError
         )
-        if tagged > 0 {
+        if tagged > 0, requireConfirmation {
             pendingAIConfirmation = true
         } else {
             pendingAINovelTags = [:]
