@@ -80,7 +80,7 @@ Select a clip: player on the left (video/audio scrub; photos show a still), insp
 
 Tag by hand or with AI. Check the folders you want to finish first, open Untagged, then ⌘A. For a run of similar clips, select them together so one pass covers the group — faster than one file at a time, and you are already looking at the footage. The inspector accepts preset facets (theme, mood, place, shot, …) or custom words (`clubmed`, a person’s name). Non-English custom tags also get Getty/Pond5 English keywords from the bundled CC-CEDICT word list (chair, forest, hamburger), then your glossary, then romanization. Add your own pairs in Settings → Glossary so tagging and search use both sides. Single clip and batch use the same controls. Click a chip to remove it. Search uses these tags later, on every job that opens this warehouse.
 
-For AI tagging, add a Gemini or OpenAI API key in Settings (⌘,). After you select a **video or photo**, the inspector and Tag menu show the action (⌥⌘T). Import never runs AI by itself. Audio, tiny files, and unreadable files are skipped. When the model succeeds, RollTag writes catalog tags, short visible non-English custom labels, and Getty/Pond5 English keywords (lowercase, space-separated), plus this warehouse’s existing place/custom tags that match folder names. A Done / Cancel prompt follows: Done or Return keeps the tags, Cancel or Esc discards that batch.
+For AI tagging, add a Gemini or OpenAI API key in Settings (⌘,). After you select a **video or photo**, the inspector and Tag menu show the action (⌥⌘T). Import never runs AI by itself. Audio, tiny files, and unreadable files are skipped. When the model succeeds, RollTag writes catalog tags, short visible non-English custom labels, and Getty/Pond5 English keywords (lowercase, space-separated), plus this warehouse’s existing place/custom tags that match folder names. A Done / Cancel prompt follows: Done or Return keeps the tags and remembers what the model tagged versus what you left, so later passes can follow that; Cancel or Esc discards that batch.
 
 ### Duplicates and trim
 
@@ -90,7 +90,7 @@ With a single video selected, **Trim** opens a separate window and writes a new 
 
 ## Where data lives
 
-- App settings: `~/rolltag/config.json` (warehouse list, AI keys, glossary, and shortcut overrides — not tags). Do not share that file or commit it to a public git repo.
+- App settings: `~/rolltag/config.json` (warehouse list, AI keys, glossary, shortcut overrides, and recent AI-vs-kept tagging examples — not per-file tags). Do not share that file or commit it to a public git repo.
 - Per warehouse: `<warehouse>/.rolltag/warehouse.sqlite`, thumbnails, and trim exports. They stay on the disk.
 - Chinese–English keywords: `CCCEDICTKeywords.json` is derived from [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict) (CC BY-SA 4.0). See `RollTag/Resources/CCCEDICT.NOTICE.txt`.
 
@@ -178,7 +178,7 @@ xcodebuild -scheme RollTag -destination 'platform=macOS' test
 
 可手打，也可 AI。先勾要處理的重點目錄，再進「未打標」、⌘A。同一組相似的影片建議一起選、一次打，比一支支快，而且審素材的同時標就打完了。右側可打預設分類（主題、情緒、地點、鏡頭等）或自訂字（例如 `clubmed`）。打中文等非英語標時，會從內建 CC-CEDICT 詞庫補 Getty／Pond5 英文關鍵字（椅子、森林、漢堡這類日常詞也在裡面），對不上才羅馬拼音。常用人名、品牌可在設定「字詞對應」裡自己加，打標與搜尋兩邊都會用到。單支與批次同一套。點 chip 可拿掉。搜尋吃這些標，之後每個案子都能再用。
 
-AI 打標要先在設定（⌘,）填 Gemini 或 OpenAI 的 API key。選了**影片或照片**之後，右側與標籤選單才出現按鈕（⌥⌘T）。匯入不會自動跑。音訊、空檔、解不開的會跳過。模型成功時會寫清單標、畫面裡看得清楚的短中文自訂詞，以及 Getty／Pond5 格式的英文關鍵字（小寫、空白分詞），也會把這個倉庫裡已有的地點／自訂標從資料夾名套上去。接著右側會問要不要留下：完成或 Enter 保留，取消或 Esc 拿掉這次標。
+AI 打標要先在設定（⌘,）填 Gemini 或 OpenAI 的 API key。選了**影片或照片**之後，右側與標籤選單才出現按鈕（⌥⌘T）。匯入不會自動跑。音訊、空檔、解不開的會跳過。模型成功時會寫清單標、畫面裡看得清楚的短中文自訂詞，以及 Getty／Pond5 格式的英文關鍵字（小寫、空白分詞），也會把這個倉庫裡已有的地點／自訂標從資料夾名套上去。接著右側會問要不要留下：完成或 Enter 保留，並記住這次 AI 打了什麼、你留下什麼，下次打標會當短範例；取消或 Esc 拿掉這次標。
 
 ### 重複檔與切段
 
@@ -188,6 +188,6 @@ AI 打標要先在設定（⌘,）填 Gemini 或 OpenAI 的 API key。選了**�
 
 ## 資料放哪
 
-- 程式設定：`~/rolltag/config.json`（倉庫名單、AI key、字詞對應、快捷鍵覆寫，不含 tags）。不要把這個檔拿去分享或進公開 git。
+- 程式設定：`~/rolltag/config.json`（倉庫名單、AI key、字詞對應、快捷鍵覆寫、最近的 AI／留下範例，不含各檔 tags）。不要把這個檔拿去分享或進公開 git。
 - 每個倉庫：`<倉庫>/.rolltag/warehouse.sqlite`、縮圖、trim 輸出。跟著硬碟走。
 - 中英關鍵字：`CCCEDICTKeywords.json` 由 [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict) 篩出（CC BY-SA 4.0），說明見 `RollTag/Resources/CCCEDICT.NOTICE.txt`。

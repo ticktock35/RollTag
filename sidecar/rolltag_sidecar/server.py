@@ -59,6 +59,7 @@ class Handler(BaseHTTPRequestHandler):
             frames = data.get("frames") or []
             catalog = data.get("catalog") or {}
             context = data.get("context") or {}
+            examples = data.get("examples") or []
             if provider not in ("gemini", "openai"):
                 self._json(400, {"error": "unsupported_provider"})
                 return
@@ -72,6 +73,7 @@ class Handler(BaseHTTPRequestHandler):
                         frames=frames,
                         catalog=catalog if isinstance(catalog, dict) else {},
                         context=context if isinstance(context, dict) else None,
+                        examples=examples if isinstance(examples, list) else None,
                     ),
                 )
             except ValueError as exc:

@@ -16,17 +16,57 @@ Also return Getty/Pond5 English keywords in "keywords":
 - use the catalog "en" names when they match what you see
 - visible nouns, place, weather, people, shot; suitable for stock-footage search
 
+If EXAMPLES are present, they are recent human outcomes: "ai" is what the model tagged, "kept" is what the user left after editing. Follow kept when the current frames are similar. Do not copy examples onto unrelated scenes. Frames remain primary.
+
 Return JSON: {"tags":[{"category":"...","value":"..."}],"keywords":["icebreaker","arctic ocean"]}
 
 CATALOG:
 """
 
 
-def build_prompt(catalog: dict, context: Optional[dict] = None) -> str:
+def build_prompt(catalog: dict, context: Optional[dict] = None, examples: Optional[list] = None) -> str:
     prompt = PROMPT + json.dumps(catalog, ensure_ascii=False)
+    cleaned = _normalize_examples(examples)
+    if cleaned:
+        prompt += "\n\nEXAMPLES:\n" + json.dumps(cleaned, ensure_ascii=False)
     if context:
         prompt += "\n\nCONTEXT:\n" + json.dumps(context, ensure_ascii=False)
     return prompt
+
+
+def _normalize_examples(examples) -> list:
+    if not isinstance(examples, list):
+        return []
+    cleaned = []
+    for item in examples[:8]:
+        if not isinstance(item, dict):
+            continue
+        ai = _example_tags(item.get("ai"))
+        kept = _example_tags(item.get("kept"))
+        if not ai or not kept:
+            continue
+        cleaned.append({"ai": ai, "kept": kept})
+    return cleaned
+
+
+def _example_tags(items) -> list:
+    if not isinstance(items, list):
+        return []
+    tags = []
+    seen = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get("category") or "").strip()
+        value = str(item.get("value") or "").strip()
+        key = (category, value)
+        if not category or not value or key in seen:
+            continue
+        seen.add(key)
+        tags.append({"category": category, "value": value})
+        if len(tags) >= 12:
+            break
+    return tags
 
 
 def parse_tags(text: str) -> list:
@@ -119,12 +159,17 @@ def suggest_tags(
     frames: list,
     catalog: dict,
     context: Optional[dict] = None,
+    examples: Optional[list] = None,
 ) -> dict:
     if not api_key:
         raise ValueError("missing_api_key")
     if not frames:
         raise ValueError("missing_frames")
-    prompt = build_prompt(catalog, context if isinstance(context, dict) else None)
+    prompt = build_prompt(
+        catalog,
+        context if isinstance(context, dict) else None,
+        examples if isinstance(examples, list) else None,
+    )
     if provider == "gemini":
         text = _gemini(api_key, model or "gemini-3.5-flash-lite", prompt, frames)
     elif provider == "openai":

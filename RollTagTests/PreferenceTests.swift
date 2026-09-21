@@ -88,6 +88,23 @@ final class PreferenceTests: XCTestCase {
         XCTAssertEqual(migrated.glossary, .empty)
     }
 
+    func testAITaggingExamplesRoundTrip() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
+        let store = PreferenceStore(homeDirectory: home)
+        var file = PreferenceFile.empty
+        file.ai.examples = [
+            AITaggingExample(
+                ai: [AITagRef(category: "nature", value: "ocean")],
+                kept: [AITagRef(category: "nature", value: "lake")]
+            )
+        ]
+        try store.save(file)
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.ai.examples.first?.ai.first?.value, "ocean")
+        XCTAssertEqual(loaded.ai.examples.first?.kept.first?.value, "lake")
+    }
+
     func testDuplicatePathIsNotAddedTwice() {
         let store = PreferenceStore(homeDirectory: FileManager.default.temporaryDirectory)
         var file = store.addWarehouse(named: "A", path: "/tmp/wh", to: .empty)

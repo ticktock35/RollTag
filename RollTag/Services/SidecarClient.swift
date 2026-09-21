@@ -60,7 +60,8 @@ final class SidecarClient {
         model: String,
         frames: [Data],
         catalog: [String: Any],
-        context: [String: Any] = [:]
+        context: [String: Any] = [:],
+        examples: [AITaggingExample] = []
     ) async throws -> [String: Any] {
         guard let baseURL else {
             throw SidecarError.unavailable
@@ -69,14 +70,19 @@ final class SidecarClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 120
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
+        var body: [String: Any] = [
             "provider": provider.rawValue,
             "api_key": apiKey,
             "model": model,
             "frames": frames.map { $0.base64EncodedString() },
             "catalog": catalog,
             "context": context,
-        ])
+        ]
+        let examplePayload = AITaggingExample.payloadList(examples)
+        if !examplePayload.isEmpty {
+            body["examples"] = examplePayload
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]

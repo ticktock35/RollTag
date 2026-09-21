@@ -85,6 +85,7 @@ final class AppModel {
     var pendingMissingDeleteIDs: Set<UUID>?
     var pendingAIConfirmation = false
     private var pendingAINovelTags: [UUID: [TagAssignment]] = [:]
+    private var pendingAIBeforeKeys: [UUID: Set<String>] = [:]
     var settingsKeyboardActive = 0
     var capturingShortcut: ShortcutAction?
     var shortcutCaptureMessage = ""
@@ -586,6 +587,7 @@ final class AppModel {
         var skipped = 0
         var lastError = ""
         pendingAINovelTags = [:]
+        pendingAIBeforeKeys = [:]
 
         for (index, footage) in items.enumerated() {
             publishProgress(
@@ -634,7 +636,8 @@ final class AppModel {
                     routes: routes,
                     frames: frames,
                     catalog: catalogPayload,
-                    context: context
+                    context: context,
+                    examples: preference.ai.examples
                 )
                 let warehouseCustoms = warehouse.footage.flatMap(\.tags).filter(\.isCustom).map(\.value)
                 let pathTags = PathTagMatcher.assignments(
@@ -658,6 +661,9 @@ final class AppModel {
                     return TagAssignment.sourceRank(tag.source) < TagAssignment.sourceRank(current.source)
                 }
                 if !novel.isEmpty, let db = databases[footage.warehouseID] {
+                    if pendingAIBeforeKeys[footage.id] == nil {
+                        pendingAIBeforeKeys[footage.id] = Set(footage.tags.map(\.identityKey))
+                    }
                     try db.addTags(novel, to: [footage.id])
                     pendingAINovelTags[footage.id, default: []].append(contentsOf: novel)
                 }
@@ -680,12 +686,15 @@ final class AppModel {
             pendingAIConfirmation = true
         } else {
             pendingAINovelTags = [:]
+            pendingAIBeforeKeys = [:]
         }
     }
 
     func confirmAITagging() {
+        recordAITaggingExamples()
         pendingAIConfirmation = false
         pendingAINovelTags = [:]
+        pendingAIBeforeKeys = [:]
         statusMessage = ""
     }
 
@@ -694,6 +703,7 @@ final class AppModel {
         let novel = pendingAINovelTags
         pendingAIConfirmation = false
         pendingAINovelTags = [:]
+        pendingAIBeforeKeys = [:]
         for (id, tags) in novel where !tags.isEmpty {
             guard let db = database(forFootage: id) else { continue }
             try? db.removeTags(tags, from: [id])
@@ -719,11 +729,27 @@ final class AppModel {
         return String(format: String(localized: "ai.doneSkipped"), locale: .current, tagged, skipped, failed)
     }
 
+    private func recordAITaggingExamples() {
+        var fresh: [AITaggingExample] = []
+        for (id, proposed) in pendingAINovelTags {
+            guard let footage = footage(id: id) else { continue }
+            let before = pendingAIBeforeKeys[id] ?? []
+            let kept = footage.tags.filter { !before.contains($0.identityKey) }
+            if let example = AITaggingExample.make(ai: proposed, kept: kept) {
+                fresh.append(example)
+            }
+        }
+        guard !fresh.isEmpty else { return }
+        preference.ai.examples = AITaggingExample.recording(preference.ai.examples, inserting: fresh)
+        persistPreference()
+    }
+
     private func suggestWithFallback(
         routes: [AITaggingRoute],
         frames: [Data],
         catalog: [String: Any],
-        context: [String: Any]
+        context: [String: Any],
+        examples: [AITaggingExample]
     ) async throws -> [String: Any] {
         var lastError: Error = SidecarError.unavailable
         for route in routes {
@@ -734,7 +760,8 @@ final class AppModel {
                     model: route.model,
                     frames: frames,
                     catalog: catalog,
-                    context: context
+                    context: context,
+                    examples: examples
                 )
             } catch {
                 lastError = error

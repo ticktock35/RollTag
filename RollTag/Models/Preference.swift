@@ -136,25 +136,29 @@ struct AIPreference: Codable, Equatable {
     var selectedProvider: AIProvider?
     var providers: [AIProvider: AIProviderSettings]
     var skipImplausibleCaptureDates: Bool
+    var examples: [AITaggingExample]
 
     enum CodingKeys: String, CodingKey {
         case selectedProvider
         case providers
         case skipImplausibleCaptureDates
+        case examples
     }
 
     static var empty: AIPreference {
-        AIPreference(selectedProvider: nil, providers: [:], skipImplausibleCaptureDates: true)
+        AIPreference(selectedProvider: nil, providers: [:], skipImplausibleCaptureDates: true, examples: [])
     }
 
     init(
         selectedProvider: AIProvider?,
         providers: [AIProvider: AIProviderSettings],
-        skipImplausibleCaptureDates: Bool = true
+        skipImplausibleCaptureDates: Bool = true,
+        examples: [AITaggingExample] = []
     ) {
         self.selectedProvider = selectedProvider
         self.providers = providers
         self.skipImplausibleCaptureDates = skipImplausibleCaptureDates
+        self.examples = examples
     }
 
     init(from decoder: Decoder) throws {
@@ -162,6 +166,7 @@ struct AIPreference: Codable, Equatable {
         selectedProvider = try container.decodeIfPresent(AIProvider.self, forKey: .selectedProvider)
         providers = try container.decodeIfPresent([AIProvider: AIProviderSettings].self, forKey: .providers) ?? [:]
         skipImplausibleCaptureDates = try container.decodeIfPresent(Bool.self, forKey: .skipImplausibleCaptureDates) ?? true
+        examples = try container.decodeIfPresent([AITaggingExample].self, forKey: .examples) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -169,6 +174,9 @@ struct AIPreference: Codable, Equatable {
         try container.encodeIfPresent(selectedProvider, forKey: .selectedProvider)
         try container.encode(providers, forKey: .providers)
         try container.encode(skipImplausibleCaptureDates, forKey: .skipImplausibleCaptureDates)
+        if !examples.isEmpty {
+            try container.encode(examples, forKey: .examples)
+        }
     }
 
     func settings(for provider: AIProvider) -> AIProviderSettings {

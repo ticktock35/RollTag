@@ -33,6 +33,22 @@ class SuggestTests(unittest.TestCase):
         prompt = build_prompt({"categories": []})
         self.assertIn("CATALOG:", prompt)
         self.assertNotIn("CONTEXT:", prompt)
+        self.assertNotIn("EXAMPLES:", prompt)
+
+    def test_prompt_includes_examples(self):
+        prompt = build_prompt(
+            {"categories": []},
+            None,
+            [
+                {
+                    "ai": [{"category": "nature", "value": "ocean"}],
+                    "kept": [{"category": "nature", "value": "lake"}],
+                }
+            ],
+        )
+        self.assertIn("EXAMPLES:", prompt)
+        self.assertIn("ocean", prompt)
+        self.assertIn("lake", prompt)
 
     def test_prompt_includes_context_when_present(self):
         prompt = build_prompt(
