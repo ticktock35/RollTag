@@ -4,6 +4,8 @@ struct PreferenceFile: Codable, Equatable {
     var version: Int
     var warehouses: [WarehousePreference]
     var ai: AIPreference
+    var shortcuts: ShortcutPreference
+    var glossary: KeywordGlossary
 
     static let currentVersion = 1
 
@@ -11,16 +13,26 @@ struct PreferenceFile: Codable, Equatable {
         case version
         case warehouses
         case ai
+        case shortcuts
+        case glossary
     }
 
     static var empty: PreferenceFile {
-        PreferenceFile(version: currentVersion, warehouses: [], ai: .empty)
+        PreferenceFile(version: currentVersion, warehouses: [], ai: .empty, shortcuts: .empty, glossary: .empty)
     }
 
-    init(version: Int, warehouses: [WarehousePreference], ai: AIPreference = .empty) {
+    init(
+        version: Int,
+        warehouses: [WarehousePreference],
+        ai: AIPreference = .empty,
+        shortcuts: ShortcutPreference = .empty,
+        glossary: KeywordGlossary = .empty
+    ) {
         self.version = version
         self.warehouses = warehouses
         self.ai = ai
+        self.shortcuts = shortcuts
+        self.glossary = glossary
     }
 
     init(from decoder: Decoder) throws {
@@ -28,6 +40,21 @@ struct PreferenceFile: Codable, Equatable {
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? PreferenceFile.currentVersion
         warehouses = try container.decodeIfPresent([WarehousePreference].self, forKey: .warehouses) ?? []
         ai = try container.decodeIfPresent(AIPreference.self, forKey: .ai) ?? .empty
+        shortcuts = try container.decodeIfPresent(ShortcutPreference.self, forKey: .shortcuts) ?? .empty
+        glossary = try container.decodeIfPresent(KeywordGlossary.self, forKey: .glossary) ?? .empty
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(warehouses, forKey: .warehouses)
+        try container.encode(ai, forKey: .ai)
+        if shortcuts != .empty {
+            try container.encode(shortcuts, forKey: .shortcuts)
+        }
+        if glossary != .empty {
+            try container.encode(glossary, forKey: .glossary)
+        }
     }
 }
 

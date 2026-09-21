@@ -3,19 +3,19 @@ import XCTest
 
 final class CustomTagTests: XCTestCase {
     func testParseSingleCustomName() {
-        XCTAssertEqual(TagAssignment.custom("皓皓")?.value, "皓皓")
-        XCTAssertEqual(TagAssignment.custom("皓皓")?.category, TagAssignment.customCategory)
-        XCTAssertTrue(TagAssignment.custom("皓皓")?.isCustom == true)
+        XCTAssertEqual(TagAssignment.custom("測試")?.value, "測試")
+        XCTAssertEqual(TagAssignment.custom("測試")?.category, TagAssignment.customCategory)
+        XCTAssertTrue(TagAssignment.custom("測試")?.isCustom == true)
     }
 
     func testParseIgnoresWhitespaceAndEmpty() {
         XCTAssertNil(TagAssignment.custom("   "))
-        XCTAssertEqual(TagAssignment.custom("  皓皓  ")?.value, "皓皓")
+        XCTAssertEqual(TagAssignment.custom("  測試  ")?.value, "測試")
     }
 
     func testParseCommaSeparatedCustomTags() {
-        let tags = TagAssignment.customs(from: "皓皓，小美, 阿公")
-        XCTAssertEqual(tags.map(\.value), ["皓皓", "小美", "阿公"])
+        let tags = TagAssignment.customs(from: "測試，小美, 阿公")
+        XCTAssertEqual(tags.map(\.value), ["測試", "小美", "阿公"])
         XCTAssertTrue(tags.allSatisfy(\.isCustom))
     }
 
@@ -42,8 +42,8 @@ final class CustomTagTests: XCTestCase {
             needsReanalysis: false
         )
         try db.insert(snap)
-        try db.addTags([.custom("皓皓")!], to: [snap.id])
-        XCTAssertEqual(try db.allFootage()[0].tags.map(\.value), ["皓皓"])
+        try db.addTags([.custom("測試")!], to: [snap.id])
+        XCTAssertEqual(try db.allFootage()[0].tags.map(\.value), ["測試"])
     }
 
     func testUserAndAISourcesCollapseToOneTag() {

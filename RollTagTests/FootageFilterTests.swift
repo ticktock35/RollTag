@@ -7,6 +7,14 @@ final class FootageFilterTests: XCTestCase {
         TagCategory(id: "nature", names: ["zh-Hant": "自然", "en": "Nature"], tags: [])
     ])
 
+    func testMissingCollectionIncludesMissingEvenWhenOffline() {
+        var gone = clip()
+        gone.status = .missing
+        XCTAssertTrue(FootageFilter.include(footage: gone, isOnline: true, selection: .collection(.missing), isDuplicate: false))
+        XCTAssertTrue(FootageFilter.include(footage: gone, isOnline: false, selection: .collection(.missing), isDuplicate: false))
+        XCTAssertFalse(FootageFilter.include(footage: gone, isOnline: true, selection: .collection(.all), isDuplicate: false))
+    }
+
     func testTaggedCollectionOnlyShowsTaggedAvailableFootage() {
         let tagged = clip(tags: [.user(category: "mood", value: "calm")])
         let bare = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", tags: [])
@@ -17,7 +25,7 @@ final class FootageFilterTests: XCTestCase {
 
     func testExistingTagsAppearUnderTheirCategory() {
         let mood = clip(tags: [.user(category: "mood", value: "calm")])
-        let custom = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", tags: [.custom("皓皓")!])
+        let custom = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", tags: [.custom("測試")!])
         XCTAssertTrue(FootageFilter.include(footage: mood, isOnline: true, selection: .tagCategory("mood"), isDuplicate: false))
         XCTAssertFalse(FootageFilter.include(footage: custom, isOnline: true, selection: .tagCategory("mood"), isDuplicate: false))
         XCTAssertTrue(FootageFilter.include(footage: custom, isOnline: true, selection: .tagCategory(TagAssignment.customCategory), isDuplicate: false))
@@ -26,7 +34,7 @@ final class FootageFilterTests: XCTestCase {
     func testPopulatedCategoriesIncludeUsedPresetAndCustom() {
         let footage = [
             clip(tags: [.user(category: "mood", value: "calm")]),
-            clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", tags: [.custom("皓皓")!])
+            clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", tags: [.custom("測試")!])
         ]
         let categories = FootageFilter.populatedCategories(
             from: footage,
@@ -180,6 +188,82 @@ final class FootageFilterTests: XCTestCase {
         XCTAssertEqual(Set(scoped[0].members.map(\.id)), [johor.id, backup.id])
         let all = DuplicateIndex.resolve(warehouses: [warehouse], scopes: [])
         XCTAssertEqual(Set(all.map(\.group.contentHash)), ["same-a", "same-b"])
+    }
+
+    func testDuplicateIndexCountsOnlyUnresolvedGroups() {
+        let warehouseID = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let keep = clip(relativePath: "keep.mov")
+        let copy = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "copy.mov")
+        let left = clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "left.mov")
+        let right = clip(id: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE", relativePath: "right.mov")
+        let warehouse = WarehouseRuntime(
+            preference: WarehousePreference(id: warehouseID, name: "W", path: "/tmp", bookmark: nil),
+            isOnline: true,
+            isReconciling: false,
+            footage: [keep, copy, left, right],
+            groups: [
+                DuplicateGroup(
+                    id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                    contentHash: "pending",
+                    resolution: .unresolved,
+                    memberIDs: [keep.id, copy.id]
+                ),
+                DuplicateGroup(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                    contentHash: "kept-apart",
+                    resolution: .keepSeparate,
+                    memberIDs: [left.id, right.id]
+                )
+            ]
+        )
+        XCTAssertEqual(DuplicateIndex.resolve(warehouses: [warehouse], scopes: []).count, 1)
+        XCTAssertEqual(DuplicateIndex.resolve(warehouses: [warehouse], scopes: []).first?.group.contentHash, "pending")
+    }
+
+    func testSidebarCollectionCountsFollowTagsMissingOfflineAndFolderScope() {
+        let warehouseID = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let tagged = clip(relativePath: "malaysia/a.mov", tags: [.user(category: "mood", value: "calm")])
+        let untagged = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "malaysia/b.mov")
+        let outside = clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "other/c.mov")
+        var missing = clip(id: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE", relativePath: "malaysia/gone.mov")
+        missing.status = .missing
+        let warehouse = WarehouseRuntime(
+            preference: WarehousePreference(id: warehouseID, name: "W", path: "/tmp", bookmark: nil),
+            isOnline: true,
+            isReconciling: false,
+            footage: [tagged, untagged, outside, missing],
+            groups: []
+        )
+        let all = FootageFilter.collectionCounts(warehouses: [warehouse], scopes: [], duplicateGroups: 7)
+        XCTAssertEqual(all.all, 3)
+        XCTAssertEqual(all.tagged, 1)
+        XCTAssertEqual(all.untagged, 2)
+        XCTAssertEqual(all.missing, 1)
+        XCTAssertEqual(all.duplicates, 7)
+        XCTAssertEqual(all.value(for: .untagged), 2)
+
+        let scoped = FootageFilter.collectionCounts(
+            warehouses: [warehouse],
+            scopes: [FolderRef(warehouseID: warehouseID, relativePath: "malaysia")],
+            duplicateGroups: 1
+        )
+        XCTAssertEqual(scoped.all, 2)
+        XCTAssertEqual(scoped.tagged, 1)
+        XCTAssertEqual(scoped.untagged, 1)
+        XCTAssertEqual(scoped.missing, 1)
+
+        let offline = WarehouseRuntime(
+            preference: WarehousePreference(id: warehouseID, name: "W", path: "/tmp", bookmark: nil),
+            isOnline: false,
+            isReconciling: false,
+            footage: [tagged, missing],
+            groups: []
+        )
+        let off = FootageFilter.collectionCounts(warehouses: [offline], scopes: [], duplicateGroups: 0)
+        XCTAssertEqual(off.all, 0)
+        XCTAssertEqual(off.tagged, 0)
+        XCTAssertEqual(off.untagged, 0)
+        XCTAssertEqual(off.missing, 1)
     }
 
     func testFolderTreeFollowsIndexedDirectoriesAndHidesDotFolders() {

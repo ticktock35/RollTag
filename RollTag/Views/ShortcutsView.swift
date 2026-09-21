@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ShortcutsView: View {
+    @Bindable var model: AppModel
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -10,34 +12,30 @@ struct ShortcutsView: View {
                     Text(String(localized: "shortcuts.intro"))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    Text(String(localized: "settings.shortcuts.menuHint"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 section(String(localized: "shortcuts.section.general"), items: [
                     .init("warehouse.add", "⌘O"),
                     .init("status.rescan", "⌘R"),
                     .init("duplicates.title", "⌘⇧D"),
+                    .init("selection.all", "⌘A"),
+                    .init("ai.tag.selection", "⌥⌘T"),
                     .init("shortcuts.action.settings", "⌘,"),
                     .init("shortcuts.action.openThis", "⌘/"),
                 ])
 
-                section(String(localized: "shortcuts.section.library"), items: [
-                    .init("selection.all", "⌘A"),
-                    .init("ai.tag.selection", "⌥⌘T"),
-                    .init("shortcuts.action.escape", "Esc"),
-                ])
-
-                section(String(localized: "shortcuts.section.playback"), items: [
-                    .init("player.playPause", String(localized: "shortcuts.key.space")),
-                    .init("player.fullscreen", "P"),
-                ])
-
-                section(String(localized: "shortcuts.section.duplicates"), items: [
-                    .init("shortcuts.action.keepLeft", "A"),
-                    .init("shortcuts.action.keepRight", "D"),
-                    .init("shortcuts.action.keepAll", "S"),
-                    .init("shortcuts.action.confirmTrash", String(localized: "shortcuts.key.return")),
-                    .init("shortcuts.action.cancelTrash", "Esc"),
-                ])
+                ForEach(ShortcutContext.allCases) { context in
+                    section(
+                        String(localized: String.LocalizationValue(context.localizationKey)),
+                        items: ShortcutAction.actions(in: context).map { action in
+                            ShortcutItem(action.localizationKey, model.preference.shortcuts.cheatsheetLabel(for: action))
+                        }
+                    )
+                }
             }
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -58,7 +56,7 @@ struct ShortcutsView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 16) {
                         Text(String(localized: String.LocalizationValue(item.actionKey)))
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        KeyCaps(item.keys)
+                        ShortcutKeyCaps(item.keys)
                     }
                     .padding(.vertical, 10)
                 }
@@ -73,7 +71,7 @@ struct ShortcutsView: View {
 }
 
 private struct ShortcutItem: Identifiable {
-    var id: String { actionKey }
+    var id: String { actionKey + keys }
     var actionKey: String
     var keys: String
 
@@ -83,7 +81,7 @@ private struct ShortcutItem: Identifiable {
     }
 }
 
-private struct KeyCaps: View {
+struct ShortcutKeyCaps: View {
     let combo: String
 
     init(_ combo: String) {

@@ -5,10 +5,18 @@ from typing import Optional
 
 PROMPT = """You tag B-roll stills for a footage warehouse.
 Choose 3 to 8 tags that clearly match the frames.
-Use only category and value ids from the catalog JSON. Never invent ids.
-Custom tags (category "custom") may be used only if that named subject is clearly visible.
-If CONTEXT is present, use filename, path, warehouse name, duration, file size, capture time, and GPS as hints for place and time tags. Frames remain primary. Still choose only catalog ids.
-Return JSON: {"tags":[{"category":"...","value":"..."}]}
+Use only category and value ids from the catalog JSON for "tags". Never invent catalog ids.
+Custom tags (category "custom") may be used for a named subject that is clearly visible, including short non-English labels.
+If CONTEXT is present, use filename, path, warehouse name, duration, file size, capture time, and GPS as hints for place and time tags. Frames remain primary.
+
+Also return Getty/Pond5 English keywords in "keywords":
+- lowercase, words separated by single spaces, no hashtags, no camelCase, no sentences
+- 6 to 20 phrases, 1 to 5 words each
+- include English for every non-English subject you name (icebreaker, not pinyin)
+- use the catalog "en" names when they match what you see
+- visible nouns, place, weather, people, shot; suitable for stock-footage search
+
+Return JSON: {"tags":[{"category":"...","value":"..."}],"keywords":["icebreaker","arctic ocean"]}
 
 CATALOG:
 """
@@ -22,24 +30,9 @@ def build_prompt(catalog: dict, context: Optional[dict] = None) -> str:
 
 
 def parse_tags(text: str) -> list:
-    if not text:
+    data = _parse_json(text)
+    if data is None:
         return []
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        if cleaned.lower().startswith("json"):
-            cleaned = cleaned[4:].strip()
-    try:
-        data = json.loads(cleaned)
-    except json.JSONDecodeError:
-        start = cleaned.find("{")
-        end = cleaned.rfind("}")
-        if start < 0 or end <= start:
-            return []
-        try:
-            data = json.loads(cleaned[start : end + 1])
-        except json.JSONDecodeError:
-            return []
     items = data.get("tags") if isinstance(data, dict) else data
     if not isinstance(items, list):
         return []
@@ -56,6 +49,67 @@ def parse_tags(text: str) -> list:
         seen.add(key)
         tags.append({"category": category, "value": value})
     return tags
+
+
+def parse_keywords(text: str) -> list:
+    data = _parse_json(text)
+    if not isinstance(data, dict):
+        return []
+    items = data.get("keywords")
+    if not isinstance(items, list):
+        return []
+    keywords = []
+    seen = set()
+    for item in items:
+        if isinstance(item, str):
+            raw = item
+        elif isinstance(item, dict):
+            raw = str(item.get("value") or item.get("keyword") or "")
+        else:
+            continue
+        formatted = _stock_keyword(raw)
+        if not formatted or formatted in seen or not _is_getty_keyword(formatted):
+            continue
+        seen.add(formatted)
+        keywords.append(formatted)
+        if len(keywords) >= 20:
+            break
+    return keywords
+
+
+def _parse_json(text: str):
+    if not text:
+        return None
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            return json.loads(cleaned[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+
+
+def _stock_keyword(raw: str) -> str:
+    trimmed = raw.replace("#", "").strip().lower()
+    return " ".join(trimmed.split())
+
+
+def _is_getty_keyword(text: str) -> bool:
+    if not text or len(text) < 3 or len(text) > 40:
+        return False
+    words = text.split(" ")
+    if not 1 <= len(words) <= 5:
+        return False
+    return all(part.isascii() and part.replace("-", "").isalnum() for part in words)
 
 
 def suggest_tags(
@@ -77,7 +131,7 @@ def suggest_tags(
         text = _openai(api_key, model or "gpt-4.1-mini", prompt, frames)
     else:
         raise ValueError("unsupported_provider")
-    return {"tags": parse_tags(text), "provider": provider, "model": model}
+    return {"tags": parse_tags(text), "keywords": parse_keywords(text), "provider": provider, "model": model}
 
 
 def _gemini(api_key: str, model: str, prompt: str, frames: list) -> str:

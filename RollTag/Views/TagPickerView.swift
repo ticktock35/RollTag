@@ -22,11 +22,7 @@ struct TagPickerView: View {
                 if !model.knownCustomTags.isEmpty {
                     customSuggestions
                 }
-                categoryRow
-                if let expanded = model.expandedTagCategory,
-                   let category = model.catalog.categories.first(where: { $0.id == expanded }) {
-                    detailRow(category)
-                }
+                presetCategories
             }
         }
     }
@@ -90,6 +86,24 @@ struct TagPickerView: View {
     private func submitCustom() {
         if model.addCustomTags(from: customText) {
             customText = ""
+        }
+    }
+
+    private var presetCategories: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !model.knownCustomTags.isEmpty {
+                Divider()
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
+            }
+            Text(String(localized: "tags.presetCategories"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            categoryRow
+            if let expanded = model.expandedTagCategory,
+               let category = model.catalog.categories.first(where: { $0.id == expanded }) {
+                detailRow(category)
+            }
         }
     }
 

@@ -5,8 +5,15 @@ struct DuplicatesView: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        DuplicatesWorkspace(model: model)
-            .frame(minWidth: 900, minHeight: 600)
+        ZStack {
+            DuplicatesWorkspace(model: model)
+                .frame(minWidth: 900, minHeight: 600)
+            if model.playback.isFullscreen {
+                FullscreenPlayerView(model: model)
+                    .ignoresSafeArea()
+                    .zIndex(20)
+            }
+        }
     }
 }
 
@@ -105,7 +112,7 @@ struct DuplicatesWorkspace: View {
                 Text(String(localized: "duplicates.compare"))
                     .font(.headline)
                 Spacer()
-                Text(String(localized: "duplicates.shortcuts"))
+                Text(model.preference.shortcuts.duplicatesHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -214,17 +221,7 @@ struct DuplicatesWorkspace: View {
     }
 
     private func keepAllGroups() {
-        for item in groups {
-            if let first = item.members.first {
-                model.resolveDuplicates(
-                    group: item.group,
-                    warehouseID: item.warehouseID,
-                    keeperID: first.id,
-                    unionTags: false,
-                    keepSeparate: true
-                )
-            }
-        }
+        model.keepAllDuplicateGroups(groups)
     }
 
     private func selectFirstGroupIfNeeded() {
@@ -258,7 +255,7 @@ private struct DuplicateCompareCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             preview
-                .frame(width: 280, height: 158)
+                .frame(width: previewSize.width, height: previewSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             Text(footage.filename)
                 .font(.headline)
@@ -280,7 +277,7 @@ private struct DuplicateCompareCard: View {
             }
         }
         .padding(12)
-        .frame(width: 304, alignment: .leading)
+        .frame(width: previewSize.width + 24, alignment: .leading)
         .background(
             Color(nsColor: .windowBackgroundColor),
             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -326,9 +323,21 @@ private struct DuplicateCompareCard: View {
         }
     }
 
+    private var previewSize: CGSize {
+        let aspect: CGFloat
+        if let thumbnail, thumbnail.size.width > 0, thumbnail.size.height > 0 {
+            aspect = PreviewLayout.aspect(size: thumbnail.size)
+        } else if footage.mediaKind != .audio, let width = footage.width, let height = footage.height {
+            aspect = PreviewLayout.aspect(width: width, height: height)
+        } else {
+            aspect = PreviewLayout.videoFallback
+        }
+        return PreviewLayout.fit(aspect: aspect, maxWidth: 280, maxHeight: 400)
+    }
+
     @ViewBuilder
     private var preview: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack {
             Color.black
             if playerArmed, footage.mediaKind.canHoverPlay, warehouse.isOnline {
                 IndependentPlayerView(
@@ -353,6 +362,8 @@ private struct DuplicateCompareCard: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
 
+        }
+        .overlay(alignment: .bottomLeading) {
             if footage.mediaKind.canHoverPlay, warehouse.isOnline {
                 Button {
                     playerArmed = true

@@ -64,6 +64,12 @@ final class PreviewPlayback {
         replaceCurrentItem(url: next.url)
     }
 
+    func play() {
+        guard canPlay, !isPlaying else { return }
+        player.play()
+        isPlaying = true
+    }
+
     func togglePlayPause() {
         guard canPlay else { return }
         if isPlaying {

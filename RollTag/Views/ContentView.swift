@@ -46,6 +46,31 @@ struct ContentView: View {
         .overlay(alignment: .bottom) {
             ScanStatusOverlay(model: model)
         }
+        .confirmationDialog(
+            String(localized: "missing.deleteTitle"),
+            isPresented: Binding(
+                get: { model.pendingMissingDeleteIDs != nil },
+                set: { if !$0 { model.cancelMissingDelete() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "missing.deleteConfirmAction"), role: .destructive) {
+                model.confirmDeleteMissing()
+            }
+            Button(String(localized: "duplicates.cancel"), role: .cancel) {
+                model.cancelMissingDelete()
+            }
+        } message: {
+            if let ids = model.pendingMissingDeleteIDs {
+                Text(
+                    String(
+                        format: String(localized: ids.count == model.visibleMissingIDs.count && ids.count > 1 ? "missing.deleteAllConfirm" : "missing.deleteConfirm"),
+                        locale: .current,
+                        ids.count
+                    )
+                )
+            }
+        }
     }
 
     private var rightColumn: some View {
@@ -143,6 +168,12 @@ struct ContentView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .help(String(localized: "sort.title"))
+            if model.sidebarSelection == .collection(.missing), !model.visibleMissingIDs.isEmpty {
+                Button(String(localized: "missing.deleteAll"), role: .destructive) {
+                    model.proposeDeleteAllVisibleMissing()
+                }
+                .fixedSize()
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

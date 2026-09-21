@@ -56,6 +56,15 @@ struct ReconcileOutcome: Equatable {
     var records: [FootageSnapshot]
     var hashedPaths: [String]
     var duplicateHashes: [String]
+
+    func omitting(ids: Set<UUID>) -> ReconcileOutcome {
+        guard !ids.isEmpty else { return self }
+        return ReconcileOutcome(
+            records: records.filter { !ids.contains($0.id) },
+            hashedPaths: hashedPaths,
+            duplicateHashes: duplicateHashes
+        )
+    }
 }
 
 enum PreviewLayout {
@@ -72,6 +81,15 @@ enum PreviewLayout {
         let width = Int(size.width.rounded())
         let height = Int(size.height.rounded())
         return aspect(width: width, height: height, fallback: fallback)
+    }
+
+    static func fit(aspect: CGFloat, maxWidth: CGFloat, maxHeight: CGFloat) -> CGSize {
+        let clamped = min(max(aspect, tallest), widest)
+        let height = maxWidth / clamped
+        if height <= maxHeight {
+            return CGSize(width: maxWidth, height: height)
+        }
+        return CGSize(width: maxHeight * clamped, height: maxHeight)
     }
 }
 

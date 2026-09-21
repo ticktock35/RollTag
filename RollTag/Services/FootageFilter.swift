@@ -98,6 +98,50 @@ enum FootageFilter {
         }
         return result
     }
+
+    /// Sidebar badges: file counts for All / Tagged / Untagged / Missing; `duplicateGroups` is unresolved groups.
+    static func collectionCounts(
+        warehouses: [WarehouseRuntime],
+        scopes: Set<FolderRef>,
+        duplicateGroups: Int
+    ) -> SmartCollectionCounts {
+        var counts = SmartCollectionCounts(duplicates: duplicateGroups)
+        for warehouse in warehouses {
+            for footage in warehouse.footage {
+                guard matchesScopes(footage: footage, scopes: scopes) else { continue }
+                if footage.status == .missing {
+                    counts.missing += 1
+                    continue
+                }
+                guard warehouse.isOnline, footage.status == .available else { continue }
+                counts.all += 1
+                if footage.tags.isEmpty {
+                    counts.untagged += 1
+                } else {
+                    counts.tagged += 1
+                }
+            }
+        }
+        return counts
+    }
+}
+
+struct SmartCollectionCounts: Equatable {
+    var all = 0
+    var tagged = 0
+    var untagged = 0
+    var missing = 0
+    var duplicates = 0
+
+    func value(for collection: SmartCollection) -> Int {
+        switch collection {
+        case .all: return all
+        case .tagged: return tagged
+        case .untagged: return untagged
+        case .missing: return missing
+        case .duplicates: return duplicates
+        }
+    }
 }
 
 struct BrowsableTagCategory: Identifiable, Hashable {

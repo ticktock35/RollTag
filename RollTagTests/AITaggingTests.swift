@@ -144,16 +144,56 @@ final class AITaggingTests: XCTestCase {
                 ["category": "nature", "value": "ocean"],
                 ["category": "nature", "value": "ocean"],
                 ["category": "nature", "value": "volcano"],
-                ["category": "custom", "value": "皓皓"],
+                ["category": "custom", "value": "測試"],
                 ["category": "custom", "value": "invented"],
             ],
             catalog: catalog,
-            customValues: ["皓皓"]
+            customValues: ["測試"]
         )
         XCTAssertEqual(tags, [
             .ai(category: "nature", value: "ocean"),
-            .ai(category: "custom", value: "皓皓"),
+            .ai(category: "custom", value: "測試"),
         ])
+    }
+
+    func testAssignmentsKeepGettyKeywordsAndVisibleChinese() {
+        let catalog = TagCatalog(categories: [
+            TagCategory(
+                id: "nature",
+                names: ["en": "Nature"],
+                tags: [TagDefinition(id: "ocean", names: ["en": "Ocean", "zh-Hant": "海"])]
+            ),
+        ])
+        let payload: [String: Any] = [
+            "tags": [
+                ["category": "nature", "value": "ocean"],
+                ["category": "custom", "value": "破冰船"],
+                ["category": "custom", "value": "invented"],
+            ],
+            "keywords": ["Icebreaker", "arctic ocean", "!!", "ab"],
+        ]
+        let tags = AITagSuggester.assignments(from: payload, catalog: catalog, customValues: [])
+        XCTAssertTrue(tags.contains { $0.category == "nature" && $0.value == "ocean" })
+        XCTAssertTrue(tags.contains { $0.isCustom && $0.value == "破冰船" })
+        XCTAssertTrue(tags.contains { $0.isCustom && $0.value == "icebreaker" })
+        XCTAssertTrue(tags.contains { $0.isCustom && $0.value == "arctic ocean" })
+        XCTAssertFalse(tags.contains { $0.value == "invented" })
+    }
+
+    func testCatalogPayloadIncludesEnglishNames() {
+        let catalog = TagCatalog(categories: [
+            TagCategory(
+                id: "nature",
+                names: ["zh-Hant": "自然", "en": "Nature"],
+                tags: [TagDefinition(id: "ocean", names: ["zh-Hant": "海", "en": "Ocean"])]
+            ),
+        ])
+        let payload = AITagSuggester.catalogPayload(catalog: catalog, locale: "zh-Hant", customValues: [])
+        let categories = payload["categories"] as? [[String: Any]]
+        let tags = categories?.first?["tags"] as? [[String: Any]]
+        XCTAssertEqual(tags?.first?["id"] as? String, "ocean")
+        XCTAssertEqual(tags?.first?["name"] as? String, "海")
+        XCTAssertEqual(tags?.first?["en"] as? String, "Ocean")
     }
 
     func testPreviewUsesParallelQuickLookPath() {
@@ -166,6 +206,12 @@ final class AITaggingTests: XCTestCase {
         XCTAssertEqual(PreviewLayout.aspect(width: 8000, height: 800), PreviewLayout.widest, accuracy: 0.001)
         XCTAssertEqual(PreviewLayout.aspect(width: 800, height: 4000), PreviewLayout.tallest, accuracy: 0.001)
         XCTAssertEqual(PreviewLayout.aspect(width: nil, height: 100), PreviewLayout.videoFallback, accuracy: 0.001)
+        let portrait = PreviewLayout.fit(aspect: 0.75, maxWidth: 280, maxHeight: 400)
+        XCTAssertEqual(portrait.width, 280, accuracy: 0.5)
+        XCTAssertEqual(portrait.height, 280 / 0.75, accuracy: 0.5)
+        let tall = PreviewLayout.fit(aspect: PreviewLayout.tallest, maxWidth: 280, maxHeight: 400)
+        XCTAssertEqual(tall.height, 400, accuracy: 0.5)
+        XCTAssertEqual(tall.width, 400 * PreviewLayout.tallest, accuracy: 0.5)
     }
 
     func testEnsureImageThumbnailWritesFileBeforeSecondUse() async throws {

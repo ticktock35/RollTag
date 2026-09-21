@@ -3,16 +3,27 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var model: AppModel
+    @State private var glossaryNative = ""
+    @State private var glossaryEnglish = ""
 
     var body: some View {
         TabView {
             warehousePane
                 .tabItem { Label(String(localized: "settings.warehouses"), systemImage: "externaldrive") }
+            glossaryPane
+                .tabItem { Label(String(localized: "settings.glossary"), systemImage: "arrow.left.arrow.right") }
             aiPane
                 .tabItem { Label(String(localized: "settings.ai"), systemImage: "key") }
+            shortcutsPane
+                .tabItem { Label(String(localized: "settings.shortcuts"), systemImage: "keyboard") }
         }
         .padding(20)
-        .frame(minWidth: 760, minHeight: 480)
+        .frame(minWidth: 760, minHeight: 520)
+        .onAppear { model.settingsKeyboardActive += 1 }
+        .onDisappear {
+            model.settingsKeyboardActive = max(0, model.settingsKeyboardActive - 1)
+            model.cancelCapturingShortcut()
+        }
     }
 
     private var warehousePane: some View {
@@ -63,6 +74,72 @@ struct SettingsView: View {
         }
     }
 
+    private var glossaryPane: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(String(localized: "settings.glossary"))
+                .font(.title2.weight(.semibold))
+            Text(String(localized: "settings.glossary.detail"))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Table(model.preference.glossary.pairs) {
+                TableColumn(String(localized: "settings.glossary.native")) { pair in
+                    TextField(String(localized: "settings.glossary.nativePlaceholder"), text: Binding(
+                        get: { pair.native },
+                        set: { model.updateGlossaryPair(id: pair.id, native: $0, english: pair.english) }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                TableColumn(String(localized: "settings.glossary.english")) { pair in
+                    TextField(String(localized: "settings.glossary.englishPlaceholder"), text: Binding(
+                        get: { pair.english },
+                        set: { model.updateGlossaryPair(id: pair.id, native: pair.native, english: $0) }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                TableColumn(String(localized: "settings.actions")) { pair in
+                    Button(String(localized: "settings.glossary.delete"), role: .destructive) {
+                        model.removeGlossaryPair(id: pair.id)
+                    }
+                }
+            }
+
+            if model.preference.glossary.pairs.isEmpty {
+                Text(String(localized: "settings.glossary.empty"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(alignment: .center, spacing: 8) {
+                TextField(String(localized: "settings.glossary.nativePlaceholder"), text: $glossaryNative)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 220)
+                Image(systemName: "arrow.left.arrow.right")
+                    .foregroundStyle(.secondary)
+                TextField(String(localized: "settings.glossary.englishPlaceholder"), text: $glossaryEnglish)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 220)
+                    .onSubmit(addGlossaryPair)
+                Button(String(localized: "settings.glossary.add")) {
+                    addGlossaryPair()
+                }
+                .disabled(!canAddGlossaryPair)
+                Spacer()
+            }
+        }
+    }
+
+    private var canAddGlossaryPair: Bool {
+        !glossaryNative.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !glossaryEnglish.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func addGlossaryPair() {
+        guard model.addGlossaryPair(native: glossaryNative, english: glossaryEnglish) else { return }
+        glossaryNative = ""
+        glossaryEnglish = ""
+    }
+
     private var aiPane: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(String(localized: "settings.ai"))
@@ -106,6 +183,103 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var shortcutsPane: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(localized: "settings.shortcuts"))
+                        .font(.title2.weight(.semibold))
+                    Text(String(localized: "settings.shortcuts.detail"))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Button(String(localized: "settings.shortcuts.resetAll")) {
+                    model.resetAllShortcuts()
+                }
+            }
+            Text(String(localized: "settings.shortcuts.menuHint"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !model.shortcutCaptureMessage.isEmpty {
+                Text(model.shortcutCaptureMessage)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    ForEach(ShortcutContext.allCases) { context in
+                        shortcutSection(context)
+                    }
+                }
+            }
+        }
+    }
+
+    private func shortcutSection(_ context: ShortcutContext) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(String(localized: String.LocalizationValue(context.localizationKey)))
+                .font(.headline)
+            if context == .library {
+                Text(String(localized: "settings.shortcuts.wasd"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if context == .playback {
+                Text(String(localized: "settings.shortcuts.fullscreenStep"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(ShortcutAction.actions(in: context).enumerated()), id: \.element.id) { index, action in
+                    if index > 0 {
+                        Divider()
+                    }
+                    shortcutRow(action)
+                }
+            }
+            .padding(.horizontal, 12)
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+        }
+    }
+
+    private func shortcutRow(_ action: ShortcutAction) -> some View {
+        HStack(spacing: 16) {
+            Text(String(localized: String.LocalizationValue(action.localizationKey)))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                if model.capturingShortcut == action {
+                    model.cancelCapturingShortcut()
+                } else {
+                    model.beginCapturingShortcut(action)
+                }
+            } label: {
+                if model.capturingShortcut == action {
+                    Text(String(localized: "settings.shortcuts.pressKey"))
+                        .font(.callout.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                } else {
+                    ShortcutKeyCaps(model.preference.shortcuts.displayLabel(for: action))
+                }
+            }
+            .buttonStyle(.plain)
+            .help(String(localized: "settings.shortcuts.recordHelp"))
+            Button(String(localized: "settings.shortcuts.resetOne")) {
+                model.resetShortcut(action)
+            }
+            .buttonStyle(.borderless)
+            .fixedSize()
+        }
+        .padding(.vertical, 8)
     }
 
     private func providerRow(_ provider: AIProvider) -> some View {

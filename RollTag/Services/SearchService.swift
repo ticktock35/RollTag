@@ -16,11 +16,32 @@ enum SearchService {
             .filter { !$0.isEmpty }
     }
 
-    static func score(footage: Footage, tokens: [String], catalog: TagCatalog, locale: String) -> Double {
+    static func expandSearchTokens(
+        _ tokens: [String],
+        catalog: TagCatalog,
+        glossary: KeywordGlossary = .empty
+    ) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        func append(_ raw: String) {
+            let token = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !token.isEmpty, seen.insert(token).inserted else { return }
+            result.append(token)
+        }
+        for token in tokens {
+            append(token)
+            for alias in StockKeywordExpander.searchAliases(for: token, catalog: catalog, glossary: glossary) {
+                append(alias)
+            }
+        }
+        return result
+    }
+
+    static func score(footage: Footage, tokens: [String], catalog: TagCatalog, locale _: String) -> Double {
         guard !tokens.isEmpty else { return 1 }
         var total = 0.0
         for token in tokens {
-            total += tokenScore(footage: footage, token: token, catalog: catalog, locale: locale)
+            total += tokenScore(footage: footage, token: token, catalog: catalog)
         }
         return total
     }
@@ -29,13 +50,14 @@ enum SearchService {
         query: String,
         items: [(Footage, Context)],
         catalog: TagCatalog,
-        locale: String = TagCatalogLoader.localeID()
+        locale: String = TagCatalogLoader.localeID(),
+        glossary: KeywordGlossary = .empty
     ) -> [ScoredFootage] {
-        let tokens = tokenize(query)
+        let tokens = expandSearchTokens(tokenize(query), catalog: catalog, glossary: glossary)
         var scored: [ScoredFootage] = []
 
         for (footage, context) in items {
-            guard context.isOnline, footage.status == .available else { continue }
+            if footage.status == .available, !context.isOnline { continue }
             let value = tokens.isEmpty ? 1.0 : score(footage: footage, tokens: tokens, catalog: catalog, locale: locale)
             if !tokens.isEmpty, value <= 0 { continue }
             scored.append(
@@ -126,7 +148,7 @@ enum SearchService {
         }
     }
 
-    private static func tokenScore(footage: Footage, token: String, catalog: TagCatalog, locale: String) -> Double {
+    private static func tokenScore(footage: Footage, token: String, catalog: TagCatalog) -> Double {
         var best = 0.0
 
         for tag in footage.tags {
@@ -134,14 +156,26 @@ enum SearchService {
             if tagValue == token { best = max(best, 100) }
             if tag.isCustom, tagValue.contains(token) { best = max(best, 90) }
             if let category = catalog.categories.first(where: { $0.id == tag.category }) {
-                let categoryName = category.localizedName(locale: locale).lowercased()
-                if categoryName == token || tag.category.lowercased() == token {
+                if tag.category.lowercased() == token {
+                    best = max(best, 40)
+                }
+                for name in category.names.values where name.lowercased() == token {
                     best = max(best, 40)
                 }
                 if let definition = category.tags.first(where: { $0.id == tag.value }) {
-                    let localized = definition.localizedName(locale: locale).lowercased()
-                    if localized == token { best = max(best, 100) }
-                    if localized.contains(token) { best = max(best, 70) }
+                    if definition.id.lowercased() == token { best = max(best, 100) }
+                    for name in definition.names.values {
+                        let localized = name.lowercased()
+                        if localized == token { best = max(best, 100) }
+                        if localized.contains(token) { best = max(best, 70) }
+                    }
+                    if let english = StockKeywordExpander.englishStockKeyword(
+                        category: category.id,
+                        value: tag.value,
+                        catalog: catalog
+                    ), english == token {
+                        best = max(best, 100)
+                    }
                 }
             }
         }

@@ -112,7 +112,7 @@ struct Footage: Identifiable, Hashable {
     }
 
     var canAITag: Bool {
-        (mediaKind == .video || mediaKind == .image) && !isTooSmallToPreview
+        status == .available && (mediaKind == .video || mediaKind == .image) && !isTooSmallToPreview
     }
 
     var captureMetadata: MediaMetadataSnapshot {

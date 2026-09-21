@@ -62,6 +62,32 @@ final class PreferenceTests: XCTestCase {
         XCTAssertEqual(migrated.ai, .empty)
     }
 
+    func testGlossaryRoundTripAndLegacyConfigStaysEmpty() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
+        let store = PreferenceStore(homeDirectory: home)
+        var file = PreferenceFile.empty
+        file.glossary = file.glossary.adding(native: "暱稱", english: "Nickname")!
+        file.glossary = file.glossary.adding(native: "品牌", english: "BrandName")!
+        try store.save(file)
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.glossary.pairs.map(\.native), ["暱稱", "品牌"])
+        XCTAssertEqual(loaded.glossary.pairs.map(\.english), ["Nickname", "BrandName"])
+        XCTAssertEqual(loaded.glossary.counterparts(for: "暱稱"), ["nickname"])
+        XCTAssertEqual(loaded.glossary.counterparts(for: "Nickname"), ["暱稱"])
+        file.glossary = loaded.glossary.adding(native: "暱稱", english: "Nickname Two")!
+        XCTAssertEqual(file.glossary.pairs.count, 2)
+        XCTAssertEqual(file.glossary.counterparts(for: "暱稱"), ["nickname two"])
+        XCTAssertEqual(file.glossary.counterparts(for: "品牌"), ["brandname"])
+
+        let legacy = """
+        {"version":1,"warehouses":[]}
+        """
+        try Data(legacy.utf8).write(to: store.configURL)
+        let migrated = try store.load()
+        XCTAssertEqual(migrated.glossary, .empty)
+    }
+
     func testDuplicatePathIsNotAddedTwice() {
         let store = PreferenceStore(homeDirectory: FileManager.default.temporaryDirectory)
         var file = store.addWarehouse(named: "A", path: "/tmp/wh", to: .empty)

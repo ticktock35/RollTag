@@ -23,7 +23,31 @@ struct PlayerPaneView: View {
 
     @ViewBuilder
     private var mediaContent: some View {
-        if let media = model.playback.media {
+        if model.focusedFootage?.status == .missing {
+            VStack(spacing: 10) {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: fillsScreen ? 48 : 28))
+                    .foregroundStyle(.white.opacity(0.7))
+                Text(model.focusedFootage?.filename ?? "")
+                    .font(fillsScreen ? .title2 : .callout)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                Text(String(localized: "player.missing"))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .font(fillsScreen ? .title3 : .callout)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                if let path = model.focusedFootage?.relativePath, !path.isEmpty {
+                    Text(path)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                        .textSelection(.enabled)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+            }
+        } else if let media = model.playback.media {
             switch media.kind {
             case .video:
                 ZStack {
@@ -90,7 +114,11 @@ struct PlayerPaneView: View {
     private var chrome: some View {
         VStack {
             Spacer()
-            PlaybackControls(playback: model.playback, compact: true)
+            PlaybackControls(
+                playback: model.playback,
+                compact: true,
+                shortcutHint: model.preference.shortcuts.playbackHint
+            )
         }
         .allowsHitTesting(true)
     }
@@ -99,6 +127,7 @@ struct PlayerPaneView: View {
 private struct PlaybackControls: View {
     var playback: PreviewPlayback
     var compact: Bool
+    var shortcutHint: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 6 : 10) {
@@ -127,7 +156,7 @@ private struct PlaybackControls: View {
                 Spacer()
                 if playback.media != nil {
                     if !compact {
-                        Text(String(localized: "player.shortcuts"))
+                        Text(shortcutHint)
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.7))
                     }
@@ -186,7 +215,11 @@ struct FullscreenPlayerView: View {
     var body: some View {
         PlayerPaneView(model: model, fillsScreen: true)
             .overlay(alignment: .bottom) {
-                PlaybackControls(playback: model.playback, compact: false)
+                PlaybackControls(
+                    playback: model.playback,
+                    compact: false,
+                    shortcutHint: model.preference.shortcuts.playbackHint
+                )
                     .padding(16)
             }
     }

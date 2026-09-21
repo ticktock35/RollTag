@@ -10,6 +10,7 @@ enum AITagSuggester {
                     [
                         "id": tag.id,
                         "name": tag.localizedName(locale: locale),
+                        "en": tag.localizedName(locale: "en"),
                     ]
                 },
             ]
@@ -80,7 +81,8 @@ enum AITagSuggester {
     static func assignments(
         from raw: [[String: String]],
         catalog: TagCatalog,
-        customValues: Set<String>
+        customValues: Set<String>,
+        keywords: [String] = []
     ) -> [TagAssignment] {
         var seen = Set<String>()
         var result: [TagAssignment] = []
@@ -94,6 +96,12 @@ enum AITagSuggester {
             guard seen.insert(key).inserted else { continue }
             result.append(.ai(category: category, value: value))
         }
+        for keyword in keywords {
+            guard let formatted = StockKeywordExpander.gettyKeyword(keyword) else { continue }
+            let key = "\(TagAssignment.customCategory)/\(formatted)"
+            guard seen.insert(key).inserted else { continue }
+            result.append(.ai(category: TagAssignment.customCategory, value: formatted))
+        }
         return result
     }
 
@@ -102,7 +110,12 @@ enum AITagSuggester {
         catalog: TagCatalog,
         customValues: Set<String>
     ) -> [TagAssignment] {
-        assignments(from: suggestedTags(in: payload), catalog: catalog, customValues: customValues)
+        assignments(
+            from: suggestedTags(in: payload),
+            catalog: catalog,
+            customValues: customValues,
+            keywords: suggestedKeywords(in: payload)
+        )
     }
 
     static func suggestedTags(in payload: [String: Any]) -> [[String: String]] {
@@ -115,6 +128,17 @@ enum AITagSuggester {
         }
     }
 
+    static func suggestedKeywords(in payload: [String: Any]) -> [String] {
+        let items = payload["keywords"] as? [Any] ?? []
+        return items.compactMap { item in
+            if let text = stringValue(item) { return text }
+            if let object = item as? [String: Any] {
+                return stringValue(object["value"]) ?? stringValue(object["keyword"])
+            }
+            return nil
+        }
+    }
+
     private static func isAllowed(
         category: String,
         value: String,
@@ -122,7 +146,8 @@ enum AITagSuggester {
         customValues: Set<String>
     ) -> Bool {
         if category == TagAssignment.customCategory {
-            return customValues.contains(value)
+            if customValues.contains(value) { return true }
+            return StockKeywordExpander.isVisibleCustomLabel(value)
         }
         return catalog.categories.contains { group in
             group.id == category && group.tags.contains { $0.id == value }

@@ -21,6 +21,15 @@ final class ReconcileTests: XCTestCase {
         XCTAssertEqual(hashed, ["trip/new.mov"])
     }
 
+    func testOutcomeOmittingDroppedIdsDoesNotResurrectDeletedDuplicates() {
+        let keep = snapshot(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", path: "keep.mov", hash: "dup")
+        let dropped = snapshot(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", path: "copy.mov", hash: "dup")
+        let outcome = ReconcileOutcome(records: [keep, dropped], hashedPaths: [], duplicateHashes: ["dup"])
+        let filtered = outcome.omitting(ids: [dropped.id])
+        XCTAssertEqual(filtered.records.map(\.id), [keep.id])
+        XCTAssertEqual(outcome.omitting(ids: []).records.count, 2)
+    }
+
     func testDeletedFileIsMarkedMissingAndHiddenFromSearchLater() {
         let existing = [snapshot(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", path: "gone.mov", hash: "abc")]
         let outcome = ReconcileService.plan(existing: existing, disk: []) { _ in

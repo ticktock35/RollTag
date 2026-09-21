@@ -63,9 +63,13 @@ final class AppModel {
     }
     private(set) var visibleResults: [ScoredFootage] = []
     private(set) var scopedDuplicateGroups: [ResolvedDuplicateGroup] = []
+    private(set) var sidebarCounts = SmartCollectionCounts()
     var libraryEpoch = 0
     var thumbRefreshToken = 0
     var selectedIDs: Set<UUID> = []
+    var libraryGridFocused = false
+    var gridColumnCount = 1
+    private var selectionAnchorID: UUID?
     var expandedTagCategory: String?
     var statusMessage = ""
     var isBusy = false
@@ -78,6 +82,12 @@ final class AppModel {
     var duplicatesKeyboardActive = 0
     var duplicateSelectedGroupID: UUID?
     var duplicatePendingDelete: DuplicateKeepRequest?
+    var pendingMissingDeleteIDs: Set<UUID>?
+    var pendingAIConfirmation = false
+    private var pendingAINovelTags: [UUID: [TagAssignment]] = [:]
+    var settingsKeyboardActive = 0
+    var capturingShortcut: ShortcutAction?
+    var shortcutCaptureMessage = ""
     let playback = PreviewPlayback()
 
     let catalog: TagCatalog
@@ -91,6 +101,11 @@ final class AppModel {
     private var lastProgressPublish: TimeInterval = 0
     private var keyMonitor: Any?
     private var fullscreenObserver: NSObjectProtocol?
+    private var discardedFootageIDs: Set<UUID> = []
+    private var reconcileRunning = false
+    private var suppressVolumeReconcileUntil = Date.distantPast
+    private var statusHintToken = UUID()
+    private var lastInputSourceHintAt = Date.distantPast
 
     init(store: PreferenceStore = PreferenceStore(), catalog: TagCatalog = TagCatalogLoader.load()) {
         self.store = store
@@ -122,6 +137,7 @@ final class AppModel {
 
     var focusedMedia: PreviewMedia? {
         guard let footage = focusedFootage,
+              footage.status == .available,
               let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }),
               warehouse.isOnline
         else { return nil }
@@ -138,9 +154,17 @@ final class AppModel {
     }
 
     var canBeginTrim: Bool {
-        guard selectedFootage.count == 1, let footage = focusedFootage, footage.mediaKind.canTrim,
-              !footage.isTooSmallToPreview else { return false }
+        guard selectedFootage.count == 1, let footage = focusedFootage, footage.status == .available,
+              footage.mediaKind.canTrim, !footage.isTooSmallToPreview else { return false }
         return warehouses.first(where: { $0.id == footage.warehouseID })?.isOnline == true
+    }
+
+    var selectedMissingFootage: [Footage] {
+        selectedFootage.filter { $0.status == .missing }
+    }
+
+    var visibleMissingIDs: Set<UUID> {
+        Set(visibleResults.compactMap { $0.footage.status == .missing ? $0.id : nil })
     }
 
     func footage(id: UUID) -> Footage? {
@@ -325,8 +349,10 @@ final class AppModel {
         refreshOnlineState()
         volumeMonitor.start { [weak self] in
             Task { @MainActor in
-                self?.refreshOnlineState()
-                await self?.reconcileOnlineWarehouses()
+                guard let self else { return }
+                self.refreshOnlineState()
+                if Date() < self.suppressVolumeReconcileUntil { return }
+                await self.reconcileOnlineWarehouses()
             }
         }
         Task {
@@ -400,6 +426,81 @@ final class AppModel {
         persistPreference()
     }
 
+    func beginCapturingShortcut(_ action: ShortcutAction) {
+        capturingShortcut = action
+        shortcutCaptureMessage = ""
+    }
+
+    func cancelCapturingShortcut() {
+        capturingShortcut = nil
+        shortcutCaptureMessage = ""
+    }
+
+    func resetShortcut(_ action: ShortcutAction) {
+        preference.shortcuts.set(nil, for: action)
+        persistPreference()
+        capturingShortcut = nil
+        shortcutCaptureMessage = ""
+    }
+
+    func resetAllShortcuts() {
+        preference.shortcuts = .empty
+        persistPreference()
+        capturingShortcut = nil
+        shortcutCaptureMessage = ""
+    }
+
+    @discardableResult
+    func addGlossaryPair(native: String, english: String) -> Bool {
+        guard let next = preference.glossary.adding(native: native, english: english) else { return false }
+        preference.glossary = next
+        persistPreference()
+        rebuildVisibleResults()
+        return true
+    }
+
+    func updateGlossaryPair(id: UUID, native: String, english: String) {
+        preference.glossary = preference.glossary.updating(id: id, native: native, english: english)
+        persistPreference()
+        rebuildVisibleResults()
+    }
+
+    func removeGlossaryPair(id: UUID) {
+        preference.glossary = preference.glossary.removing(id: id)
+        persistPreference()
+        rebuildVisibleResults()
+    }
+
+    @discardableResult
+    func applyCapturedShortcut(_ event: NSEvent) -> Bool {
+        guard capturingShortcut != nil else { return false }
+        if Self.isEditingText {
+            cancelCapturingShortcut()
+            return false
+        }
+        if event.keyCode == ShortcutKeys.escape {
+            cancelCapturingShortcut()
+            return true
+        }
+        let modifiers = event.modifierFlags.intersection(ShortcutBinding.significantModifiers)
+        if modifiers.contains(.command) {
+            shortcutCaptureMessage = String(localized: "settings.shortcuts.noCommand")
+            return true
+        }
+        guard let action = capturingShortcut else { return true }
+        let binding = ShortcutBinding(keyCode: event.keyCode, modifiers: modifiers)
+        if let conflict = preference.shortcuts.conflict(assigning: binding, to: action) {
+            let name = String(localized: String.LocalizationValue(conflict.localizationKey))
+            shortcutCaptureMessage = String(format: String(localized: "settings.shortcuts.conflict"), locale: .current, name)
+            return true
+        }
+        preference.shortcuts.set(binding, for: action)
+        persistPreference()
+        capturingShortcut = nil
+        shortcutCaptureMessage = ""
+        return true
+    }
+
     func removeWarehouse(id: UUID) {
         preference = store.removeWarehouse(id: id, from: preference)
         databases[id] = nil
@@ -439,12 +540,13 @@ final class AppModel {
     }
 
     var canTagWithAI: Bool {
-        showsAITagging && !isBusy
+        showsAITagging && !isBusy && !pendingAIConfirmation
     }
 
     func addTags(_ tags: [TagAssignment]) {
+        let expanded = expandTags(tags, includeEnglishKeywords: localeID != "en")
         applyToSelection { db, ids in
-            try db.addTags(tags, to: ids)
+            try db.addTags(expanded, to: ids)
         }
     }
 
@@ -483,6 +585,7 @@ final class AppModel {
         var failed = 0
         var skipped = 0
         var lastError = ""
+        pendingAINovelTags = [:]
 
         for (index, footage) in items.enumerated() {
             publishProgress(
@@ -545,16 +648,18 @@ final class AppModel {
                     customValues: customValues
                 )
                 let incoming = TagAssignment.uniqued(pathTags + aiTags)
+                let expanded = expandTags(incoming, includeEnglishKeywords: true)
                 let existingByKey = Dictionary(
                     footage.tags.map { ($0.identityKey, $0) },
                     uniquingKeysWith: { TagAssignment.sourceRank($0.source) <= TagAssignment.sourceRank($1.source) ? $0 : $1 }
                 )
-                let novel = incoming.filter { tag in
+                let novel = expanded.filter { tag in
                     guard let current = existingByKey[tag.identityKey] else { return true }
                     return TagAssignment.sourceRank(tag.source) < TagAssignment.sourceRank(current.source)
                 }
                 if !novel.isEmpty, let db = databases[footage.warehouseID] {
                     try db.addTags(novel, to: [footage.id])
+                    pendingAINovelTags[footage.id, default: []].append(contentsOf: novel)
                 }
                 tagged += 1
             } catch {
@@ -571,6 +676,33 @@ final class AppModel {
             failed: failed,
             lastError: lastError
         )
+        if tagged > 0 {
+            pendingAIConfirmation = true
+        } else {
+            pendingAINovelTags = [:]
+        }
+    }
+
+    func confirmAITagging() {
+        pendingAIConfirmation = false
+        pendingAINovelTags = [:]
+        statusMessage = ""
+    }
+
+    func cancelAITagging() {
+        guard pendingAIConfirmation else { return }
+        let novel = pendingAINovelTags
+        pendingAIConfirmation = false
+        pendingAINovelTags = [:]
+        for (id, tags) in novel where !tags.isEmpty {
+            guard let db = database(forFootage: id) else { continue }
+            try? db.removeTags(tags, from: [id])
+        }
+        reloadFootage()
+        statusMessage = String(localized: "ai.cancelled")
+        if playback.isFullscreen {
+            playback.exitFullscreen()
+        }
     }
 
     private func aiStatusMessage(total: Int, tagged: Int, skipped: Int, failed: Int, lastError: String) -> String {
@@ -620,9 +752,19 @@ final class AppModel {
     }
 
     func removeTags(_ tags: [TagAssignment]) {
+        let expanded = expandTags(tags, includeEnglishKeywords: true)
         applyToSelection { db, ids in
-            try db.removeTags(tags, from: ids)
+            try db.removeTags(expanded, from: ids)
         }
+    }
+
+    private func expandTags(_ tags: [TagAssignment], includeEnglishKeywords: Bool) -> [TagAssignment] {
+        StockKeywordExpander.expand(
+            tags,
+            catalog: catalog,
+            includeEnglishKeywords: includeEnglishKeywords,
+            glossary: preference.glossary
+        )
     }
 
     func updateNotes(_ notes: String, for id: UUID) {
@@ -645,24 +787,25 @@ final class AppModel {
         do {
             if keepSeparate {
                 try db.setResolution(groupID: group.id, resolution: .keepSeparate)
+                patchWarehouse(warehouseID, groupID: group.id, resolution: .keepSeparate)
             } else {
                 try db.mergeMetadata(keeperID: keeperID, from: others, unionTags: unionTags)
                 if deleteOthers {
+                    suppressVolumeReconcileUntil = Date().addingTimeInterval(5)
+                    discardedFootageIDs.formUnion(others.map(\.id))
                     var failed: [String] = []
+                    var removed = Set<UUID>()
                     for other in others {
                         let url = other.absoluteURL(warehouseRoot: warehouse.preference.url)
                         do {
                             if FileManager.default.fileExists(atPath: url.path) {
                                 try FileManager.default.trashItem(at: url, resultingItemURL: nil)
                             }
-                            let thumb = ThumbnailService.thumbnailFileURL(
-                                warehouseRoot: warehouse.preference.url,
-                                footageID: other.id
-                            )
-                            try? FileManager.default.removeItem(at: thumb)
                             try db.removeFootage(id: other.id)
+                            removed.insert(other.id)
                         } catch {
                             failed.append(other.filename)
+                            discardedFootageIDs.remove(other.id)
                         }
                     }
                     if !failed.isEmpty {
@@ -673,14 +816,64 @@ final class AppModel {
                         )
                     }
                     try db.deleteDuplicateGroup(id: group.id)
+                    patchWarehouse(
+                        warehouseID,
+                        removing: removed,
+                        groupID: group.id,
+                        dropGroup: true
+                    )
                 } else {
                     try db.setResolution(groupID: group.id, resolution: .merged)
+                    patchWarehouse(warehouseID, groupID: group.id, resolution: .merged)
                 }
             }
-            reloadFootage()
         } catch {
             statusMessage = error.localizedDescription
         }
+    }
+
+    func keepAllDuplicateGroups(_ items: [ResolvedDuplicateGroup]) {
+        let grouped = Dictionary(grouping: items, by: \.warehouseID)
+        for (warehouseID, list) in grouped {
+            guard let db = databases[warehouseID] else { continue }
+            for item in list {
+                try? db.setResolution(groupID: item.group.id, resolution: .keepSeparate)
+            }
+            patchWarehouse(warehouseID, groupIDs: Set(list.map(\.id)), resolution: .keepSeparate)
+        }
+    }
+
+    private func patchWarehouse(
+        _ warehouseID: UUID,
+        removing removedIDs: Set<UUID> = [],
+        groupID: UUID? = nil,
+        groupIDs: Set<UUID> = [],
+        resolution: DuplicateResolution? = nil,
+        dropGroup: Bool = false
+    ) {
+        guard let index = warehouses.firstIndex(where: { $0.id == warehouseID }) else { return }
+        let current = warehouses[index]
+        var footage = current.footage
+        var groups = current.groups
+        if !removedIDs.isEmpty {
+            footage.removeAll { removedIDs.contains($0.id) }
+        }
+        if dropGroup, let groupID {
+            groups.removeAll { $0.id == groupID }
+        } else if let resolution {
+            let ids = groupID.map { Set([$0]) } ?? groupIDs
+            for i in groups.indices where ids.contains(groups[i].id) {
+                groups[i].resolution = resolution
+            }
+        }
+        warehouses[index] = WarehouseRuntime(
+            preference: current.preference,
+            isOnline: current.isOnline,
+            isReconciling: current.isReconciling,
+            footage: footage,
+            groups: groups
+        )
+        rebuildVisibleResults()
     }
 
     func trimSelected(start: Double, end: Double) async {
@@ -733,11 +926,15 @@ final class AppModel {
                 selectedIDs.insert(id)
                 focusedFootageID = id
             }
-        } else if modifiers.contains(.shift), let last = focusedFootageID ?? selectedIDs.first {
+            selectionAnchorID = focusedFootageID
+        } else if modifiers.contains(.shift) {
             let ids = visibleResults.map(\.id)
-            guard let from = ids.firstIndex(of: last), let to = ids.firstIndex(of: id) else {
+            let last = selectionAnchorID ?? focusedFootageID ?? selectedIDs.first
+            guard let last, let from = ids.firstIndex(of: last), let to = ids.firstIndex(of: id) else {
                 selectedIDs = [id]
                 focusedFootageID = id
+                selectionAnchorID = id
+                presentFocusedMedia()
                 return
             }
             let range = from <= to ? ids[from...to] : ids[to...from]
@@ -746,20 +943,86 @@ final class AppModel {
         } else {
             selectedIDs = [id]
             focusedFootageID = id
+            selectionAnchorID = id
         }
         presentFocusedMedia()
     }
 
+    func updateGridColumnCount(width: CGFloat) {
+        let columns = GridNavigation.columnCount(width: width)
+        if gridColumnCount != columns {
+            gridColumnCount = columns
+        }
+    }
+
+    func moveLibrarySelection(_ direction: GridNavigation.Direction, extend: Bool) {
+        let ids = visibleResults.map(\.id)
+        guard !ids.isEmpty else { return }
+        let current = focusedFootageID.flatMap { ids.firstIndex(of: $0) }
+            ?? ids.firstIndex(where: { selectedIDs.contains($0) })
+        let nextIndex: Int
+        if let current {
+            guard let moved = GridNavigation.index(
+                moving: direction,
+                from: current,
+                count: ids.count,
+                columns: gridColumnCount
+            ) else { return }
+            nextIndex = moved
+        } else {
+            nextIndex = (direction == .left || direction == .up) ? ids.count - 1 : 0
+        }
+        selectSingle(ids[nextIndex], modifiers: extend ? .shift : [])
+    }
+
+    func stepFullscreenMedia(_ delta: Int) {
+        guard playback.isFullscreen else { return }
+        let ids = fullscreenPlaylistIDs()
+        guard !ids.isEmpty else { return }
+        let current = focusedFootageID.flatMap { ids.firstIndex(of: $0) }
+            ?? ids.firstIndex(where: { selectedIDs.contains($0) })
+        let start = current ?? (delta > 0 ? -1 : ids.count)
+        guard let nextIndex = GridNavigation.firstPresentableIndex(
+            moving: delta,
+            from: start,
+            count: ids.count,
+            isPresentable: { canPresentInPlayer(ids[$0]) }
+        ) else { return }
+        selectSingle(ids[nextIndex], modifiers: [])
+        playback.play()
+    }
+
+    private func fullscreenPlaylistIDs() -> [UUID] {
+        if duplicatesKeyboardActive > 0, let pair = currentDuplicatePair() {
+            return duplicateMembers(pair).map(\.id)
+        }
+        return visibleResults.map(\.id)
+    }
+
+    private func canPresentInPlayer(_ id: UUID) -> Bool {
+        guard let footage = warehouses.flatMap(\.footage).first(where: { $0.id == id }) else { return false }
+        guard footage.status == .available else { return false }
+        guard let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }), warehouse.isOnline else {
+            return false
+        }
+        return true
+    }
+
     func selectAllVisible() {
         selectedIDs = Set(visibleResults.map(\.id))
-        if let focusedFootageID, selectedIDs.contains(focusedFootageID) { return }
+        if let focusedFootageID, selectedIDs.contains(focusedFootageID) {
+            presentFocusedMedia()
+            return
+        }
         focusedFootageID = visibleResults.first?.id
+        selectionAnchorID = focusedFootageID
         presentFocusedMedia()
     }
 
     func clearSelection() {
         selectedIDs = []
         focusedFootageID = nil
+        selectionAnchorID = nil
         playback.present(nil)
     }
 
@@ -771,9 +1034,128 @@ final class AppModel {
         }
     }
 
+    func toggleSelectedFullscreen() {
+        if playback.isFullscreen {
+            playback.toggleFullscreen()
+            return
+        }
+        if focusedFootageID == nil, duplicatesKeyboardActive > 0,
+           let pair = currentDuplicatePair() {
+            let keeper = duplicateMembers(pair).first
+            focusedFootageID = keeper?.id
+            if let id = keeper?.id {
+                selectedIDs = [id]
+            }
+        }
+        presentFocusedMedia()
+        guard playback.media != nil else { return }
+        playback.toggleFullscreen()
+    }
+
+    private func hintSwitchInputSourceIfNeeded(_ event: NSEvent) {
+        guard ShortcutKeys.shouldHintSwitchInputSource(
+            characters: event.characters,
+            keyCode: event.keyCode,
+            boundLetterKeyCodes: preference.shortcuts.letterKeyCodes
+        ) else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastInputSourceHintAt) > 8 else { return }
+        lastInputSourceHintAt = now
+        showTemporaryStatus(String(localized: "status.switchInputSource"))
+    }
+
+    private func showTemporaryStatus(_ message: String, seconds: Double = 4) {
+        statusMessage = message
+        let token = UUID()
+        statusHintToken = token
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(seconds))
+            if statusHintToken == token, statusMessage == message {
+                statusMessage = ""
+            }
+        }
+    }
+
     func revealInFinder(_ footage: Footage) {
+        guard footage.status == .available else {
+            openContainingFolder(footage)
+            return
+        }
         guard let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }), warehouse.isOnline else { return }
         NSWorkspace.shared.activateFileViewerSelecting([footage.absoluteURL(warehouseRoot: warehouse.preference.url)])
+    }
+
+    func openContainingFolder(_ footage: Footage) {
+        guard let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }) else { return }
+        let fileURL = footage.absoluteURL(warehouseRoot: warehouse.preference.url)
+        let folder = fileURL.deletingLastPathComponent()
+        if FileManager.default.fileExists(atPath: folder.path) {
+            NSWorkspace.shared.open(folder)
+            return
+        }
+        if warehouse.isOnline, FileManager.default.fileExists(atPath: warehouse.preference.url.path) {
+            NSWorkspace.shared.open(warehouse.preference.url)
+            return
+        }
+        statusMessage = String(localized: "finder.folderMissing")
+    }
+
+    func proposeDeleteMissing(_ ids: Set<UUID>) {
+        let missing = Set(ids.compactMap { footage(id: $0) }.filter { $0.status == .missing }.map(\.id))
+        guard !missing.isEmpty else { return }
+        pendingMissingDeleteIDs = missing
+    }
+
+    func proposeDeleteAllVisibleMissing() {
+        proposeDeleteMissing(visibleMissingIDs)
+    }
+
+    func cancelMissingDelete() {
+        pendingMissingDeleteIDs = nil
+    }
+
+    func confirmDeleteMissing() {
+        guard let ids = pendingMissingDeleteIDs else { return }
+        pendingMissingDeleteIDs = nil
+        removeMissingRecords(ids)
+    }
+
+    private func removeMissingRecords(_ ids: Set<UUID>) {
+        let items = ids.compactMap { footage(id: $0) }.filter { $0.status == .missing }
+        guard !items.isEmpty else { return }
+        discardedFootageIDs.formUnion(items.map(\.id))
+        let grouped = Dictionary(grouping: items, by: \.warehouseID)
+        var removed = Set<UUID>()
+        var failed = 0
+        for (warehouseID, list) in grouped {
+            guard let db = databases[warehouseID] else {
+                failed += list.count
+                discardedFootageIDs.subtract(list.map(\.id))
+                continue
+            }
+            var gone = Set<UUID>()
+            for item in list {
+                do {
+                    try db.removeFootage(id: item.id)
+                    gone.insert(item.id)
+                } catch {
+                    discardedFootageIDs.remove(item.id)
+                    failed += 1
+                }
+            }
+            if !gone.isEmpty {
+                patchWarehouse(warehouseID, removing: gone)
+                removed.formUnion(gone)
+            }
+        }
+        selectedIDs.subtract(removed)
+        if let focusedFootageID, removed.contains(focusedFootageID) {
+            self.focusedFootageID = selectedIDs.first
+            presentFocusedMedia()
+        }
+        if failed > 0 {
+            statusMessage = String(format: String(localized: "missing.deleteFailed"), locale: .current, failed)
+        }
     }
 
     func persistPreference() {
@@ -785,6 +1167,9 @@ final class AppModel {
     }
 
     func reconcileOnlineWarehouses() async {
+        if reconcileRunning { return }
+        reconcileRunning = true
+        defer { reconcileRunning = false }
         for warehouse in preference.warehouses where store.isOnline(warehouse) {
             await reconcile(warehouseID: warehouse.id)
         }
@@ -846,8 +1231,9 @@ final class AppModel {
                 ),
                 force: true
             )
-            try db.apply(outcome: outcome)
-            try await analyzeIfNeeded(db: db, outcome: outcome, root: root, warehouseName: warehouseName, warehouseID: warehouseID)
+            let applied = outcome.omitting(ids: discardedFootageIDs)
+            try db.apply(outcome: applied)
+            try await analyzeIfNeeded(db: db, outcome: applied, root: root, warehouseName: warehouseName, warehouseID: warehouseID)
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -964,9 +1350,6 @@ final class AppModel {
                     ),
                     force: index == 0 || completed == pending.count
                 )
-                if completed == pending.count || completed % 128 == 0 {
-                    reloadFootage()
-                }
                 submitMore()
             }
         }
@@ -990,7 +1373,9 @@ final class AppModel {
         warehouseName: String,
         warehouseID: UUID
     ) async throws {
-        let pending = outcome.records.filter { $0.status == .available }
+        let pending = outcome.records.filter {
+            $0.status == .available && $0.capturedAt == nil && ($0.capturedAtLocal == nil || $0.capturedAtLocal?.isEmpty == true)
+        }
         guard !pending.isEmpty else { return }
         let skipImplausible = preference.ai.skipImplausibleCaptureDates
         var submitted = 0
@@ -1024,9 +1409,6 @@ final class AppModel {
                     ),
                     force: index == 0 || completed == pending.count
                 )
-                if completed == pending.count || completed % 128 == 0 {
-                    reloadFootage()
-                }
                 submitMore()
             }
         }
@@ -1067,6 +1449,11 @@ final class AppModel {
     private func rebuildVisibleResults() {
         let scopes = FootageFilter.resolvedScopes(selection: sidebarSelection, folderScopes: workFolders)
         scopedDuplicateGroups = DuplicateIndex.resolve(warehouses: warehouses, scopes: scopes)
+        sidebarCounts = FootageFilter.collectionCounts(
+            warehouses: warehouses,
+            scopes: scopes,
+            duplicateGroups: scopedDuplicateGroups.count
+        )
         if case .collection(.duplicates) = sidebarSelection {
             visibleResults = []
             libraryEpoch += 1
@@ -1090,7 +1477,13 @@ final class AppModel {
                 return (footage, context)
             }
         }
-        let ranked = SearchService.rank(query: searchText, items: items, catalog: catalog, locale: localeID)
+        let ranked = SearchService.rank(
+            query: searchText,
+            items: items,
+            catalog: catalog,
+            locale: localeID,
+            glossary: preference.glossary
+        )
         visibleResults = SearchService.ordered(ranked, sort: librarySort, ascending: sortAscending)
         libraryEpoch += 1
     }
@@ -1131,59 +1524,149 @@ final class AppModel {
     }
 
     private func handlePlaybackKey(_ event: NSEvent) -> NSEvent? {
+        if applyCapturedShortcut(event) { return nil }
+        if settingsKeyboardActive > 0 { return event }
         if Self.isEditingText { return event }
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if event.keyCode == 53 {
-            if duplicatesKeyboardActive > 0, !playback.isFullscreen {
+        let shortcuts = preference.shortcuts
+        if handleLibraryArrowKey(event) {
+            return nil
+        }
+        if playback.isFullscreen, duplicatePendingDelete == nil, let delta = shortcuts.fullscreenStepDelta(
+            keyCode: event.keyCode,
+            modifiers: event.modifierFlags
+        ) {
+            hintSwitchInputSourceIfNeeded(event)
+            stepFullscreenMedia(delta)
+            return nil
+        }
+        if shortcuts.matches(event, .clearSelection) || shortcuts.matches(event, .duplicateCancelTrash) {
+            if playback.isFullscreen {
+                playback.exitFullscreen()
+                return nil
+            }
+            if duplicatesKeyboardActive > 0 {
                 if duplicatePendingDelete != nil {
                     cancelDuplicateTrash()
                     return nil
                 }
-                return event
+                if shortcuts.matches(event, .duplicateCancelTrash) {
+                    return event
+                }
             }
-            exitFullscreenOrClearSelection()
+            if pendingAIConfirmation {
+                cancelAITagging()
+                return nil
+            }
+            if shortcuts.matches(event, .clearSelection) {
+                exitFullscreenOrClearSelection()
+                return nil
+            }
+        }
+        if pendingAIConfirmation, shortcuts.matches(event, .confirmAI) {
+            if duplicatesKeyboardActive > 0, duplicatePendingDelete != nil,
+               shortcuts.matches(event, .duplicateConfirmTrash) {
+                confirmDuplicateTrash()
+                return nil
+            }
+            confirmAITagging()
             return nil
         }
-        guard modifiers.isEmpty else { return event }
         if duplicatesKeyboardActive > 0 {
             if duplicatePendingDelete != nil {
-                if event.keyCode == 36 || event.keyCode == 76 {
+                if shortcuts.matches(event, .duplicateConfirmTrash) {
                     confirmDuplicateTrash()
                     return nil
                 }
                 return event
             }
-            switch event.charactersIgnoringModifiers?.lowercased() {
-            case "a":
+            if shortcuts.matches(event, .duplicateKeepLeft) {
+                hintSwitchInputSourceIfNeeded(event)
                 proposeDuplicateKeepLeft()
                 return nil
-            case "d":
+            }
+            if shortcuts.matches(event, .duplicateKeepRight) {
+                hintSwitchInputSourceIfNeeded(event)
                 proposeDuplicateKeepRight()
                 return nil
-            case "s":
+            }
+            if shortcuts.matches(event, .duplicateKeepAll) {
+                hintSwitchInputSourceIfNeeded(event)
                 keepAllCurrentDuplicate()
                 return nil
-            default:
-                return event
             }
+            if shortcuts.matches(event, .fullscreen) {
+                hintSwitchInputSourceIfNeeded(event)
+                toggleSelectedFullscreen()
+                return nil
+            }
+            if shortcuts.matches(event, .playPause) {
+                hintSwitchInputSourceIfNeeded(event)
+                if playback.media == nil { presentFocusedMedia() }
+                guard playback.canPlay else { return event }
+                playback.togglePlayPause()
+                return nil
+            }
+            if ShortcutKeys.looksLikeIMECharacter(event.characters) {
+                hintSwitchInputSourceIfNeeded(event)
+                return nil
+            }
+            return event
         }
-        switch event.charactersIgnoringModifiers {
-        case " ":
+        if shortcuts.matches(event, .playPause) {
+            hintSwitchInputSourceIfNeeded(event)
             guard playback.canPlay else { return event }
             playback.togglePlayPause()
             return nil
-        case "p", "P":
-            guard playback.media != nil || playback.isFullscreen else { return event }
-            playback.toggleFullscreen()
-            return nil
-        default:
-            return event
         }
+        if shortcuts.matches(event, .fullscreen) {
+            hintSwitchInputSourceIfNeeded(event)
+            toggleSelectedFullscreen()
+            return nil
+        }
+        if ShortcutKeys.looksLikeIMECharacter(event.characters) {
+            hintSwitchInputSourceIfNeeded(event)
+        }
+        return event
+    }
+
+    private func handleLibraryArrowKey(_ event: NSEvent) -> Bool {
+        guard libraryGridFocused else { return false }
+        guard duplicatesKeyboardActive == 0 else { return false }
+        guard !playback.isFullscreen else { return false }
+        guard sidebarSelection != .collection(.duplicates) else { return false }
+        guard Self.isLibraryKeyWindow else { return false }
+        guard !Self.isFocusInSidebar() else { return false }
+        guard let direction = preference.shortcuts.libraryGridDirection(
+            keyCode: event.keyCode,
+            modifiers: event.modifierFlags
+        ) else { return false }
+        if ShortcutKeys.isUSLetter(event.keyCode) {
+            hintSwitchInputSourceIfNeeded(event)
+        }
+        moveLibrarySelection(direction, extend: event.modifierFlags.contains(.shift))
+        return true
     }
 
     static var isEditingText: Bool {
         guard let responder = NSApp.keyWindow?.firstResponder else { return false }
         return responder is NSTextView || responder is NSTextField || responder is NSText
+    }
+
+    static var isLibraryKeyWindow: Bool {
+        guard let window = NSApp.keyWindow else { return false }
+        let id = window.identifier?.rawValue ?? ""
+        return id != "duplicates" && id != "shortcuts" && id != "trim"
+    }
+
+    static func isFocusInSidebar(_ window: NSWindow? = NSApp.keyWindow) -> Bool {
+        var responder = window?.firstResponder
+        while let current = responder {
+            if current is NSTableView || current is NSOutlineView {
+                return true
+            }
+            responder = current.nextResponder
+        }
+        return false
     }
 
     private func database(forFootage id: UUID) -> WarehouseDatabase? {

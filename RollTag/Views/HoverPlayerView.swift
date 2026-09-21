@@ -34,7 +34,7 @@ struct HoverPlayerView: NSViewRepresentable {
             super.init(frame: frameRect)
             wantsLayer = true
             playerLayer.player = player
-            playerLayer.videoGravity = .resizeAspectFill
+            playerLayer.videoGravity = .resizeAspect
             layer?.addSublayer(playerLayer)
             player.isMuted = isMuted
         }

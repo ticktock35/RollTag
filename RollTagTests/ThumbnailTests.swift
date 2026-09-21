@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import XCTest
 @testable import RollTag
 
@@ -63,6 +64,50 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appendingPathComponent("\(drop.uuidString).jpg").path))
     }
 
+    func testVideoDisplaySizeAppliesPreferredTransform() {
+        let stored = CGSize(width: 1920, height: 1080)
+        let landscape = ThumbnailService.displaySize(naturalSize: stored, preferredTransform: .identity)
+        XCTAssertEqual(landscape.width, 1920)
+        XCTAssertEqual(landscape.height, 1080)
+        let portrait = ThumbnailService.displaySize(
+            naturalSize: stored,
+            preferredTransform: CGAffineTransform(rotationAngle: .pi / 2)
+        )
+        XCTAssertEqual(portrait.width, 1080)
+        XCTAssertEqual(portrait.height, 1920)
+    }
+
+    func testOrientedPixelSizeSwapsIPhonePortraitDimensions() {
+        let upright = ThumbnailService.displaySize(width: 4032, height: 3024, orientation: 1)
+        XCTAssertEqual(upright.width, 4032)
+        XCTAssertEqual(upright.height, 3024)
+        let rotated = ThumbnailService.displaySize(width: 4032, height: 3024, orientation: 6)
+        XCTAssertEqual(rotated.width, 3024)
+        XCTAssertEqual(rotated.height, 4032)
+    }
+
+    func testStillImageAppliesExifOrientationSoPortraitStaysUpright() throws {
+        let source = try writeJPEG(width: 80, height: 40, orientation: 6)
+        let sized = ThumbnailService.orientedPixelSize(url: source)
+        XCTAssertEqual(sized?.width, 40)
+        XCTAssertEqual(sized?.height, 80)
+        let image = ThumbnailService.stillImage(url: source, maxEdge: 80, preferEmbedded: false)
+        let size = pixelSize(image)
+        XCTAssertGreaterThan(size.height, size.width)
+    }
+
+    func testEnsureReplacesStoredThumbWhenAspectIgnoresOrientation() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-orient-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let source = try writeJPEG(width: 80, height: 40, orientation: 6, in: dir)
+        let dest = dir.appendingPathComponent("thumb.jpg")
+        let wrong = try writeJPEG(width: 80, height: 40, orientation: 1, in: dir)
+        try FileManager.default.copyItem(at: wrong, to: dest)
+        let image = await ThumbnailService.ensureImageThumbnail(source: source, thumbnailURL: dest, maxEdge: 80)
+        let size = pixelSize(image)
+        XCTAssertGreaterThan(size.height, size.width)
+    }
+
     func testPreviewStillDoesNotReplaceGridThumb() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-preview-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -73,6 +118,43 @@ final class ThumbnailTests: XCTestCase {
         _ = await ThumbnailService.previewStill(url: source, maxEdge: 1280)
         let after = try FileManager.default.attributesOfItem(atPath: dest.path)[.size] as? Int
         XCTAssertEqual(before, after)
+    }
+
+    private func writeJPEG(width: Int, height: Int, orientation: Int, in directory: URL? = nil) throws -> URL {
+        let dir = directory ?? FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-jpg-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("src-\(orientation)-\(UUID().uuidString).jpg")
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            throw NSError(domain: "ThumbnailTests", code: 2)
+        }
+        context.setFillColor(CGColor(red: 0.85, green: 0.2, blue: 0.2, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        guard let cg = context.makeImage(),
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil)
+        else {
+            throw NSError(domain: "ThumbnailTests", code: 3)
+        }
+        CGImageDestinationAddImage(
+            destination,
+            cg,
+            [
+                kCGImagePropertyOrientation: orientation,
+                kCGImageDestinationLossyCompressionQuality: 0.92
+            ] as CFDictionary
+        )
+        guard CGImageDestinationFinalize(destination) else {
+            throw NSError(domain: "ThumbnailTests", code: 4)
+        }
+        return url
     }
 
     private func writePNG(width: Int, height: Int, in directory: URL? = nil) throws -> URL {

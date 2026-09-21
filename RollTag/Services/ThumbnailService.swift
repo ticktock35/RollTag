@@ -16,7 +16,6 @@ struct MediaAnalysis {
 enum ThumbnailService {
     static let analyzeConcurrency = 2
     static let previewSize = CGSize(width: 480, height: 270)
-    static let lazyPosterSize = CGSize(width: 320, height: 180)
     static let gridMaxEdge: CGFloat = 320
     static let storedThumbMaxEdge: CGFloat = 480
     static let playerMaxEdge: CGFloat = 1280
@@ -101,18 +100,23 @@ enum ThumbnailService {
             return nil
         }
         let cacheKey = memoryKey(thumbnailURL, maxEdge: maxEdge)
-        if let cached = ThumbnailMemoryCache.shared.image(for: cacheKey) {
+        if let cached = ThumbnailMemoryCache.shared.image(for: cacheKey),
+           thumbnailMatchesSourceAspect(cached, source: source) {
             return cached
         }
-        if let existing = loadThumbnail(at: thumbnailURL, maxEdge: maxEdge) {
+        if let existing = loadThumbnail(at: thumbnailURL, maxEdge: maxEdge),
+           thumbnailMatchesSourceAspect(existing, source: source) {
             ThumbnailMemoryCache.shared.store(existing, for: cacheKey)
             return existing
+        }
+        if FileManager.default.fileExists(atPath: thumbnailURL.path) {
+            removeStoredThumbnail(at: thumbnailURL)
         }
         guard allowCreate else { return nil }
         await ThumbnailDecodeGate.shared.acquire()
         let image = await Task.detached(priority: .utility) { () -> NSImage? in
             let storedEdge = min(max(maxEdge, gridMaxEdge), storedThumbMaxEdge)
-            guard let stored = decodeStill(url: source, maxEdge: storedEdge) else { return nil }
+            guard let stored = decodeStill(url: source, maxEdge: storedEdge, preferEmbedded: false) else { return nil }
             writeThumbnail(stored, to: thumbnailURL)
             if maxEdge + 0.5 < storedEdge {
                 return decodeStill(url: thumbnailURL, maxEdge: maxEdge) ?? stored
@@ -137,17 +141,23 @@ enum ThumbnailService {
             return nil
         }
         let cacheKey = memoryKey(thumbnailURL, maxEdge: maxEdge)
-        if let cached = ThumbnailMemoryCache.shared.image(for: cacheKey) {
+        if let cached = ThumbnailMemoryCache.shared.image(for: cacheKey),
+           thumbnailMatchesSourceAspect(cached, source: source) {
             return cached
         }
-        if let existing = loadThumbnail(at: thumbnailURL, maxEdge: maxEdge) {
+        if let existing = loadThumbnail(at: thumbnailURL, maxEdge: maxEdge),
+           thumbnailMatchesSourceAspect(existing, source: source) {
             ThumbnailMemoryCache.shared.store(existing, for: cacheKey)
             return existing
+        }
+        if FileManager.default.fileExists(atPath: thumbnailURL.path) {
+            removeStoredThumbnail(at: thumbnailURL)
         }
         guard allowCreate else { return nil }
         await ThumbnailDecodeGate.shared.acquire()
         let image = await Task.detached(priority: .utility) { () -> NSImage? in
-            guard let stored = posterFallback(url: source) else { return nil }
+            let storedEdge = min(max(maxEdge, gridMaxEdge), storedThumbMaxEdge)
+            guard let stored = posterFallback(url: source, maxEdge: storedEdge) else { return nil }
             writeThumbnail(stored, to: thumbnailURL)
             if maxEdge + 0.5 < max(stored.size.width, stored.size.height) {
                 return decodeStill(url: thumbnailURL, maxEdge: maxEdge) ?? stored
@@ -183,19 +193,69 @@ enum ThumbnailService {
         }
     }
 
-    static func stillImage(url: URL, maxEdge: CGFloat = 768, preferEmbedded: Bool = true) -> NSImage? {
+    static func stillImage(url: URL, maxEdge: CGFloat = 768, preferEmbedded: Bool = false) -> NSImage? {
         decodeStill(url: url, maxEdge: maxEdge, preferEmbedded: preferEmbedded)
     }
 
-    static func decodeStill(url: URL, maxEdge: CGFloat, preferEmbedded: Bool = true) -> NSImage? {
-        if let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: preferEmbedded) {
+    static func decodeStill(url: URL, maxEdge: CGFloat, preferEmbedded: Bool = false) -> NSImage? {
+        if preferEmbedded, let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: true) {
             return image
         }
-        if preferEmbedded, let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: false) {
+        if let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: false) {
             return image
         }
         guard let original = NSImage(contentsOf: url) else { return nil }
         return downscale(original, maxEdge: maxEdge) ?? original
+    }
+
+    /// Pixel size after EXIF/TIFF orientation (iPhone portrait is often stored landscape).
+    static func orientedPixelSize(url: URL) -> (width: Int, height: Int)? {
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, options)
+            ?? mappedImageSource(url: url, options: options),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = intValue(properties[kCGImagePropertyPixelWidth]),
+              let height = intValue(properties[kCGImagePropertyPixelHeight])
+        else { return nil }
+        let orientation = intValue(properties[kCGImagePropertyOrientation]) ?? 1
+        return displaySize(width: width, height: height, orientation: orientation)
+    }
+
+    static func displaySize(width: Int, height: Int, orientation: Int) -> (width: Int, height: Int) {
+        switch orientation {
+        case 5, 6, 7, 8:
+            return (height, width)
+        default:
+            return (width, height)
+        }
+    }
+
+    /// Display size after the video track's preferred transform (phone portrait is often stored landscape).
+    static func displaySize(naturalSize: CGSize, preferredTransform: CGAffineTransform) -> (width: Int, height: Int) {
+        let rendered = naturalSize.applying(preferredTransform)
+        return (
+            width: max(1, Int(abs(rendered.width).rounded())),
+            height: max(1, Int(abs(rendered.height).rounded()))
+        )
+    }
+
+    static func orientedVideoSize(url: URL) -> (width: Int, height: Int)? {
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        guard let track = asset.tracks(withMediaType: .video).first else { return nil }
+        let size = displaySize(naturalSize: track.naturalSize, preferredTransform: track.preferredTransform)
+        guard size.width > 0, size.height > 0 else { return nil }
+        return size
+    }
+
+    static func orientedMediaSize(url: URL) -> (width: Int, height: Int)? {
+        switch MediaKind.of(filename: url.lastPathComponent) {
+        case .image:
+            return orientedPixelSize(url: url)
+        case .video:
+            return orientedVideoSize(url: url)
+        case .audio:
+            return nil
+        }
     }
 
     private static func imageSourceThumbnail(url: URL, maxEdge: CGFloat, preferEmbedded: Bool) -> NSImage? {
@@ -222,27 +282,35 @@ enum ThumbnailService {
     }
 
     private static func downscale(_ image: NSImage, maxEdge: CGFloat) -> NSImage? {
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
-        let longest = max(cg.width, cg.height)
-        let edge = max(Int(maxEdge.rounded()), 1)
-        if longest <= edge { return nsImage(from: cg) }
-        let scale = CGFloat(edge) / CGFloat(longest)
-        let width = max(1, Int((CGFloat(cg.width) * scale).rounded()))
-        let height = max(1, Int((CGFloat(cg.height) * scale).rounded()))
-        let colorSpace = cg.colorSpace ?? CGColorSpaceCreateDeviceRGB()
-        guard let context = CGContext(
-            data: nil,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nsImage(from: cg) }
-        context.interpolationQuality = .medium
-        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
-        guard let scaled = context.makeImage() else { return nsImage(from: cg) }
-        return nsImage(from: scaled)
+        let sourceSize = image.size
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return nil }
+        let longest = max(sourceSize.width, sourceSize.height)
+        let edge = max(maxEdge, 1)
+        let scale = longest > edge ? edge / longest : 1
+        let scaled = NSSize(
+            width: max(1, (sourceSize.width * scale).rounded()),
+            height: max(1, (sourceSize.height * scale).rounded())
+        )
+        let output = NSImage(size: scaled)
+        output.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .medium
+        image.draw(in: NSRect(origin: .zero, size: scaled), from: .zero, operation: .copy, fraction: 1)
+        output.unlockFocus()
+        output.cacheMode = .never
+        return output
+    }
+
+    private static func thumbnailMatchesSourceAspect(_ thumbnail: NSImage, source: URL) -> Bool {
+        guard let oriented = orientedMediaSize(url: source),
+              oriented.width > 0,
+              oriented.height > 0,
+              let cg = thumbnail.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              cg.width > 0,
+              cg.height > 0
+        else { return true }
+        let thumbAspect = CGFloat(cg.width) / CGFloat(cg.height)
+        let sourceAspect = CGFloat(oriented.width) / CGFloat(oriented.height)
+        return abs(thumbAspect - sourceAspect) / max(sourceAspect, 0.01) < 0.12
     }
 
     private static func memoryKey(_ url: URL, maxEdge: CGFloat) -> String {
@@ -256,19 +324,13 @@ enum ThumbnailService {
     }
 
     private static func analyzeImage(url: URL) -> MediaAnalysis {
-        var width: Int?
-        var height: Int?
-        if let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
-           let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
-            width = intValue(properties[kCGImagePropertyPixelWidth])
-            height = intValue(properties[kCGImagePropertyPixelHeight])
-        }
+        let size = orientedPixelSize(url: url)
         return MediaAnalysis(
             thumbnail: nil,
             phash: nil,
             duration: nil,
-            width: width,
-            height: height,
+            width: size?.width,
+            height: size?.height,
             capturedAt: nil
         )
     }
@@ -287,12 +349,13 @@ enum ThumbnailService {
 
     private static func analyzeVideo(url: URL) async -> MediaAnalysis {
         let duration = await loadedDuration(url)
+        let size = orientedVideoSize(url: url)
         return MediaAnalysis(
             thumbnail: nil,
             phash: nil,
             duration: duration,
-            width: nil,
-            height: nil,
+            width: size?.width,
+            height: size?.height,
             capturedAt: nil
         )
     }
@@ -306,11 +369,12 @@ enum ThumbnailService {
         return nil
     }
 
-    private static func posterFallback(url: URL) -> NSImage? {
+    private static func posterFallback(url: URL, maxEdge: CGFloat = storedThumbMaxEdge) -> NSImage? {
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = lazyPosterSize
+        let edge = max(maxEdge, 1)
+        generator.maximumSize = CGSize(width: edge, height: edge)
         generator.requestedTimeToleranceBefore = .positiveInfinity
         generator.requestedTimeToleranceAfter = .positiveInfinity
         let time = CMTime(seconds: 0, preferredTimescale: 600)

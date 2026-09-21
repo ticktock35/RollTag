@@ -1,0 +1,10 @@
+CC-CEDICT (MDBG)
+https://www.mdbg.net/chinese/dictionary?page=cc-cedict
+
+This app bundles a derived keyword list (CCCEDICTKeywords.json) filtered
+for stock-footage English keywords. That list remains licensed under
+Creative Commons Attribution-ShareAlike 4.0 International:
+
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Referenced work: CEDICT, Copyright (C) 1997, 1998 Paul Andrew Denisowski

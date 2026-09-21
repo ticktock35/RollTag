@@ -42,7 +42,7 @@ final class SearchTests: XCTestCase {
         XCTAssertTrue(ranked.isEmpty)
     }
 
-    func testMissingFootageIsExcluded() {
+    func testMissingFootageRanksWhenTheMissingListPassesItIn() {
         var clip = footage(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", name: "sea.mov", tags: [.user(category: "place", value: "ocean")])
         clip.status = .missing
         let ranked = SearchService.rank(
@@ -51,13 +51,13 @@ final class SearchTests: XCTestCase {
             catalog: catalog,
             locale: "en"
         )
-        XCTAssertTrue(ranked.isEmpty)
+        XCTAssertEqual(ranked.first?.id, clip.id)
     }
 
     func testCustomTagIsSearchable() {
-        let clip = footage(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", name: "kid.mov", tags: [.custom("皓皓")!])
+        let clip = footage(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", name: "kid.mov", tags: [.custom("測試")!])
         let ranked = SearchService.rank(
-            query: "皓皓",
+            query: "測試",
             items: [(clip, .init(warehouseName: "A", warehousePath: "/A", isOnline: true))],
             catalog: catalog,
             locale: "zh-Hant"
@@ -83,6 +83,60 @@ final class SearchTests: XCTestCase {
         XCTAssertEqual(byChinese.first?.id, clip.id)
         XCTAssertEqual(byCategory.first?.id, clip.id)
         XCTAssertGreaterThan(byChinese[0].score, byCategory[0].score)
+    }
+
+    func testNonEnglishQueryAlsoMatchesEnglishKeywords() {
+        let ocean = footage(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", name: "clip.mov", tags: [.user(category: "place", value: "ocean")])
+        let englishOnly = footage(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", name: "other.mov", tags: [.custom("ocean")!])
+        let romanized = footage(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", name: "kid.mov", tags: [.custom("hua hua")!])
+        let bySea = SearchService.rank(
+            query: "海",
+            items: [
+                (ocean, .init(warehouseName: "A", warehousePath: "/A", isOnline: true)),
+                (englishOnly, .init(warehouseName: "A", warehousePath: "/A", isOnline: true))
+            ],
+            catalog: catalog,
+            locale: "en"
+        )
+        XCTAssertEqual(Set(bySea.map(\.id)), [ocean.id, englishOnly.id])
+        let byName = SearchService.rank(
+            query: "花花",
+            items: [(romanized, .init(warehouseName: "A", warehousePath: "/A", isOnline: true))],
+            catalog: catalog,
+            locale: "en"
+        )
+        XCTAssertEqual(byName.first?.id, romanized.id)
+    }
+
+    func testEnglishQueryIsNotExpandedIntoUnrelatedTokens() {
+        XCTAssertEqual(SearchService.expandSearchTokens(["ocean"], catalog: catalog), ["ocean"])
+        XCTAssertEqual(SearchService.expandSearchTokens(["海"], catalog: catalog), ["海", "ocean"])
+        XCTAssertEqual(SearchService.expandSearchTokens(["瑞典"], catalog: catalog), ["瑞典", "sweden"])
+        XCTAssertFalse(SearchService.expandSearchTokens(["瑞典"], catalog: catalog).contains { $0.contains("dian") })
+    }
+
+    func testGlossaryQueryMatchesEitherSide() {
+        let glossary = KeywordGlossary(pairs: [KeywordPair(native: "暱稱", english: "Nickname")])
+        let clip = footage(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", name: "kid.mov", tags: [.custom("暱稱")!])
+        let byEnglish = SearchService.rank(
+            query: "Nickname",
+            items: [(clip, .init(warehouseName: "A", warehousePath: "/A", isOnline: true))],
+            catalog: catalog,
+            locale: "en",
+            glossary: glossary
+        )
+        XCTAssertEqual(byEnglish.first?.id, clip.id)
+        XCTAssertEqual(
+            SearchService.expandSearchTokens(["nickname"], catalog: catalog, glossary: glossary),
+            ["nickname", "暱稱"]
+        )
+        XCTAssertEqual(
+            SearchService.expandSearchTokens(["暱稱"], catalog: catalog, glossary: glossary),
+            ["暱稱", "nickname"]
+        )
+        XCTAssertFalse(
+            SearchService.expandSearchTokens(["暱稱"], catalog: catalog, glossary: glossary).contains { $0.contains("cheng") }
+        )
     }
 
     func testLibrarySortByFilenameAndSize() {

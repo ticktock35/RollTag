@@ -137,6 +137,70 @@
         }
       }
     },
+    "ai.cancel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
+    "ai.cancelled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discarded this AI tagging batch."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消這次 AI 打標。"
+          }
+        }
+      }
+    },
+    "ai.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
+    },
+    "ai.confirm.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the AI tags. Done or Return keeps them; Cancel or Esc discards this batch."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請檢查 AI 標籤。按「完成」或 Enter 保留；按「取消」或 Esc 拿掉這次打上的標。"
+          }
+        }
+      }
+    },
     "ai.done" : {
       "localizations" : {
         "en" : {
@@ -799,13 +863,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A keep leftmost · D keep rightmost · S keep all · Return move the rest to Trash"
+            "value" : "%1$@ keep leftmost · %2$@ keep rightmost · %3$@ keep all · %4$@ move the rest to Trash"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A 留最左 · D 留最右 · S 全留下 · Enter 確認丟進垃圾桶"
+            "value" : "%1$@ 留最左 · %2$@ 留最右 · %3$@ 全留下 · %4$@ 確認丟進垃圾桶"
           }
         }
       }
@@ -890,6 +954,38 @@
         }
       }
     },
+    "empty.noMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing missing"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有找不到的檔"
+          }
+        }
+      }
+    },
+    "empty.noMissing.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every indexed file is still on disk."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "索引裡的檔目前都還在磁碟上。"
+          }
+        }
+      }
+    },
     "empty.noResults" : {
       "localizations" : {
         "en" : {
@@ -934,6 +1030,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "把資料夾拖進視窗，或到設定裡新增路徑。"
+          }
+        }
+      }
+    },
+    "finder.folderMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That folder is not on this Mac right now."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個目錄現在這台 Mac 讀不到。"
+          }
+        }
+      }
+    },
+    "finder.openFolder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open folder"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開目錄"
           }
         }
       }
@@ -1114,6 +1242,22 @@
         }
       }
     },
+    "inspector.hash" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Content hash"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "內容雜湊"
+          }
+        }
+      }
+    },
     "inspector.notes" : {
       "localizations" : {
         "en" : {
@@ -1146,6 +1290,22 @@
         }
       }
     },
+    "inspector.relativePath" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relative path"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相對路徑"
+          }
+        }
+      }
+    },
     "inspector.size" : {
       "localizations" : {
         "en" : {
@@ -1158,6 +1318,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "大小"
+          }
+        }
+      }
+    },
+    "inspector.status.missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missing"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到"
           }
         }
       }
@@ -1226,6 +1402,137 @@
         }
       }
     },
+    "missing.delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from library"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從資料庫刪掉"
+          }
+        }
+      }
+    },
+    "missing.deleteAll" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove all"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全刪"
+          }
+        }
+      }
+    },
+    "missing.deleteAllConfirm" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove %lld missing records from the library? This does not touch the disk — the files are already gone."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從資料庫移除這 %lld 筆找不到的紀錄？磁碟上的檔本來就不在，不會再刪一次。"
+          }
+        }
+      }
+    },
+    "missing.deleteConfirm" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove %lld missing record(s) from the library? This does not touch the disk."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從資料庫移除這 %lld 筆找不到的紀錄？磁碟上的檔本來就不在。"
+          }
+        }
+      }
+    },
+    "missing.deleteConfirmAction" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪掉"
+          }
+        }
+      }
+    },
+    "missing.deleteFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not remove %lld missing record(s)."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有 %lld 筆找不到的紀錄無法刪掉"
+          }
+        }
+      }
+    },
+    "missing.deleteSelected" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove selected"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪掉選取"
+          }
+        }
+      }
+    },
+    "missing.deleteTitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove missing records?"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪掉找不到的紀錄？"
+          }
+        }
+      }
+    },
     "player.empty" : {
       "localizations" : {
         "en" : {
@@ -1258,6 +1565,39 @@
         }
       }
     },
+    "player.missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is not on disk. Tags and other metadata are still in the library."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "磁碟上已經沒有這個檔。標籤與其他資料還留在資料庫。"
+          }
+        }
+      }
+    },
+    "player.next" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next clip"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一則"
+          }
+        }
+      }
+    },
     "player.playPause" : {
       "localizations" : {
         "en" : {
@@ -1274,18 +1614,35 @@
         }
       }
     },
-    "player.shortcuts" : {
+    "player.previous" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Space play/pause · P or Esc exit"
+            "value" : "Previous clip"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "空白鍵播放／暫停 · P 或 Esc 離開"
+            "value" : "上一則"
+          }
+        }
+      }
+    },
+    "player.shortcuts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ play/pause · %2$@ previous · %3$@ next · %4$@ or %5$@ exit"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 播放／暫停 · %2$@ 上一則 · %3$@ 下一則 · %4$@ 或 %5$@ 離開"
           }
         }
       }
@@ -1884,6 +2241,150 @@
         }
       }
     },
+    "settings.glossary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glossary"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字詞對應"
+          }
+        }
+      }
+    },
+    "settings.glossary.add" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入"
+          }
+        }
+      }
+    },
+    "settings.glossary.delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除"
+          }
+        }
+      }
+    },
+    "settings.glossary.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your usual names and terms, mapped both ways. Tagging a listed word also writes its English keyword; searching either side finds the same clips."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自己常用的人名、品牌可以在這裡對上英文。打表裡的詞會一併寫上對應英文；搜其中一邊也找得到另一邊的片子。"
+          }
+        }
+      }
+    },
+    "settings.glossary.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pairs yet. Add a usual term and its English keyword."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還沒有對應。左邊填常用詞，右邊填英文關鍵字。"
+          }
+        }
+      }
+    },
+    "settings.glossary.english" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英文"
+          }
+        }
+      }
+    },
+    "settings.glossary.englishPlaceholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English keyword"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英文關鍵字"
+          }
+        }
+      }
+    },
+    "settings.glossary.native" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your term"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常用詞"
+          }
+        }
+      }
+    },
+    "settings.glossary.nativePlaceholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "custom term"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常用詞"
+          }
+        }
+      }
+    },
     "settings.name" : {
       "localizations" : {
         "en" : {
@@ -1928,6 +2429,182 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪的是「這個目錄還算不算倉庫」，不是硬碟上的片子。"
+          }
+        }
+      }
+    },
+    "settings.shortcuts" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shortcuts"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快捷鍵"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.conflict" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already used by %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已由「%@」使用"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the keys used while playing, browsing the library, and reviewing duplicates. Click a key, then press the new one. Esc cancels recording."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放、瀏覽媒體庫、處理重複檔時用的按鍵可在這裡改。點一組鍵再按下新的按鍵。Esc 取消錄製。"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.fullscreenStep" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In fullscreen, [ and , go to the previous clip; ] and . go to the next. Shift on comma/period is the same (< and >)."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全螢幕時 [ 與 , 上一則，] 與 . 下一則。逗號／句號加 ⇧ 也就是 < 與 >。"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.menuHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menu shortcuts stay the Mac defaults: ⌘O add warehouse, ⌘R rescan, ⌘⇧D duplicates, ⌘A select all, ⌥⌘T AI tag, ⌘, settings, ⌘/ this list."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選單快捷鍵維持 Mac 慣例：⌘O 新增倉庫、⌘R 重掃、⌘⇧D 重複檔、⌘A 全選、⌥⌘T AI 打標、⌘, 設定、⌘/ 一覽。"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.noCommand" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don’t use Command — that stays for menu shortcuts."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不要用 Command，選單快捷鍵仍走 Mac 慣例。"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.pressKey" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press a key"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請按一個鍵"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.recordHelp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click, then press the new key"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點一下，再按下新的按鍵"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.resetAll" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Defaults"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢復預設"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.resetOne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預設"
+          }
+        }
+      }
+    },
+    "settings.shortcuts.wasd" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In the library grid, W A S D also move up / left / down / right. Shift extends the selection."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "媒體庫格線裡 W A S D 也等同上／左／下／右。⇧ 加選。"
           }
         }
       }
@@ -2027,6 +2704,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "離開全螢幕；已在視窗模式則取消選取"
+          }
+        }
+      }
+    },
+    "shortcuts.action.gridArrows" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to the adjacent clip in the grid (Shift extends the selection)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到格線上相鄰的素材（⇧ 加選）"
+          }
+        }
+      }
+    },
+    "shortcuts.action.gridDown" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to the clip below"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到下面的素材"
+          }
+        }
+      }
+    },
+    "shortcuts.action.gridLeft" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to the clip on the left"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到左邊的素材"
+          }
+        }
+      }
+    },
+    "shortcuts.action.gridRight" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to the clip on the right"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到右邊的素材"
+          }
+        }
+      }
+    },
+    "shortcuts.action.gridUp" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to the clip above"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到上面的素材"
           }
         }
       }
@@ -2132,6 +2894,23 @@
         }
       }
     },
+    "shortcuts.key.arrows" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "← ↑ → ↓"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "← ↑ → ↓"
+          }
+        }
+      }
+    },
     "shortcuts.key.return" : {
       "localizations" : {
         "en" : {
@@ -2165,6 +2944,7 @@
       }
     },
     "shortcuts.section.duplicates" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2197,6 +2977,7 @@
       }
     },
     "shortcuts.section.library" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2213,6 +2994,7 @@
       }
     },
     "shortcuts.section.playback" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2256,6 +3038,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分類"
+          }
+        }
+      }
+    },
+    "sidebar.count.all" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld clips"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 支素材"
+          }
+        }
+      }
+    },
+    "sidebar.count.missing" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld missing files"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個找不到"
+          }
+        }
+      }
+    },
+    "sidebar.count.tagged" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld tagged clips"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 支已打標"
+          }
+        }
+      }
+    },
+    "sidebar.count.untagged" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld untagged clips"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 支尚未打標"
+          }
+        }
+      }
+    },
+    "sidebar.duplicates.none" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No unprocessed duplicate groups"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有尚未處理的重複檔"
+          }
+        }
+      }
+    },
+    "sidebar.duplicates.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld unprocessed duplicate groups"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 組尚未處理的重複檔"
           }
         }
       }
@@ -2491,6 +3373,22 @@
         }
       }
     },
+    "status.switchInputSource" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shortcuts need a Latin keyboard. Switch to ABC or U.S."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快捷鍵要用英文輸入法。請切到 ABC 或「美式鍵盤」。"
+          }
+        }
+      }
+    },
     "tags.addCustom" : {
       "localizations" : {
         "en" : {
@@ -2528,13 +3426,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your tag, e.g. HaoHao"
+            "value" : "Your tag, e.g. clubmed"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "自己的標籤，例如皓皓"
+            "value" : "自己的標籤，例如 clubmed"
           }
         }
       }
@@ -2551,6 +3449,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用過的自訂標籤"
+          }
+        }
+      }
+    },
+    "tags.presetCategories" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset categories"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預設標籤分類"
           }
         }
       }

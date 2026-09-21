@@ -21,6 +21,27 @@ struct InspectorView: View {
                     .disabled(!model.canTagWithAI)
                     .help(String(localized: "ai.tag.help"))
                 }
+                if model.pendingAIConfirmation {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(String(localized: "ai.confirm.detail"))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 8) {
+                            Button(String(localized: "ai.confirm")) {
+                                model.confirmAITagging()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .keyboardShortcut(.defaultAction)
+                            Button(String(localized: "ai.cancel"), role: .cancel) {
+                                model.cancelAITagging()
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
                 TagPickerView(model: model)
                 if model.selectedFootage.count == 1, let footage = model.selectedFootage.first {
                     notes(footage)
@@ -42,6 +63,15 @@ struct InspectorView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(footage.filename)
                     .font(.title3.weight(.semibold))
+                if footage.status == .missing {
+                    Text(String(localized: "inspector.status.missing"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
+                LabeledContent(String(localized: "inspector.relativePath")) {
+                    Text(footage.relativePath)
+                        .textSelection(.enabled)
+                }
                 LabeledContent(String(localized: "inspector.folder")) {
                     Text(footage.directoryPath.isEmpty ? "—" : footage.directoryPath)
                 }
@@ -84,6 +114,14 @@ struct InspectorView: View {
                 LabeledContent(String(localized: "inspector.size")) {
                     Text(ByteCountFormatter.string(fromByteCount: footage.size, countStyle: .file))
                 }
+                if let hash = footage.contentHash, !hash.isEmpty {
+                    LabeledContent(String(localized: "inspector.hash")) {
+                        Text(hash)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                            .lineLimit(2)
+                    }
+                }
                 if footage.isTooSmallToPreview {
                     Text(
                         String(
@@ -95,15 +133,39 @@ struct InspectorView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                Button(String(localized: "finder.reveal")) {
-                    model.revealInFinder(footage)
+                if footage.status == .missing {
+                    missingActions(ids: [footage.id], footage: footage)
+                } else {
+                    Button(String(localized: "finder.reveal")) {
+                        model.revealInFinder(footage)
+                    }
+                    .buttonStyle(.link)
                 }
-                .buttonStyle(.link)
             }
         } else {
             Text(String(format: String(localized: "inspector.batch"), locale: .current, model.selectedFootage.count))
                 .font(.title3.weight(.semibold))
+            if !model.selectedMissingFootage.isEmpty {
+                missingActions(ids: Set(model.selectedMissingFootage.map(\.id)), footage: model.selectedMissingFootage.count == 1 ? model.selectedMissingFootage.first : nil)
+            }
         }
+    }
+
+    @ViewBuilder
+    private func missingActions(ids: Set<UUID>, footage: Footage?) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let footage {
+                Button(String(localized: "finder.openFolder")) {
+                    model.openContainingFolder(footage)
+                }
+                .buttonStyle(.bordered)
+            }
+            Button(String(localized: ids.count > 1 ? "missing.deleteSelected" : "missing.delete"), role: .destructive) {
+                model.proposeDeleteMissing(ids)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.top, 4)
     }
 
     private func notes(_ footage: Footage) -> some View {

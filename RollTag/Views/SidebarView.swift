@@ -8,7 +8,9 @@ struct SidebarView: View {
             Section(String(localized: "sidebar.library")) {
                 ForEach(SmartCollection.allCases) { collection in
                     Label(String(localized: String.LocalizationValue(collection.localizationKey)), systemImage: icon(for: collection))
+                        .badge(badge(for: collection))
                         .tag(SidebarSelection.collection(collection))
+                        .help(help(for: collection))
                 }
             }
 
@@ -94,6 +96,29 @@ struct SidebarView: View {
                 }
             }
         }
+    }
+
+    private func badge(for collection: SmartCollection) -> Int {
+        model.sidebarCounts.value(for: collection)
+    }
+
+    private func help(for collection: SmartCollection) -> String {
+        let count = model.sidebarCounts.value(for: collection)
+        if collection == .duplicates {
+            if count == 0 {
+                return String(localized: "sidebar.duplicates.none")
+            }
+            return String(format: String(localized: "sidebar.duplicates.pending"), locale: .current, count)
+        }
+        let key: String
+        switch collection {
+        case .all: key = "sidebar.count.all"
+        case .tagged: key = "sidebar.count.tagged"
+        case .untagged: key = "sidebar.count.untagged"
+        case .missing: key = "sidebar.count.missing"
+        case .duplicates: key = "sidebar.duplicates.pending"
+        }
+        return String(format: String(localized: String.LocalizationValue(key)), locale: .current, count)
     }
 
     private func icon(for collection: SmartCollection) -> String {

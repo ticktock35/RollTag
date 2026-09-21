@@ -56,9 +56,9 @@ struct RollTagApp: App {
                 }
                 .disabled(!model.playback.canPlay)
                 Button(String(localized: "player.fullscreen")) {
-                    model.playback.toggleFullscreen()
+                    model.toggleSelectedFullscreen()
                 }
-                .disabled(model.playback.media == nil && !model.playback.isFullscreen)
+                .disabled(model.focusedFootageID == nil && model.playback.media == nil && !model.playback.isFullscreen)
             }
             CommandGroup(after: .sidebar) {
                 Button(String(localized: "duplicates.title")) {
@@ -87,7 +87,7 @@ struct RollTagApp: App {
         .keyboardShortcut("d", modifiers: [.command, .shift])
 
         Window(String(localized: "shortcuts.title"), id: "shortcuts") {
-            ShortcutsView()
+            ShortcutsView(model: model)
         }
         .defaultSize(width: 540, height: 640)
 

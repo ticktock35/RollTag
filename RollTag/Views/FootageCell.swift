@@ -25,7 +25,7 @@ struct FootageCell: View {
                     .strokeBorder(isSelected ? Color.accentColor : Color.black.opacity(0.08), lineWidth: isSelected ? 2 : 1)
             }
             .overlay(alignment: .topTrailing) {
-                if hovering, item.footage.mediaKind.canHoverPlay, !item.footage.isTooSmallToPreview {
+                if hovering, item.footage.status == .available, item.footage.mediaKind.canHoverPlay, !item.footage.isTooSmallToPreview {
                     Button {
                         playing.toggle()
                     } label: {
@@ -43,6 +43,11 @@ struct FootageCell: View {
                 Text(item.footage.filename)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
+                if item.footage.status == .missing {
+                    Text(String(localized: "inspector.status.missing"))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
                 Text(item.warehouseName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -59,6 +64,10 @@ struct FootageCell: View {
         .task(id: "\(item.id.uuidString)-\(thumbRefreshToken)") {
             liveThumb = nil
             previewFailed = false
+            if item.footage.status == .missing {
+                previewFailed = true
+                return
+            }
             guard item.footage.mediaKind != .audio, let warehouseRoot else { return }
             if item.footage.isTooSmallToPreview {
                 previewFailed = true
@@ -95,7 +104,7 @@ struct FootageCell: View {
 
     @ViewBuilder
     private var previewContent: some View {
-        if hovering, playing, item.footage.mediaKind.canHoverPlay, !item.footage.isTooSmallToPreview, let warehouseRoot {
+        if hovering, playing, item.footage.status == .available, item.footage.mediaKind.canHoverPlay, !item.footage.isTooSmallToPreview, let warehouseRoot {
             HoverPlayerView(
                 url: item.footage.absoluteURL(warehouseRoot: warehouseRoot),
                 isPlaying: true,
@@ -105,7 +114,7 @@ struct FootageCell: View {
             Image(nsImage: shown)
                 .resizable()
                 .interpolation(.medium)
-                .aspectRatio(contentMode: item.footage.mediaKind == .image ? .fit : .fill)
+                .aspectRatio(contentMode: .fit)
         } else if item.footage.mediaKind == .audio {
             Image(systemName: placeholderIcon)
                 .font(.title2)
@@ -130,26 +139,30 @@ struct FootageCell: View {
     }
 
     private var previewAspect: CGFloat {
-        if item.footage.mediaKind == .image {
-            if let width = item.footage.width, let height = item.footage.height {
-                return PreviewLayout.aspect(width: width, height: height)
-            }
+        if item.footage.mediaKind != .audio {
             if let shown = liveThumb, shown.size.width > 0, shown.size.height > 0 {
                 return PreviewLayout.aspect(size: shown.size)
+            }
+            if let width = item.footage.width, let height = item.footage.height {
+                return PreviewLayout.aspect(width: width, height: height)
             }
         }
         return PreviewLayout.videoFallback
     }
 
     private var placeholderIcon: String {
+        if item.footage.status == .missing { return "eye.slash" }
         switch item.footage.mediaKind {
-        case .image: "photo"
-        case .audio: "speaker.wave.2"
-        case .video: "film"
+        case .image: return "photo"
+        case .audio: return "speaker.wave.2"
+        case .video: return "film"
         }
     }
 
     private var previewFailureText: String {
+        if item.footage.status == .missing {
+            return String(localized: "inspector.status.missing")
+        }
         if item.footage.mediaKind == .image {
             return String(localized: "preview.unavailable")
         }

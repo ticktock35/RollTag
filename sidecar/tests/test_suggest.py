@@ -29,6 +29,11 @@ class SuggestTests(unittest.TestCase):
     def test_parse_garbage(self):
         self.assertEqual(parse_tags("not json"), [])
 
+    def test_prompt_omits_context_block_when_missing(self):
+        prompt = build_prompt({"categories": []})
+        self.assertIn("CATALOG:", prompt)
+        self.assertNotIn("CONTEXT:", prompt)
+
     def test_prompt_includes_context_when_present(self):
         prompt = build_prompt(
             {"categories": []},
@@ -44,10 +49,18 @@ class SuggestTests(unittest.TestCase):
         self.assertIn("DJI_0029.MP4", prompt)
         self.assertIn("103.8", prompt)
 
-    def test_prompt_omits_context_block_when_missing(self):
+    def test_prompt_includes_getty_keywords(self):
         prompt = build_prompt({"categories": []})
-        self.assertIn("CATALOG:", prompt)
-        self.assertNotIn("CONTEXT:", prompt)
+        self.assertIn("keywords", prompt)
+        self.assertIn("Getty/Pond5", prompt)
+
+    def test_parse_keywords(self):
+        from rolltag_sidecar.suggest import parse_keywords
+
+        keywords = parse_keywords(
+            '{"tags":[{"category":"nature","value":"ocean"}],"keywords":["Icebreaker","arctic ocean","ab","nope!!!"]}'
+        )
+        self.assertEqual(keywords, ["icebreaker", "arctic ocean"])
 
     def test_http_error_uses_gemini_message(self):
         body = '{"error":{"code":404,"message":"This model models/gemini-2.5-flash-lite is no longer available to new users.","status":"NOT_FOUND"}}'
