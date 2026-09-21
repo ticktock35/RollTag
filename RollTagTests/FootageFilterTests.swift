@@ -50,6 +50,154 @@ final class FootageFilterTests: XCTestCase {
         XCTAssertEqual(categories.map(\.id), ["mood"])
     }
 
+    func testWarehouseFolderIncludesDescendantsOnly() {
+        let warehouse = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let inJohor = clip(relativePath: "malaysia/johor/clubmed/a.mov")
+        let inKL = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "malaysia/kl/b.mov")
+        let siblingPrefix = clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "malaysia備份/c.mov")
+        let rootFile = clip(id: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE", relativePath: "root.mov")
+        let folder = SidebarSelection.warehouseFolder(warehouse, "malaysia")
+        XCTAssertTrue(FootageFilter.include(footage: inJohor, isOnline: true, selection: folder, isDuplicate: false))
+        XCTAssertTrue(FootageFilter.include(footage: inKL, isOnline: true, selection: folder, isDuplicate: false))
+        XCTAssertFalse(FootageFilter.include(footage: siblingPrefix, isOnline: true, selection: folder, isDuplicate: false))
+        XCTAssertFalse(FootageFilter.include(footage: rootFile, isOnline: true, selection: folder, isDuplicate: false))
+        XCTAssertTrue(FootageFilter.include(footage: rootFile, isOnline: true, selection: .warehouse(warehouse), isDuplicate: false))
+    }
+
+    func testWarehouseFolderDoesNotShowOfflineOrMissing() {
+        let warehouse = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        var missing = clip(relativePath: "malaysia/gone.mov")
+        missing.status = .missing
+        let folder = SidebarSelection.warehouseFolder(warehouse, "malaysia")
+        XCTAssertFalse(FootageFilter.include(footage: missing, isOnline: true, selection: folder, isDuplicate: false))
+        XCTAssertFalse(FootageFilter.include(footage: clip(relativePath: "malaysia/a.mov"), isOnline: false, selection: folder, isDuplicate: false))
+    }
+
+    func testWorkFoldersKeepUntaggedAndDuplicatesInsideThoseDirectories() {
+        let warehouse = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let johor = clip(relativePath: "malaysia/johor/a.mov")
+        let kl = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "malaysia/kl/b.mov")
+        let scopes: Set<FolderRef> = [
+            FolderRef(warehouseID: warehouse, relativePath: "malaysia/johor")
+        ]
+        XCTAssertTrue(
+            FootageFilter.include(
+                footage: johor,
+                isOnline: true,
+                selection: .collection(.untagged),
+                isDuplicate: false,
+                folderScopes: scopes
+            )
+        )
+        XCTAssertFalse(
+            FootageFilter.include(
+                footage: kl,
+                isOnline: true,
+                selection: .collection(.untagged),
+                isDuplicate: false,
+                folderScopes: scopes
+            )
+        )
+        XCTAssertTrue(
+            FootageFilter.include(
+                footage: johor,
+                isOnline: true,
+                selection: .collection(.duplicates),
+                isDuplicate: true,
+                folderScopes: scopes
+            )
+        )
+        XCTAssertFalse(
+            FootageFilter.include(
+                footage: kl,
+                isOnline: true,
+                selection: .collection(.duplicates),
+                isDuplicate: true,
+                folderScopes: scopes
+            )
+        )
+        XCTAssertTrue(
+            FootageFilter.duplicateGroup(
+                [johor.id, kl.id],
+                members: [johor, kl],
+                intersects: scopes
+            )
+        )
+        XCTAssertFalse(
+            FootageFilter.duplicateGroup(
+                [kl.id],
+                members: [kl],
+                intersects: scopes
+            )
+        )
+    }
+
+    func testMultipleWorkFoldersAreAUnion() {
+        let warehouse = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let johor = clip(relativePath: "malaysia/johor/a.mov")
+        let kl = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "malaysia/kl/b.mov")
+        let root = clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "root.mov")
+        let scopes: Set<FolderRef> = [
+            FolderRef(warehouseID: warehouse, relativePath: "malaysia/johor"),
+            FolderRef(warehouseID: warehouse, relativePath: "malaysia/kl")
+        ]
+        XCTAssertTrue(FootageFilter.include(footage: johor, isOnline: true, selection: .collection(.all), isDuplicate: false, folderScopes: scopes))
+        XCTAssertTrue(FootageFilter.include(footage: kl, isOnline: true, selection: .collection(.all), isDuplicate: false, folderScopes: scopes))
+        XCTAssertFalse(FootageFilter.include(footage: root, isOnline: true, selection: .collection(.all), isDuplicate: false, folderScopes: scopes))
+    }
+
+    func testDuplicateIndexUsesMemberIDsAndFolderScope() {
+        let warehouseID = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let johor = clip(relativePath: "malaysia/johor/a.mov")
+        let backup = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "backup/a.mov")
+        let other = clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "other/b.mov")
+        let otherTwin = clip(id: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE", relativePath: "other/b-copy.mov")
+        let warehouse = WarehouseRuntime(
+            preference: WarehousePreference(id: warehouseID, name: "W", path: "/tmp", bookmark: nil),
+            isOnline: true,
+            isReconciling: false,
+            footage: [johor, backup, other, otherTwin],
+            groups: [
+                DuplicateGroup(
+                    id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+                    contentHash: "same-a",
+                    resolution: .unresolved,
+                    memberIDs: [johor.id, backup.id]
+                ),
+                DuplicateGroup(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                    contentHash: "same-b",
+                    resolution: .unresolved,
+                    memberIDs: [other.id, otherTwin.id]
+                )
+            ]
+        )
+        let scoped = DuplicateIndex.resolve(
+            warehouses: [warehouse],
+            scopes: [FolderRef(warehouseID: warehouseID, relativePath: "malaysia/johor")]
+        )
+        XCTAssertEqual(scoped.map(\.group.contentHash), ["same-a"])
+        XCTAssertEqual(Set(scoped[0].members.map(\.id)), [johor.id, backup.id])
+        let all = DuplicateIndex.resolve(warehouses: [warehouse], scopes: [])
+        XCTAssertEqual(Set(all.map(\.group.contentHash)), ["same-a", "same-b"])
+    }
+
+    func testFolderTreeFollowsIndexedDirectoriesAndHidesDotFolders() {
+        let warehouse = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let footage = [
+            clip(relativePath: "malaysia/johor/clubmed/a.mov"),
+            clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "malaysia/kl/b.mov"),
+            clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "root.mov"),
+            clip(id: "EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE", relativePath: ".rolltag/trimmed/cut.mov")
+        ]
+        let tree = WarehouseFolderTree.nodes(warehouseID: warehouse, from: footage)
+        XCTAssertEqual(tree.map(\.relativePath), ["malaysia"])
+        XCTAssertEqual(tree[0].children?.map(\.relativePath), ["malaysia/johor", "malaysia/kl"])
+        XCTAssertEqual(tree[0].children?.first?.children?.map(\.relativePath), ["malaysia/johor/clubmed"])
+        XCTAssertTrue(WarehouseFolderTree.contains(directoryPath: "malaysia/johor", folder: "malaysia"))
+        XCTAssertFalse(WarehouseFolderTree.contains(directoryPath: "malaysia備份", folder: "malaysia"))
+    }
+
     func testTinyVideoIsTooSmallToPreview() {
         var tiny = clip(tags: [])
         tiny.size = 1024
@@ -62,12 +210,16 @@ final class FootageFilterTests: XCTestCase {
         XCTAssertFalse(real.isTooSmallToPreview)
     }
 
-    private func clip(id: String = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", tags: [TagAssignment]) -> Footage {
+    private func clip(
+        id: String = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+        relativePath: String = "clip.mov",
+        tags: [TagAssignment] = []
+    ) -> Footage {
         Footage(
             id: UUID(uuidString: id)!,
             warehouseID: UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!,
-            relativePath: "clip.mov",
-            filename: "clip.mov",
+            relativePath: relativePath,
+            filename: (relativePath as NSString).lastPathComponent,
             size: 1,
             mtime: 1,
             contentHash: "h",

@@ -27,6 +27,42 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertLessThanOrEqual(max(size.width, size.height), 64)
     }
 
+    func testEnsureCreatesThumbnailWhenCacheMissing() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-make-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let source = try writePNG(width: 640, height: 480, in: dir)
+        let dest = dir.appendingPathComponent("thumb.jpg")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dest.path))
+        let image = await ThumbnailService.ensureImageThumbnail(source: source, thumbnailURL: dest, maxEdge: 320)
+        XCTAssertNotNil(image)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dest.path))
+    }
+
+    func testMissingOriginalDeletesStoredThumbnail() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-gone-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let source = try writePNG(width: 200, height: 200, in: dir)
+        let dest = dir.appendingPathComponent("thumb.jpg")
+        _ = await ThumbnailService.ensureImageThumbnail(source: source, thumbnailURL: dest, maxEdge: 160)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dest.path))
+        try FileManager.default.removeItem(at: source)
+        let image = await ThumbnailService.ensureImageThumbnail(source: source, thumbnailURL: dest, maxEdge: 160)
+        XCTAssertNil(image)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dest.path))
+    }
+
+    func testSweepRemovesOrphanThumbnails() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-sweep-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let keep = UUID()
+        let drop = UUID()
+        try Data([0xFF, 0xD8, 0xFF]).write(to: dir.appendingPathComponent("\(keep.uuidString).jpg"))
+        try Data([0xFF, 0xD8, 0xFF]).write(to: dir.appendingPathComponent("\(drop.uuidString).jpg"))
+        ThumbnailService.sweepOrphanThumbnails(in: dir, keep: [keep])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent("\(keep.uuidString).jpg").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dir.appendingPathComponent("\(drop.uuidString).jpg").path))
+    }
+
     func testPreviewStillDoesNotReplaceGridThumb() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-preview-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

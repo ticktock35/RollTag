@@ -23,27 +23,39 @@ struct SidebarView: View {
 
             Section(String(localized: "sidebar.warehouses")) {
                 ForEach(model.warehouses) { warehouse in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(warehouse.isOnline ? Color.green.opacity(0.85) : Color.secondary.opacity(0.35))
-                            .frame(width: 7, height: 7)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(warehouse.preference.name)
-                                .foregroundStyle(warehouse.isOnline ? .primary : .secondary)
-                            if let progress = model.scanProgress, progress.warehouseID == warehouse.id {
-                                Text("\(progress.percentInt)% · \(progress.currentFile.isEmpty ? String(localized: "status.scanning") : progress.currentFile)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            } else {
-                                Text(warehouse.isOnline ? String(localized: "warehouse.online") : String(localized: "warehouse.offline"))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                    OutlineGroup(
+                        [
+                            WarehouseFolderNode(
+                                warehouseID: warehouse.id,
+                                relativePath: "",
+                                name: warehouse.preference.name,
+                                children: warehouse.folderNodes.isEmpty ? nil : warehouse.folderNodes
+                            )
+                        ],
+                        children: \.children
+                    ) { node in
+                        if node.isWarehouseRoot {
+                            warehouseRow(warehouse)
+                                .tag(SidebarSelection.warehouse(warehouse.id))
+                        } else {
+                            let ref = FolderRef(warehouseID: warehouse.id, relativePath: node.relativePath)
+                            HStack(spacing: 6) {
+                                Button {
+                                    model.toggleWorkFolder(ref)
+                                } label: {
+                                    Image(systemName: model.isWorkFolder(ref) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(model.isWorkFolder(ref) ? Color.accentColor : Color.secondary)
+                                        .imageScale(.small)
+                                }
+                                .buttonStyle(.borderless)
+                                .help(String(localized: model.isWorkFolder(ref) ? "scope.unpinHelp" : "scope.pinHelp"))
+                                Label(node.name, systemImage: "folder")
+                                    .foregroundStyle(warehouse.isOnline ? .primary : .secondary)
                             }
+                            .tag(SidebarSelection.warehouseFolder(warehouse.id, node.relativePath))
+                            .help(node.relativePath)
                         }
                     }
-                    .tag(SidebarSelection.warehouse(warehouse.id))
                     .opacity(warehouse.isOnline ? 1 : 0.7)
                 }
             }
@@ -58,6 +70,29 @@ struct SidebarView: View {
             .buttonStyle(.borderless)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
+        }
+    }
+
+    private func warehouseRow(_ warehouse: WarehouseRuntime) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(warehouse.isOnline ? Color.green.opacity(0.85) : Color.secondary.opacity(0.35))
+                .frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(warehouse.preference.name)
+                    .foregroundStyle(warehouse.isOnline ? .primary : .secondary)
+                if let progress = model.scanProgress, progress.warehouseID == warehouse.id {
+                    Text("\(progress.percentInt)% · \(progress.currentFile.isEmpty ? String(localized: "status.scanning") : progress.currentFile)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } else {
+                    Text(warehouse.isOnline ? String(localized: "warehouse.online") : String(localized: "warehouse.offline"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

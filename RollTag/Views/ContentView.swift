@@ -12,7 +12,7 @@ struct ContentView: View {
         ZStack {
             NavigationSplitView {
                 SidebarView(model: model)
-                    .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+                    .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
             } detail: {
                 rightColumn
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -67,6 +67,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, minHeight: 220)
 
                     VStack(spacing: 0) {
+                        WorkScopeBanner(model: model)
                         libraryBar
                         FootageGridView(model: model)
                             .frame(maxWidth: .infinity, minHeight: 160)
@@ -88,7 +89,7 @@ struct ContentView: View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            TextField(String(localized: "search.prompt"), text: $model.searchText)
+            TextField(searchPrompt, text: $model.searchText)
                 .textFieldStyle(.plain)
             if !model.searchText.isEmpty {
                 Button {
@@ -155,16 +156,46 @@ struct ContentView: View {
     }
 
     private var title: String {
-        switch model.sidebarSelection {
-        case .collection(let collection):
-            String(localized: String.LocalizationValue(collection.localizationKey))
-        case .warehouse(let id):
-            model.warehouses.first(where: { $0.id == id })?.preference.name ?? String(localized: "app.name")
-        case .tagCategory(let id):
-            model.populatedTagCategories.first(where: { $0.id == id })?.title
-                ?? model.catalog.categories.first(where: { $0.id == id })?.localizedName(locale: TagCatalogLoader.localeID(from: locale))
-                ?? String(localized: "tags.customCategory")
+        let base: String = {
+            switch model.sidebarSelection {
+            case .collection(let collection):
+                String(localized: String.LocalizationValue(collection.localizationKey))
+            case .warehouse(let id):
+                model.warehouses.first(where: { $0.id == id })?.preference.name ?? String(localized: "app.name")
+            case .warehouseFolder(let id, let path):
+                folderTitle(warehouseID: id, path: path)
+            case .tagCategory(let id):
+                model.populatedTagCategories.first(where: { $0.id == id })?.title
+                    ?? model.catalog.categories.first(where: { $0.id == id })?.localizedName(locale: TagCatalogLoader.localeID(from: locale))
+                    ?? String(localized: "tags.customCategory")
+            }
+        }()
+        if model.workFolders.count > 1 {
+            return String(localized: "scope.title \(base) \(model.workFolderSummary)")
         }
+        return base
+    }
+
+    private var searchPrompt: String {
+        if model.workFolders.count > 1 {
+            return String(localized: "search.promptInFolders \(model.workFolderSummary)")
+        }
+        if case .warehouseFolder(_, let path) = model.sidebarSelection {
+            let folder = (path as NSString).lastPathComponent
+            return String(localized: "search.promptInFolder \(folder)")
+        }
+        if let only = model.workFolders.first {
+            return String(localized: "search.promptInFolder \(only.folderName)")
+        }
+        return String(localized: "search.prompt")
+    }
+
+    private func folderTitle(warehouseID: UUID, path: String) -> String {
+        let folder = (path as NSString).lastPathComponent
+        if let name = model.warehouses.first(where: { $0.id == warehouseID })?.preference.name {
+            return "\(name) / \(path)"
+        }
+        return folder
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

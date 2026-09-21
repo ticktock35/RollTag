@@ -5,7 +5,52 @@ enum FootageFilter {
         footage: Footage,
         isOnline: Bool,
         selection: SidebarSelection,
-        isDuplicate: Bool
+        isDuplicate: Bool,
+        folderScopes: Set<FolderRef> = []
+    ) -> Bool {
+        guard matchesSelection(
+            footage: footage,
+            isOnline: isOnline,
+            selection: selection,
+            isDuplicate: isDuplicate,
+            folderScopes: folderScopes
+        ) else { return false }
+        return matchesScopes(footage: footage, scopes: resolvedScopes(selection: selection, folderScopes: folderScopes))
+    }
+
+    static func resolvedScopes(selection: SidebarSelection, folderScopes: Set<FolderRef>) -> Set<FolderRef> {
+        if !folderScopes.isEmpty { return folderScopes }
+        if case .warehouseFolder(let id, let path) = selection {
+            return [FolderRef(warehouseID: id, relativePath: path)]
+        }
+        return []
+    }
+
+    static func matchesScopes(footage: Footage, scopes: Set<FolderRef>) -> Bool {
+        guard !scopes.isEmpty else { return true }
+        return scopes.contains { scope in
+            footage.warehouseID == scope.warehouseID
+                && WarehouseFolderTree.contains(directoryPath: footage.directoryPath, folder: scope.relativePath)
+        }
+    }
+
+    static func duplicateGroup(
+        _ memberIDs: Set<UUID>,
+        members: [Footage],
+        intersects scopes: Set<FolderRef>
+    ) -> Bool {
+        guard !scopes.isEmpty else { return true }
+        return members.contains { footage in
+            memberIDs.contains(footage.id) && matchesScopes(footage: footage, scopes: scopes)
+        }
+    }
+
+    private static func matchesSelection(
+        footage: Footage,
+        isOnline: Bool,
+        selection: SidebarSelection,
+        isDuplicate: Bool,
+        folderScopes: Set<FolderRef>
     ) -> Bool {
         switch selection {
         case .collection(.all):
@@ -20,6 +65,12 @@ enum FootageFilter {
             return isOnline && isDuplicate
         case .warehouse(let id):
             return footage.warehouseID == id && isOnline && footage.status == .available
+        case .warehouseFolder(let id, _):
+            guard isOnline, footage.status == .available else { return false }
+            if folderScopes.isEmpty {
+                return footage.warehouseID == id
+            }
+            return true
         case .tagCategory(let category):
             return isOnline
                 && footage.status == .available

@@ -16,11 +16,14 @@ struct DuplicatesWorkspace: View {
     @State private var keeperID: UUID?
 
     var body: some View {
-        VSplitView {
-            comparePane
-                .frame(maxWidth: .infinity, minHeight: 240)
-            groupList
-                .frame(maxWidth: .infinity, minHeight: 180)
+        VStack(spacing: 0) {
+            WorkScopeBanner(model: model)
+            VSplitView {
+                comparePane
+                    .frame(maxWidth: .infinity, minHeight: 240)
+                groupList
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -80,16 +83,20 @@ struct DuplicatesWorkspace: View {
         }
     }
 
-    private var groups: [(WarehouseRuntime, DuplicateGroup)] {
-        model.unresolvedDuplicateGroups
+    private var groups: [ResolvedDuplicateGroup] {
+        model.scopedDuplicateGroups
     }
 
-    private var selectedPair: (WarehouseRuntime, DuplicateGroup)? {
+    private var selectedGroup: ResolvedDuplicateGroup? {
         if let selectedGroupID,
-           let pair = groups.first(where: { $0.1.id == selectedGroupID }) {
-            return pair
+           let group = groups.first(where: { $0.id == selectedGroupID }) {
+            return group
         }
         return groups.first
+    }
+
+    private func warehouse(for item: ResolvedDuplicateGroup) -> WarehouseRuntime? {
+        model.warehouses.first(where: { $0.id == item.warehouseID })
     }
 
     private var comparePane: some View {
@@ -107,19 +114,18 @@ struct DuplicatesWorkspace: View {
 
             Divider()
 
-            if let pair = selectedPair {
-                let members = duplicateMembers(warehouse: pair.0, group: pair.1)
+            if let item = selectedGroup, let warehouse = warehouse(for: item) {
                 ScrollView(.horizontal, showsIndicators: true) {
                     HStack(alignment: .top, spacing: 12) {
-                        ForEach(members) { member in
+                        ForEach(item.members) { member in
                             DuplicateCompareCard(
                                 footage: member,
-                                warehouse: pair.0,
-                                isKeeper: (model.duplicatePendingDelete?.keeperID ?? keeperID ?? members.first?.id) == member.id
+                                warehouse: warehouse,
+                                isKeeper: (model.duplicatePendingDelete?.keeperID ?? keeperID ?? item.members.first?.id) == member.id
                             )
                             .onTapGesture {
                                 keeperID = member.id
-                                model.selectSingle(member.id, modifiers: [])
+                                model.selectDuplicateMember(member.id)
                             }
                         }
                     }
@@ -127,9 +133,9 @@ struct DuplicatesWorkspace: View {
                 }
             } else {
                 ContentUnavailableView(
-                    String(localized: "duplicates.empty"),
+                    String(localized: model.workFolders.isEmpty ? "duplicates.empty" : "duplicates.empty.scoped"),
                     systemImage: "square.on.square",
-                    description: Text(String(localized: "duplicates.empty.detail"))
+                    description: Text(String(localized: String.LocalizationValue(model.workFolders.isEmpty ? "duplicates.empty.detail" : "duplicates.empty.scoped.detail")))
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -156,31 +162,29 @@ struct DuplicatesWorkspace: View {
 
             if groups.isEmpty {
                 ContentUnavailableView(
-                    String(localized: "duplicates.empty"),
+                    String(localized: model.workFolders.isEmpty ? "duplicates.empty" : "duplicates.empty.scoped"),
                     systemImage: "checkmark.circle",
-                    description: Text(String(localized: "duplicates.empty.detail"))
+                    description: Text(String(localized: String.LocalizationValue(model.workFolders.isEmpty ? "duplicates.empty.detail" : "duplicates.empty.scoped.detail")))
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
-                        ForEach(groups, id: \.1.id) { warehouse, group in
-                            let members = duplicateMembers(warehouse: warehouse, group: group)
+                        ForEach(groups) { item in
                             DuplicateGroupCard(
-                                warehouse: warehouse,
-                                group: group,
-                                members: members,
-                                isSelected: selectedPair?.1.id == group.id
+                                warehouseName: model.warehouses.first(where: { $0.id == item.warehouseID })?.preference.name ?? "",
+                                members: item.members,
+                                isSelected: selectedGroup?.id == item.id
                             ) {
-                                selectedGroupID = group.id
-                                keeperID = members.first?.id
-                                if let first = members.first {
-                                    model.selectSingle(first.id, modifiers: [])
+                                selectedGroupID = item.id
+                                keeperID = item.members.first?.id
+                                if let first = item.members.first {
+                                    model.selectDuplicateMember(first.id)
                                 }
                             } keepSelected: {
-                                keepOne(warehouse: warehouse, group: group, members: members)
+                                keepOne(item)
                             } keepAll: {
-                                keepAll(warehouse: warehouse, group: group, members: members)
+                                keepAll(item)
                             }
                         }
                     }
@@ -191,24 +195,18 @@ struct DuplicatesWorkspace: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func duplicateMembers(warehouse: WarehouseRuntime, group: DuplicateGroup) -> [Footage] {
-        warehouse.footage
-            .filter { group.memberIDs.contains($0.id) }
-            .sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
-    }
-
-    private func keepOne(warehouse: WarehouseRuntime, group: DuplicateGroup, members: [Footage]) {
-        let keeper = keeperID.flatMap { id in members.first(where: { $0.id == id }) } ?? members.first
+    private func keepOne(_ item: ResolvedDuplicateGroup) {
+        let keeper = keeperID.flatMap { id in item.members.first(where: { $0.id == id }) } ?? item.members.first
         guard let keeper else { return }
         keeperID = keeper.id
-        model.proposeDuplicateKeep(warehouseID: warehouse.id, group: group, keeperID: keeper.id)
+        model.proposeDuplicateKeep(warehouseID: item.warehouseID, group: item.group, keeperID: keeper.id)
     }
 
-    private func keepAll(warehouse: WarehouseRuntime, group: DuplicateGroup, members: [Footage]) {
-        guard let first = members.first else { return }
+    private func keepAll(_ item: ResolvedDuplicateGroup) {
+        guard let first = item.members.first else { return }
         model.resolveDuplicates(
-            group: group,
-            warehouseID: warehouse.id,
+            group: item.group,
+            warehouseID: item.warehouseID,
             keeperID: first.id,
             unionTags: false,
             keepSeparate: true
@@ -216,12 +214,12 @@ struct DuplicatesWorkspace: View {
     }
 
     private func keepAllGroups() {
-        for (runtime, item) in groups {
-            if let first = item.memberIDs.first {
+        for item in groups {
+            if let first = item.members.first {
                 model.resolveDuplicates(
-                    group: item,
-                    warehouseID: runtime.id,
-                    keeperID: first,
+                    group: item.group,
+                    warehouseID: item.warehouseID,
+                    keeperID: first.id,
                     unionTags: false,
                     keepSeparate: true
                 )
@@ -231,25 +229,19 @@ struct DuplicatesWorkspace: View {
 
     private func selectFirstGroupIfNeeded() {
         guard selectedGroupID == nil, let first = groups.first else { return }
-        selectedGroupID = first.1.id
-        let members = duplicateMembers(warehouse: first.0, group: first.1)
-        keeperID = members.first?.id
+        selectedGroupID = first.id
+        keeperID = first.members.first?.id
         if let id = keeperID {
-            model.selectSingle(id, modifiers: [])
+            model.selectDuplicateMember(id)
         }
     }
 
     private func reconcileSelection() {
-        if let selectedGroupID, groups.contains(where: { $0.1.id == selectedGroupID }) {
+        if let selectedGroupID, groups.contains(where: { $0.id == selectedGroupID }) {
             return
         }
-        selectedGroupID = groups.first?.1.id
-        if let pair = selectedPair {
-            let members = duplicateMembers(warehouse: pair.0, group: pair.1)
-            keeperID = members.first?.id
-        } else {
-            keeperID = nil
-        }
+        selectedGroupID = groups.first?.id
+        keeperID = groups.first?.members.first?.id
     }
 }
 
@@ -258,6 +250,8 @@ private struct DuplicateCompareCard: View {
     let warehouse: WarehouseRuntime
     let isKeeper: Bool
     @State private var thumbnail: NSImage?
+    @State private var loadingThumb = true
+    @State private var missingOriginal = false
     @State private var playing = false
     @State private var playerArmed = false
 
@@ -298,24 +292,37 @@ private struct DuplicateCompareCard: View {
         .task(id: footage.id) {
             playing = false
             playerArmed = false
-            guard warehouse.isOnline else { return }
+            thumbnail = nil
+            missingOriginal = false
+            loadingThumb = footage.mediaKind != .audio
+            guard warehouse.isOnline, footage.mediaKind != .audio else {
+                loadingThumb = false
+                return
+            }
             let url = footage.absoluteURL(warehouseRoot: warehouse.preference.url)
             let thumb = ThumbnailService.thumbnailFileURL(warehouseRoot: warehouse.preference.url, footageID: footage.id)
+            if !FileManager.default.fileExists(atPath: url.path) {
+                ThumbnailService.removeStoredThumbnail(at: thumb)
+                missingOriginal = true
+                loadingThumb = false
+                return
+            }
             if footage.mediaKind == .image {
                 thumbnail = await ThumbnailService.ensureImageThumbnail(
                     source: url,
                     thumbnailURL: thumb,
-                    maxEdge: 480,
-                    allowCreate: !ThumbnailService.deferGeneration
+                    maxEdge: ThumbnailService.gridMaxEdge,
+                    allowCreate: true
                 )
             } else if footage.mediaKind == .video {
                 thumbnail = await ThumbnailService.ensureVideoThumbnail(
                     source: url,
                     thumbnailURL: thumb,
-                    maxEdge: 480,
-                    allowCreate: !ThumbnailService.deferGeneration
+                    maxEdge: ThumbnailService.gridMaxEdge,
+                    allowCreate: true
                 )
             }
+            loadingThumb = false
         }
     }
 
@@ -334,11 +341,16 @@ private struct DuplicateCompareCard: View {
                     .resizable()
                     .interpolation(.medium)
                     .scaledToFit()
+            } else if loadingThumb {
+                ProgressView()
+                    .controlSize(.small)
             } else if footage.mediaKind == .audio {
                 Image(systemName: "speaker.wave.2")
                     .foregroundStyle(.white.opacity(0.7))
             } else {
-                ProgressView().controlSize(.small)
+                Image(systemName: missingOriginal ? "eye.slash" : (footage.mediaKind == .image ? "photo" : "film"))
+                    .font(.title2)
+                    .foregroundStyle(.white.opacity(0.7))
             }
 
             if footage.mediaKind.canHoverPlay, warehouse.isOnline {
@@ -371,8 +383,7 @@ private struct DuplicateCompareCard: View {
 }
 
 private struct DuplicateGroupCard: View {
-    let warehouse: WarehouseRuntime
-    let group: DuplicateGroup
+    let warehouseName: String
     let members: [Footage]
     let isSelected: Bool
     let onSelect: () -> Void
@@ -385,7 +396,7 @@ private struct DuplicateGroupCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(String(format: String(localized: "duplicates.group"), locale: .current, members.count))
                         .font(.headline)
-                    Text(warehouse.preference.name)
+                    Text(warehouseName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(folderSummary)

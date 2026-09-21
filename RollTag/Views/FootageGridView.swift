@@ -65,6 +65,9 @@ struct FootageGridView: View {
         if model.preference.warehouses.isEmpty {
             return String(localized: "empty.noWarehouses.detail")
         }
+        if !model.workFolders.isEmpty {
+            return String(localized: "empty.noFootage.scoped.detail")
+        }
         return String(localized: "empty.noFootage.detail")
     }
 }

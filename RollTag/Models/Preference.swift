@@ -208,5 +208,18 @@ enum SmartCollection: String, CaseIterable, Identifiable {
 enum SidebarSelection: Hashable {
     case collection(SmartCollection)
     case warehouse(UUID)
+    /// Relative folder inside a warehouse. Search and the grid stay inside this folder and its descendants.
+    case warehouseFolder(UUID, String)
     case tagCategory(String)
+}
+
+struct FolderRef: Hashable, Identifiable, Sendable {
+    var warehouseID: UUID
+    var relativePath: String
+
+    var id: String { "\(warehouseID.uuidString)/\(relativePath)" }
+
+    var folderName: String {
+        (relativePath as NSString).lastPathComponent
+    }
 }

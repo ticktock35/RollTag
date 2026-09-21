@@ -87,6 +87,8 @@ final class WarehouseDatabase {
             }
         }
         try refreshDuplicateGroups(hashes: outcome.duplicateHashes)
+        let keep = Set(outcome.records.filter { $0.status == .available }.map(\.id))
+        ThumbnailService.sweepOrphanThumbnails(in: thumbsURL, keep: keep)
     }
 
     func insert(_ snapshot: FootageSnapshot) throws {
@@ -221,6 +223,7 @@ final class WarehouseDatabase {
     }
 
     func removeFootage(id: UUID) throws {
+        ThumbnailService.removeStoredThumbnail(at: thumbsURL.appendingPathComponent("\(id.uuidString).jpg"))
         try execute("DELETE FROM duplicate_members WHERE footage_id = ?;", params: [id.uuidString])
         try execute("DELETE FROM footage WHERE id = ?;", params: [id.uuidString])
     }

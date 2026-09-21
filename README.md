@@ -72,19 +72,19 @@ Supported: video (`mov` / `mp4` / `m4v` / `avi` / `mkv` / `mxf`), photos (includ
 
 ### Find and preview
 
-The left sidebar has smart lists (All, Tagged, Untagged, Missing, Duplicates) and categories you have used. Search and sort sit above the grid. Only online warehouses are searched.
+The left sidebar has smart lists (All, Tagged, Untagged, Missing, Duplicates) and categories you have used. Expand a warehouse to browse its folders. Click a folder — or check a few — to search, tag, and handle duplicates only in those folders first; click the warehouse name (or Whole library) for the rest. Switching to Untagged or Duplicates keeps the same folders. Search and sort sit above the grid. Only online warehouses are searched.
 
 Select a clip: player on the left (video/audio scrub; photos show a still), inspector on the right (path, capture time, GPS if present, tags). Hover a grid cell to preview video/audio. Space plays/pauses; P or Esc toggles fullscreen. ⌘/ lists every shortcut.
 
 ### Tag
 
-Tag by hand or with AI. For a run of similar clips, select them together so one pass covers the group — faster than one file at a time, and you are already looking at the footage. The inspector accepts preset facets (theme, mood, place, shot, …) or custom words (`clubmed`, a person’s name). Single clip and batch use the same controls. Click a chip to remove it. Search uses these tags later, on every job that opens this warehouse.
+Tag by hand or with AI. Check the folders you want to finish first, open Untagged, then ⌘A. For a run of similar clips, select them together so one pass covers the group — faster than one file at a time, and you are already looking at the footage. The inspector accepts preset facets (theme, mood, place, shot, …) or custom words (`clubmed`, a person’s name). Single clip and batch use the same controls. Click a chip to remove it. Search uses these tags later, on every job that opens this warehouse.
 
 For AI tagging, add a Gemini or OpenAI API key in Settings (⌘,). After you select a **video or photo**, the inspector and Tag menu show the action (⌥⌘T). Import never runs AI by itself. Audio, tiny files, and unreadable files are skipped. When the model succeeds, RollTag also applies this warehouse’s existing place/custom tags that match folder names.
 
 ### Duplicates and trim
 
-Sidebar Duplicates or ⌘⇧D: compare side by side. A keeps the leftmost, D the rightmost, S keeps all; Enter confirms sending the others to Trash.
+Sidebar Duplicates or ⌘⇧D: compare side by side. If working folders are set, only groups that touch those folders appear; you still see every copy in the group. A keeps the leftmost, D the rightmost, S keeps all; Enter confirms sending the others to Trash.
 
 With a single video selected, **Trim** opens a separate window and writes a new file in the warehouse that you can tag on its own.
 
@@ -169,19 +169,19 @@ xcodebuild -scheme RollTag -destination 'platform=macOS' test
 
 ### 找片子與預覽
 
-左側是智慧列表（全部、已打標、未打標、找不到、重複）與已用過的分類。右下格線上面有搜尋與排序。只搜現在讀得到的倉庫。
+左側是智慧列表（全部、已打標、未打標、找不到、重複）與已用過的分類。倉庫可展開看底下的目錄；點一層或勾幾個重點，搜尋、打標與重複檔只先做那些資料夾與其下層。再點「未打標」或「重複檔」不會丟掉範圍。點倉庫名或「看整倉」才回到整庫。右下格線上面有搜尋與排序。只搜現在讀得到的倉庫。
 
 點一支：右上左欄播放（影片／音訊可拉時間軸；照片看大圖），右欄看路徑、拍攝時間、GPS（有才顯示）與標籤。格線 hover 可預覽影片／音訊。空白鍵播放／暫停；P 或 Esc 進出全螢幕。⌘/ 看全部快捷鍵。
 
 ### 打標
 
-可手打，也可 AI。同一組相似的影片建議一起選、一次打，比一支支快，而且審素材的同時標就打完了。右側可打預設分類（主題、情緒、地點、鏡頭等）或自訂字（例如「皓皓」「clubmed」）。單支與批次同一套。點 chip 可拿掉。搜尋吃這些標，之後每個案子都能再用。
+可手打，也可 AI。先勾要處理的重點目錄，再進「未打標」、⌘A。同一組相似的影片建議一起選、一次打，比一支支快，而且審素材的同時標就打完了。右側可打預設分類（主題、情緒、地點、鏡頭等）或自訂字（例如「皓皓」「clubmed」）。單支與批次同一套。點 chip 可拿掉。搜尋吃這些標，之後每個案子都能再用。
 
 AI 打標要先在設定（⌘,）填 Gemini 或 OpenAI 的 API key。選了**影片或照片**之後，右側與標籤選單才出現按鈕（⌥⌘T）。匯入不會自動跑。音訊、空檔、解不開的會跳過。模型成功時，也會把這個倉庫裡已有的地點／自訂標從資料夾名套上去。
 
 ### 重複檔與切段
 
-左側「重複檔」或 ⌘⇧D：並排比較，A 留最左、D 留最右、S 全留下，Enter 確認後其他複本進垃圾桶。
+左側「重複檔」或 ⌘⇧D：並排比較。有重點目錄時，只列出至少有一支落在那些目錄的組，比較時仍看得到組內所有複本。A 留最左、D 留最右、S 全留下，Enter 確認後其他複本進垃圾桶。
 
 只選一支影片時，右側「剪輯」開獨立視窗，輸出成倉庫內新檔，可另外打標。
 

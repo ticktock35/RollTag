@@ -8,8 +8,26 @@ struct WarehouseRuntime: Identifiable, Hashable {
     var isReconciling: Bool
     var footage: [Footage]
     var groups: [DuplicateGroup]
+    var footageByID: [UUID: Footage]
+    var folderNodes: [WarehouseFolderNode]
 
     var id: UUID { preference.id }
+
+    init(
+        preference: WarehousePreference,
+        isOnline: Bool,
+        isReconciling: Bool,
+        footage: [Footage],
+        groups: [DuplicateGroup]
+    ) {
+        self.preference = preference
+        self.isOnline = isOnline
+        self.isReconciling = isReconciling
+        self.footage = footage
+        self.groups = groups
+        self.footageByID = Dictionary(uniqueKeysWithValues: footage.map { ($0.id, $0) })
+        self.folderNodes = WarehouseFolderTree.nodes(warehouseID: preference.id, from: footage)
+    }
 }
 
 struct DuplicateKeepRequest: Equatable {
@@ -26,6 +44,12 @@ final class AppModel {
     var preference = PreferenceFile.empty
     var warehouses: [WarehouseRuntime] = []
     var sidebarSelection: SidebarSelection = .collection(.all) {
+        didSet {
+            syncWorkFolders(from: sidebarSelection)
+            rebuildVisibleResults()
+        }
+    }
+    var workFolders: Set<FolderRef> = [] {
         didSet { rebuildVisibleResults() }
     }
     var searchText = "" {
@@ -38,6 +62,7 @@ final class AppModel {
         didSet { rebuildVisibleResults() }
     }
     private(set) var visibleResults: [ScoredFootage] = []
+    private(set) var scopedDuplicateGroups: [ResolvedDuplicateGroup] = []
     var libraryEpoch = 0
     var thumbRefreshToken = 0
     var selectedIDs: Set<UUID> = []
@@ -213,22 +238,79 @@ final class AppModel {
     }
 
     private func currentDuplicatePair() -> (WarehouseRuntime, DuplicateGroup)? {
-        if let duplicateSelectedGroupID,
-           let pair = unresolvedDuplicateGroups.first(where: { $0.1.id == duplicateSelectedGroupID }) {
-            return pair
+        if let resolved = resolvedDuplicateGroup(id: duplicateSelectedGroupID)
+            ?? scopedDuplicateGroups.first,
+           let warehouse = warehouses.first(where: { $0.id == resolved.warehouseID }) {
+            return (warehouse, resolved.group)
         }
-        return unresolvedDuplicateGroups.first
+        return nil
+    }
+
+    private func resolvedDuplicateGroup(id: UUID?) -> ResolvedDuplicateGroup? {
+        guard let id else { return nil }
+        return scopedDuplicateGroups.first(where: { $0.id == id })
     }
 
     private func duplicateMembers(_ pair: (WarehouseRuntime, DuplicateGroup)) -> [Footage] {
-        pair.0.footage
-            .filter { pair.1.memberIDs.contains($0.id) }
+        if let resolved = scopedDuplicateGroups.first(where: { $0.id == pair.1.id }) {
+            return resolved.members
+        }
+        return pair.1.memberIDs.compactMap { pair.0.footageByID[$0] }
             .sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
     }
 
     var unresolvedDuplicateGroups: [(WarehouseRuntime, DuplicateGroup)] {
-        warehouses.flatMap { warehouse in
-            warehouse.groups.filter { $0.resolution == .unresolved && $0.memberIDs.count > 1 }.map { (warehouse, $0) }
+        scopedDuplicateGroups.compactMap { item in
+            guard let warehouse = warehouses.first(where: { $0.id == item.warehouseID }) else { return nil }
+            return (warehouse, item.group)
+        }
+    }
+
+    func selectDuplicateMember(_ id: UUID) {
+        selectedIDs = [id]
+        focusedFootageID = id
+    }
+
+    var workFolderNames: [String] {
+        workFolders
+            .sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
+            .map(\.folderName)
+    }
+
+    var workFolderSummary: String {
+        workFolderNames.joined(separator: "、")
+    }
+
+    func isWorkFolder(_ ref: FolderRef) -> Bool {
+        workFolders.contains(ref)
+    }
+
+    func toggleWorkFolder(_ ref: FolderRef) {
+        if workFolders.contains(ref) {
+            workFolders.remove(ref)
+        } else {
+            workFolders.insert(ref)
+        }
+    }
+
+    func clearWorkFolders() {
+        workFolders = []
+        if case .warehouseFolder(let id, _) = sidebarSelection {
+            sidebarSelection = .warehouse(id)
+        }
+    }
+
+    private func syncWorkFolders(from selection: SidebarSelection) {
+        switch selection {
+        case .warehouseFolder(let id, let path):
+            let ref = FolderRef(warehouseID: id, relativePath: path)
+            if !workFolders.contains(ref) {
+                workFolders = [ref]
+            }
+        case .warehouse:
+            workFolders = []
+        default:
+            break
         }
     }
 
@@ -558,7 +640,7 @@ final class AppModel {
         deleteOthers: Bool = false
     ) {
         guard let db = databases[warehouseID], let warehouse = warehouses.first(where: { $0.id == warehouseID }) else { return }
-        let members = warehouse.footage.filter { group.memberIDs.contains($0.id) }
+        let members = group.memberIDs.compactMap { warehouse.footageByID[$0] }
         let others = members.filter { $0.id != keeperID }
         do {
             if keepSeparate {
@@ -983,9 +1065,14 @@ final class AppModel {
     }
 
     private func rebuildVisibleResults() {
-        let duplicateIDs = Set(
-            warehouses.flatMap(\.groups).filter { $0.memberIDs.count > 1 }.flatMap(\.memberIDs)
-        )
+        let scopes = FootageFilter.resolvedScopes(selection: sidebarSelection, folderScopes: workFolders)
+        scopedDuplicateGroups = DuplicateIndex.resolve(warehouses: warehouses, scopes: scopes)
+        if case .collection(.duplicates) = sidebarSelection {
+            visibleResults = []
+            libraryEpoch += 1
+            return
+        }
+        let duplicateIDs = Set(scopedDuplicateGroups.flatMap { $0.members.map(\.id) })
         let items: [(Footage, SearchService.Context)] = warehouses.flatMap { warehouse in
             warehouse.footage.compactMap { footage in
                 let context = SearchService.Context(
@@ -997,7 +1084,8 @@ final class AppModel {
                     footage: footage,
                     isOnline: context.isOnline,
                     selection: sidebarSelection,
-                    isDuplicate: duplicateIDs.contains(footage.id)
+                    isDuplicate: duplicateIDs.contains(footage.id),
+                    folderScopes: workFolders
                 ) else { return nil }
                 return (footage, context)
             }

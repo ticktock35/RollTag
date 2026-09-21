@@ -60,7 +60,25 @@ enum ThumbnailService {
     }
 
     static func loadThumbnail(at url: URL, maxEdge: CGFloat = gridMaxEdge) -> NSImage? {
-        stillImage(url: url, maxEdge: maxEdge, preferEmbedded: false)
+        decodeStill(url: url, maxEdge: maxEdge)
+    }
+
+    static func removeStoredThumbnail(at url: URL) {
+        try? FileManager.default.removeItem(at: url)
+        ThumbnailMemoryCache.shared.remove(thumbnailURL: url)
+    }
+
+    static func sweepOrphanThumbnails(in directory: URL, keep: Set<UUID>) {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        ) else { return }
+        for file in files where file.pathExtension.lowercased() == "jpg" {
+            let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent)
+            if id == nil || keep.contains(id!) == false {
+                removeStoredThumbnail(at: file)
+            }
+        }
     }
 
     static func previewStill(url: URL, maxEdge: CGFloat = playerMaxEdge) async -> NSImage? {
@@ -78,6 +96,10 @@ enum ThumbnailService {
         maxEdge: CGFloat = gridMaxEdge,
         allowCreate: Bool = true
     ) async -> NSImage? {
+        if !FileManager.default.fileExists(atPath: source.path) {
+            removeStoredThumbnail(at: thumbnailURL)
+            return nil
+        }
         let cacheKey = memoryKey(thumbnailURL, maxEdge: maxEdge)
         if let cached = ThumbnailMemoryCache.shared.image(for: cacheKey) {
             return cached
@@ -90,10 +112,10 @@ enum ThumbnailService {
         await ThumbnailDecodeGate.shared.acquire()
         let image = await Task.detached(priority: .utility) { () -> NSImage? in
             let storedEdge = min(max(maxEdge, gridMaxEdge), storedThumbMaxEdge)
-            guard let stored = stillImage(url: source, maxEdge: storedEdge, preferEmbedded: true) else { return nil }
+            guard let stored = decodeStill(url: source, maxEdge: storedEdge) else { return nil }
             writeThumbnail(stored, to: thumbnailURL)
             if maxEdge + 0.5 < storedEdge {
-                return stillImage(url: thumbnailURL, maxEdge: maxEdge, preferEmbedded: false) ?? stored
+                return decodeStill(url: thumbnailURL, maxEdge: maxEdge) ?? stored
             }
             return stored
         }.value
@@ -110,6 +132,10 @@ enum ThumbnailService {
         maxEdge: CGFloat = gridMaxEdge,
         allowCreate: Bool = true
     ) async -> NSImage? {
+        if !FileManager.default.fileExists(atPath: source.path) {
+            removeStoredThumbnail(at: thumbnailURL)
+            return nil
+        }
         let cacheKey = memoryKey(thumbnailURL, maxEdge: maxEdge)
         if let cached = ThumbnailMemoryCache.shared.image(for: cacheKey) {
             return cached
@@ -124,7 +150,7 @@ enum ThumbnailService {
             guard let stored = posterFallback(url: source) else { return nil }
             writeThumbnail(stored, to: thumbnailURL)
             if maxEdge + 0.5 < max(stored.size.width, stored.size.height) {
-                return stillImage(url: thumbnailURL, maxEdge: maxEdge, preferEmbedded: false) ?? stored
+                return decodeStill(url: thumbnailURL, maxEdge: maxEdge) ?? stored
             }
             return stored
         }.value
@@ -158,11 +184,26 @@ enum ThumbnailService {
     }
 
     static func stillImage(url: URL, maxEdge: CGFloat = 768, preferEmbedded: Bool = true) -> NSImage? {
+        decodeStill(url: url, maxEdge: maxEdge, preferEmbedded: preferEmbedded)
+    }
+
+    static func decodeStill(url: URL, maxEdge: CGFloat, preferEmbedded: Bool = true) -> NSImage? {
+        if let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: preferEmbedded) {
+            return image
+        }
+        if preferEmbedded, let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: false) {
+            return image
+        }
+        guard let original = NSImage(contentsOf: url) else { return nil }
+        return downscale(original, maxEdge: maxEdge) ?? original
+    }
+
+    private static func imageSourceThumbnail(url: URL, maxEdge: CGFloat, preferEmbedded: Bool) -> NSImage? {
         let pixelSize = max(Int(maxEdge.rounded()), 1)
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions),
-              CGImageSourceGetCount(source) > 0
-        else { return nil }
+        let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions)
+            ?? mappedImageSource(url: url, options: sourceOptions)
+        guard let source, CGImageSourceGetCount(source) > 0 else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceShouldCache: false,
             kCGImageSourceShouldCacheImmediately: false,
@@ -173,6 +214,35 @@ enum ThumbnailService {
         ]
         guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         return nsImage(from: cg)
+    }
+
+    private static func mappedImageSource(url: URL, options: CFDictionary) -> CGImageSource? {
+        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return nil }
+        return CGImageSourceCreateWithData(data as CFData, options)
+    }
+
+    private static func downscale(_ image: NSImage, maxEdge: CGFloat) -> NSImage? {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let longest = max(cg.width, cg.height)
+        let edge = max(Int(maxEdge.rounded()), 1)
+        if longest <= edge { return nsImage(from: cg) }
+        let scale = CGFloat(edge) / CGFloat(longest)
+        let width = max(1, Int((CGFloat(cg.width) * scale).rounded()))
+        let height = max(1, Int((CGFloat(cg.height) * scale).rounded()))
+        let colorSpace = cg.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nsImage(from: cg) }
+        context.interpolationQuality = .medium
+        context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let scaled = context.makeImage() else { return nsImage(from: cg) }
+        return nsImage(from: scaled)
     }
 
     private static func memoryKey(_ url: URL, maxEdge: CGFloat) -> String {
@@ -305,6 +375,12 @@ final class ThumbnailMemoryCache: @unchecked Sendable {
         let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         let cost = max(1, (cg?.width ?? 1) * (cg?.height ?? 1) * 4)
         cache.setObject(image, forKey: key as NSString, cost: cost)
+    }
+
+    func remove(thumbnailURL: URL) {
+        for edge in [64, 180, 320, 480, 768, 1280] {
+            cache.removeObject(forKey: "\(thumbnailURL.path)#\(edge)" as NSString)
+        }
     }
 }
 
