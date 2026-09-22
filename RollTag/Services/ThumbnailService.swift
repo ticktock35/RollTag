@@ -81,12 +81,10 @@ enum ThumbnailService {
     }
 
     static func previewStill(url: URL, maxEdge: CGFloat = playerMaxEdge) async -> NSImage? {
-        await ThumbnailDecodeGate.shared.acquire()
-        let image = await Task.detached(priority: .utility) { () -> NSImage? in
-            stillImage(url: url, maxEdge: maxEdge, preferEmbedded: false)
+        await Task.detached(priority: .userInitiated) { () -> NSImage? in
+            stillImage(url: url, maxEdge: maxEdge, preferEmbedded: true)
+                ?? stillImage(url: url, maxEdge: maxEdge, preferEmbedded: false)
         }.value
-        await ThumbnailDecodeGate.shared.release()
-        return image
     }
 
     static func ensureImageThumbnail(

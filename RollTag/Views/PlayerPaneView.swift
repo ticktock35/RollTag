@@ -283,9 +283,20 @@ private struct PlayerImageView: View {
             }
         }
         .task(id: media.id) {
-            image = nil
+            if let warehouseRoot {
+                let thumbURL = ThumbnailService.thumbnailFileURL(warehouseRoot: warehouseRoot, footageID: media.id)
+                if let cached = ThumbnailService.loadThumbnail(at: thumbURL, maxEdge: ThumbnailService.storedThumbMaxEdge) {
+                    image = cached
+                } else {
+                    image = nil
+                }
+            } else {
+                image = nil
+            }
             guard warehouseRoot != nil else { return }
-            image = await ThumbnailService.previewStill(url: media.url, maxEdge: ThumbnailService.playerMaxEdge)
+            if let large = await ThumbnailService.previewStill(url: media.url, maxEdge: ThumbnailService.playerMaxEdge) {
+                image = large
+            }
         }
     }
 }

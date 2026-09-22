@@ -1,6 +1,13 @@
 import unittest
 
-from rolltag_sidecar.suggest import _http_error_message, build_prompt, parse_tags
+from rolltag_sidecar.suggest import (
+    _http_error_message,
+    build_prompt,
+    parse_tags,
+    parsed_retry_delay,
+    pick_frames,
+    should_retry,
+)
 
 
 class SuggestTests(unittest.TestCase):
@@ -89,6 +96,24 @@ class SuggestTests(unittest.TestCase):
         body = '{"error":{"code":404,"message":"This model models/gemini-2.5-flash-lite is no longer available to new users.","status":"NOT_FOUND"}}'
         self.assertIn("no longer available", _http_error_message(404, body))
         self.assertNotIn("http_404", _http_error_message(404, body))
+
+    def test_should_retry_rate_limits_not_not_found(self):
+        self.assertTrue(should_retry(429, ""))
+        self.assertTrue(should_retry(503, ""))
+        self.assertTrue(should_retry(400, '{"error":{"status":"RESOURCE_EXHAUSTED"}}'))
+        self.assertFalse(should_retry(404, body='{"error":{"status":"NOT_FOUND"}}'))
+        self.assertFalse(should_retry(401, ""))
+
+    def test_parsed_retry_delay_reads_gemini_details(self):
+        body = '{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"8s"}]}}'
+        self.assertEqual(parsed_retry_delay(body), 8.0)
+        self.assertIsNone(parsed_retry_delay("not json"))
+
+    def test_pick_frames_keeps_start_mid_end(self):
+        frames = ["a", "b", "c", "d", "e", "f"]
+        self.assertEqual(pick_frames(frames, 3), ["a", "c", "f"])
+        self.assertEqual(pick_frames(frames, 6), frames)
+        self.assertEqual(pick_frames(["only"], 3), ["only"])
 
 
 if __name__ == "__main__":

@@ -2310,13 +2310,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Priority: Gemini 3.5 Flash Lite, then gpt-4.1-mini. Choose a capable model per provider."
+            "value" : "Priority: Gemini 3.5 Flash Lite, then gpt-4.1-mini. Gemini rate limits are tighter; a failure falls back to OpenAI immediately. Choose a capable model per provider."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "優先 Gemini 3.5 Flash Lite，其次 gpt-4.1-mini。各平台只列出能力足夠的模型。"
+            "value" : "優先 Gemini 3.5 Flash Lite，其次 gpt-4.1-mini。Gemini 配額較緊，失敗立刻改送 OpenAI。各平台只列出能力足夠的模型。"
           }
         }
       }

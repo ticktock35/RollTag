@@ -122,14 +122,12 @@ final class AppModel {
     }
 
     var selectedFootage: [Footage] {
-        let all = warehouses.flatMap(\.footage)
-        return all.filter { selectedIDs.contains($0.id) }
+        selectedIDs.compactMap { footage(id: $0) }
     }
 
     var focusedFootage: Footage? {
-        let all = warehouses.flatMap(\.footage)
         if let focusedFootageID, selectedIDs.contains(focusedFootageID),
-           let item = all.first(where: { $0.id == focusedFootageID }) {
+           let item = footage(id: focusedFootageID) {
             return item
         }
         return selectedFootage.first
@@ -168,7 +166,12 @@ final class AppModel {
     }
 
     func footage(id: UUID) -> Footage? {
-        warehouses.flatMap(\.footage).first(where: { $0.id == id })
+        for warehouse in warehouses {
+            if let footage = warehouse.footageByID[id] {
+                return footage
+            }
+        }
+        return nil
     }
 
     func onlineRoot(for footageID: UUID) -> URL? {

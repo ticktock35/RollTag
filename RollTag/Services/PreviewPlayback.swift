@@ -26,7 +26,7 @@ struct TrimSession: Equatable, Identifiable {
 @MainActor
 @Observable
 final class PreviewPlayback {
-    let player = AVPlayer()
+    let player: AVPlayer
     var media: PreviewMedia?
     var isPlaying = false
     var isFullscreen = false
@@ -37,11 +37,18 @@ final class PreviewPlayback {
     var isIncompleteFile = false
 
     private var loadedURL: URL?
+    private var presentGeneration = 0
     private var endObserver: NSObjectProtocol?
     private var timeObserver: Any?
     private var itemStatusObservation: NSKeyValueObservation?
     private var enteredSystemFullscreen = false
     private var resumeAfterScrub = false
+
+    init() {
+        let player = AVPlayer()
+        player.automaticallyWaitsToMinimizeStalling = false
+        self.player = player
+    }
 
     var canPlay: Bool {
         guard let media, !isIncompleteFile, !didFailToLoad else { return false }
@@ -50,6 +57,8 @@ final class PreviewPlayback {
 
     func present(_ next: PreviewMedia?) {
         media = next
+        presentGeneration += 1
+        let token = presentGeneration
         guard let next, next.kind == .video || next.kind == .audio else {
             unloadPlayer()
             return
@@ -61,7 +70,12 @@ final class PreviewPlayback {
             return
         }
         guard loadedURL != next.url else { return }
-        replaceCurrentItem(url: next.url)
+        pause()
+        Task { @MainActor in
+            await Task.yield()
+            guard token == presentGeneration else { return }
+            replaceCurrentItem(url: next.url)
+        }
     }
 
     func play() {
@@ -145,6 +159,7 @@ final class PreviewPlayback {
     }
 
     func unload() {
+        presentGeneration += 1
         media = nil
         unloadPlayer()
         exitFullscreen()
@@ -161,7 +176,8 @@ final class PreviewPlayback {
         currentSeconds = 0
         didFailToLoad = false
         isIncompleteFile = false
-        let item = AVPlayerItem(url: url)
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        let item = AVPlayerItem(asset: asset)
         observeItem(item)
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
@@ -175,7 +191,6 @@ final class PreviewPlayback {
             }
         }
         player.replaceCurrentItem(with: item)
-        player.seek(to: .zero)
         ensureTimeObserver()
     }
 

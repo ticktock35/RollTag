@@ -1,7 +1,11 @@
 import json
+import time
 import urllib.error
 import urllib.request
 from typing import Optional
+
+GEMINI_FRAME_LIMIT = 3
+RETRYABLE_STATUS = {429, 500, 502, 503}
 
 PROMPT = """You tag B-roll stills for a footage warehouse.
 Choose 3 to 8 tags that clearly match the frames.
@@ -183,12 +187,21 @@ def suggest_tags(
         examples if isinstance(examples, list) else None,
     )
     if provider == "gemini":
-        text = _gemini(api_key, model or "gemini-3.5-flash-lite", prompt, frames)
+        text = _gemini(api_key, model or "gemini-3.5-flash-lite", prompt, pick_frames(frames, GEMINI_FRAME_LIMIT))
     elif provider == "openai":
         text = _openai(api_key, model or "gpt-4.1-mini", prompt, frames)
     else:
         raise ValueError("unsupported_provider")
     return {"tags": parse_tags(text), "keywords": parse_keywords(text), "provider": provider, "model": model}
+
+
+def pick_frames(frames: list, limit: int) -> list:
+    if limit <= 0 or len(frames) <= limit:
+        return list(frames)
+    if limit == 1:
+        return [frames[len(frames) // 2]]
+    step = (len(frames) - 1) / (limit - 1)
+    return [frames[round(index * step)] for index in range(limit)]
 
 
 def _gemini(api_key: str, model: str, prompt: str, frames: list) -> str:
@@ -206,7 +219,10 @@ def _gemini(api_key: str, model: str, prompt: str, frames: list) -> str:
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent?key={api_key}"
     )
-    data = _post_json(url, payload, {"Content-Type": "application/json"})
+    data = _post_json(url, payload, {"Content-Type": "application/json"}, retries=1)
+    blocked = ((data.get("promptFeedback") or {}).get("blockReason"))
+    if blocked:
+        raise RuntimeError(f"gemini_blocked:{blocked}")
     candidates = data.get("candidates") or []
     if not candidates:
         raise RuntimeError(_gemini_error(data))
@@ -242,6 +258,7 @@ def _openai(api_key: str, model: str, prompt: str, frames: list) -> str:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         },
+        retries=2,
     )
     choices = data.get("choices") or []
     if not choices:
@@ -249,19 +266,64 @@ def _openai(api_key: str, model: str, prompt: str, frames: list) -> str:
     return ((choices[0].get("message") or {}).get("content")) or ""
 
 
-def _post_json(url: str, payload: dict, headers: dict) -> dict:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
+def _post_json(url: str, payload: dict, headers: dict, retries: int = 3) -> dict:
+    body = json.dumps(payload).encode("utf-8")
+    last_error = RuntimeError("request_failed")
+    for attempt in range(retries):
+        request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=90) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", errors="replace")
+            last_error = RuntimeError(_http_error_message(exc.code, raw))
+            if attempt + 1 < retries and should_retry(exc.code, raw):
+                time.sleep(retry_seconds(exc.code, raw, attempt))
+                continue
+            raise last_error from None
+        except urllib.error.URLError as exc:
+            last_error = RuntimeError(str(exc.reason)[:200] or "network_error")
+            if attempt + 1 < retries:
+                time.sleep(retry_seconds(503, "", attempt))
+                continue
+            raise last_error from None
+    raise last_error
+
+
+def should_retry(code: int, body: str) -> bool:
+    if code in RETRYABLE_STATUS:
+        return True
+    upper = body.upper()
+    return "RESOURCE_EXHAUSTED" in upper or "UNAVAILABLE" in upper
+
+
+def retry_seconds(code: int, body: str, attempt: int) -> float:
+    delay = parsed_retry_delay(body)
+    if delay is None:
+        delay = 1.0 + attempt
+    return min(max(delay, 0.4), 2.0)
+
+
+def parsed_retry_delay(body: str) -> Optional[float]:
     try:
-        with urllib.request.urlopen(request, timeout=90) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")[:800]
-        raise RuntimeError(_http_error_message(exc.code, body)) from None
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    error = data.get("error") if isinstance(data, dict) else None
+    if not isinstance(error, dict):
+        return None
+    for item in error.get("details") or []:
+        if not isinstance(item, dict):
+            continue
+        raw = item.get("retryDelay")
+        if isinstance(raw, str) and raw.endswith("s"):
+            try:
+                return float(raw[:-1])
+            except ValueError:
+                continue
+        if isinstance(raw, (int, float)):
+            return float(raw)
+    return None
 
 
 def _http_error_message(code: int, body: str) -> str:

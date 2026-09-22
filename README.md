@@ -93,7 +93,7 @@ Non-English custom tags also get Getty/Pond5 English keywords from the bundled C
 3. Press **AI tag** in the inspector or ⌥⌘T. After the model returns, Done or Return keeps the tags; Cancel or Esc discards that batch.
 4. Or right-click **Untagged** in the sidebar, or one or more items in the media grid, and choose **AI Batch Tag**. That run is one file at a time and keeps tags immediately — no confirmation.
 
-A large batch can **fail on later files even when the clips are fine**. RollTag sends each file to Gemini or OpenAI with no pause; the platform may hit a rate or daily quota, time out, or return an error. Those count as failed, not skipped (skipped means audio, tiny, or no frames). The status line shows how many succeeded and failed. Wait a few minutes and run AI Batch Tag again on what is still untagged, or add a second key so one provider can cover the other.
+A large batch can **fail on later files even when the clips are fine**. Gemini’s free or low tier hits rate limits much sooner than OpenAI. A Gemini failure falls through to OpenAI immediately if that key is set — no waiting between files. Failures are not skipped (skipped means audio, tiny, or no frames). The status line shows how many succeeded and failed. Wait a few minutes and run AI Batch Tag again on what is still untagged, or add a second key so one provider can cover the other.
 
 When the model succeeds, RollTag writes catalog tags, short visible non-English custom labels, and Getty/Pond5 English keywords (lowercase, space-separated), plus this warehouse’s existing place/custom tags that match folder names.
 
@@ -215,7 +215,7 @@ xcodebuild -scheme RollTag -destination 'platform=macOS' test
 3. 按右側「AI 打標」或 ⌥⌘T。模型回來後：完成或 Enter 保留；取消或 Esc 拿掉這次標。
 4. 或在側欄「未打標」、或媒體區選一支／多支後按右鍵「AI 批次打標」。一支一支送，打完就留下，不必確認。
 
-大批次後面幾支**可能失敗，檔案本身往往沒問題**。RollTag 一支接著一支送給 Gemini 或 OpenAI，中間不停；平台可能碰到頻率／每日配額、逾時或回錯誤。這種算「失敗」，不是「跳過」（跳過是音訊、太小或抽不出幀）。狀態列會寫成功與失敗支數。等幾分鐘再對還在未打標的跑一次，或再加一把 key 當備援。
+大批次後面幾支**可能失敗，檔案本身往往沒問題**。Gemini 免費／低額度比 OpenAI 更容易碰到頻率上限。Gemini 失敗且有 OpenAI key 就立刻改送，支與支之間不停。這種算「失敗」，不是「跳過」（跳過是音訊、太小或抽不出幀）。狀態列會寫成功與失敗支數。等幾分鐘再對還在未打標的跑一次，或再加一把 key 當備援。
 
 模型成功時會寫清單標、畫面裡看得清楚的短中文自訂詞，以及 Getty／Pond5 格式的英文關鍵字（小寫、空白分詞），也會把這個倉庫裡已有的地點／自訂標從資料夾名套上去。
 
