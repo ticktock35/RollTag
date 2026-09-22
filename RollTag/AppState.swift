@@ -86,7 +86,6 @@ final class AppModel {
     var pendingAIConfirmation = false
     private var pendingAINovelTags: [UUID: [TagAssignment]] = [:]
     private var pendingAIBeforeKeys: [UUID: Set<String>] = [:]
-    var settingsKeyboardActive = 0
     var capturingShortcut: ShortcutAction?
     var shortcutCaptureMessage = ""
     let playback = PreviewPlayback()
@@ -1589,7 +1588,7 @@ final class AppModel {
 
     private func handlePlaybackKey(_ event: NSEvent) -> NSEvent? {
         if applyCapturedShortcut(event) { return nil }
-        if settingsKeyboardActive > 0 { return event }
+        if Self.isSettingsKeyWindow { return event }
         if Self.isEditingText { return event }
         let shortcuts = preference.shortcuts
         if handleLibraryArrowKey(event) {
@@ -1716,10 +1715,16 @@ final class AppModel {
         return responder is NSTextView || responder is NSTextField || responder is NSText
     }
 
+    static let settingsWindowID = "settings"
+
+    static var isSettingsKeyWindow: Bool {
+        NSApp.keyWindow?.identifier?.rawValue == settingsWindowID
+    }
+
     static var isLibraryKeyWindow: Bool {
         guard let window = NSApp.keyWindow else { return false }
         let id = window.identifier?.rawValue ?? ""
-        return id != "duplicates" && id != "shortcuts" && id != "trim"
+        return id != "duplicates" && id != "shortcuts" && id != "trim" && id != settingsWindowID
     }
 
     static func isFocusInSidebar(_ window: NSWindow? = NSApp.keyWindow) -> Bool {

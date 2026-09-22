@@ -1,15 +1,31 @@
+import AppKit
 import SwiftUI
+
+final class RollTagAppDelegate: NSObject, NSApplicationDelegate {
+    var model: AppModel?
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        model?.stop()
+    }
+}
 
 @main
 struct RollTagApp: App {
+    @NSApplicationDelegateAdaptor(RollTagAppDelegate.self) private var appDelegate
     @State private var model = AppModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
                 .frame(minWidth: 1180, minHeight: 760)
-                .onAppear { model.start() }
-                .onDisappear { model.stop() }
+                .onAppear {
+                    appDelegate.model = model
+                    model.start()
+                }
         }
         .commands {
             CommandGroup(replacing: .newItem) {

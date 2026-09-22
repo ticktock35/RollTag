@@ -18,10 +18,13 @@ struct SettingsView: View {
                 .tabItem { Label(String(localized: "settings.shortcuts"), systemImage: "keyboard") }
         }
         .padding(20)
-        .frame(minWidth: 760, minHeight: 520)
-        .onAppear { model.settingsKeyboardActive += 1 }
+        .frame(minWidth: 760, minHeight: 620)
+        .onAppear {
+            DispatchQueue.main.async {
+                NSApp.keyWindow?.identifier = NSUserInterfaceItemIdentifier(AppModel.settingsWindowID)
+            }
+        }
         .onDisappear {
-            model.settingsKeyboardActive = max(0, model.settingsKeyboardActive - 1)
             model.cancelCapturingShortcut()
         }
     }
@@ -141,55 +144,63 @@ struct SettingsView: View {
     }
 
     private var aiPane: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(String(localized: "settings.ai"))
-                .font(.title2.weight(.semibold))
-            Text(String(localized: "settings.ai.detail"))
-                .foregroundStyle(.secondary)
-            HStack(spacing: 16) {
-                Link(String(localized: "settings.ai.keys.gemini"), destination: URL(string: "https://aistudio.google.com/api-keys")!)
-                Link(String(localized: "settings.ai.keys.openai"), destination: URL(string: "https://platform.openai.com/api-keys")!)
-            }
-            .font(.callout)
-            Text(String(localized: "settings.ai.keys.warn"))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Text(String(localized: "settings.ai.priority"))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-            Picker(String(localized: "settings.ai.captureTime"), selection: Binding(
-                get: { model.preference.ai.skipImplausibleCaptureDates },
-                set: { model.updateSkipImplausibleCaptureDates($0) }
-            )) {
-                Text(String(localized: "settings.ai.captureTime.skipImplausible")).tag(true)
-                Text(String(localized: "settings.ai.captureTime.preferHeader")).tag(false)
-            }
-            .pickerStyle(.radioGroup)
-            Text(String(localized: "settings.ai.captureTime.detail"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Picker(String(localized: "settings.ai.active"), selection: Binding(
-                get: { model.preference.ai.selectedProvider },
-                set: { model.selectAIProvider($0) }
-            )) {
-                Text(String(localized: "settings.ai.none")).tag(Optional<AIProvider>.none)
-                ForEach(AIProvider.allCases) { provider in
-                    Text(String(localized: String.LocalizationValue(provider.localizationKey))).tag(Optional(provider))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(String(localized: "settings.ai"))
+                    .font(.title2.weight(.semibold))
+                Text(String(localized: "settings.ai.detail"))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 16) {
+                    Link(String(localized: "settings.ai.keys.gemini"), destination: URL(string: "https://aistudio.google.com/api-keys")!)
+                    Link(String(localized: "settings.ai.keys.openai"), destination: URL(string: "https://platform.openai.com/api-keys")!)
                 }
+                .font(.callout)
+                Text(String(localized: "settings.ai.keys.warn"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(localized: "settings.ai.priority"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Picker(String(localized: "settings.ai.captureTime"), selection: Binding(
+                    get: { model.preference.ai.skipImplausibleCaptureDates },
+                    set: { model.updateSkipImplausibleCaptureDates($0) }
+                )) {
+                    Text(String(localized: "settings.ai.captureTime.skipImplausible")).tag(true)
+                    Text(String(localized: "settings.ai.captureTime.preferHeader")).tag(false)
+                }
+                .pickerStyle(.radioGroup)
+                Text(String(localized: "settings.ai.captureTime.detail"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Picker(String(localized: "settings.ai.active"), selection: Binding(
+                    get: { model.preference.ai.selectedProvider },
+                    set: { model.selectAIProvider($0) }
+                )) {
+                    Text(String(localized: "settings.ai.none")).tag(Optional<AIProvider>.none)
+                    ForEach(AIProvider.allCases) { provider in
+                        Text(String(localized: String.LocalizationValue(provider.localizationKey))).tag(Optional(provider))
+                    }
+                }
+                .pickerStyle(.radioGroup)
+
+                Divider()
+
+                ForEach(AIProvider.allCases) { provider in
+                    providerRow(provider)
+                }
+
+                Text(String(localized: "settings.ai.privacy"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .pickerStyle(.radioGroup)
-
-            Divider()
-
-            ForEach(AIProvider.allCases) { provider in
-                providerRow(provider)
-            }
-
-            Text(String(localized: "settings.ai.privacy"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 8)
         }
     }
 

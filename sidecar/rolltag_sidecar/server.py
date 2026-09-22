@@ -1,4 +1,7 @@
 import json
+import os
+import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .hashutil import content_hash
@@ -85,7 +88,16 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
 
+def watch_parent_stdin() -> None:
+    try:
+        sys.stdin.read()
+    except Exception:
+        pass
+    os._exit(0)
+
+
 def main() -> None:
+    threading.Thread(target=watch_parent_stdin, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     host, port = server.server_address
     print(f"READY {host}:{port}", flush=True)

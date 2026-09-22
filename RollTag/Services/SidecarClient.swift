@@ -1,14 +1,17 @@
+import Darwin
 import Foundation
 
 final class SidecarClient {
     private var process: Process?
+    private var stdinPipe: Pipe?
     private(set) var baseURL: URL?
     private let hasher = FileHasher()
 
     var isRunning: Bool { baseURL != nil }
 
     func start() {
-        guard process == nil else { return }
+        if let process, process.isRunning { return }
+        stop()
         guard let sidecarRoot = Bundle.main.resourceURL?.appendingPathComponent("sidecar"),
               FileManager.default.fileExists(atPath: sidecarRoot.path)
         else {
@@ -24,23 +27,49 @@ final class SidecarClient {
         task.arguments = ["-m", "rolltag_sidecar"]
         task.currentDirectoryURL = sidecarRoot
 
+        let stdin = Pipe()
         let stdout = Pipe()
+        task.standardInput = stdin
         task.standardOutput = stdout
         task.standardError = Pipe()
+        task.terminationHandler = { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self, self.process == task else { return }
+                self.process = nil
+                self.stdinPipe = nil
+                self.baseURL = nil
+            }
+        }
 
         do {
             try task.run()
             process = task
+            stdinPipe = stdin
             if let line = readReadyLine(from: stdout), let url = parseReady(line) {
                 baseURL = url
             }
         } catch {
             process = nil
+            stdinPipe = nil
         }
     }
 
     func stop() {
-        process?.terminate()
+        if let handle = stdinPipe?.fileHandleForWriting {
+            try? handle.close()
+        }
+        stdinPipe = nil
+        if let task = process, task.isRunning {
+            task.terminate()
+            let deadline = Date().addingTimeInterval(1)
+            while task.isRunning, Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.02)
+            }
+            if task.isRunning {
+                kill(task.processIdentifier, SIGKILL)
+            }
+            task.waitUntilExit()
+        }
         process = nil
         baseURL = nil
     }
