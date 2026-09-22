@@ -263,7 +263,7 @@ private struct ScanStatusOverlay: View {
         if model.playback.isFullscreen {
             EmptyView()
         } else if let progress = model.scanProgress {
-            ScanProgressBanner(progress: progress)
+            ScanProgressBanner(progress: progress, model: model)
         } else if !model.statusMessage.isEmpty {
             Text(model.statusMessage)
                 .font(.caption)

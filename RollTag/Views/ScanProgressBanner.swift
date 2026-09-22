@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ScanProgressBanner: View {
     let progress: ScanProgress
+    @Bindable var model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -36,6 +37,16 @@ struct ScanProgressBanner: View {
 
             ProgressView(value: progress.phaseFraction == nil && progress.phase == .scanning ? nil : progress.overallFraction)
                 .progressViewStyle(.linear)
+
+            if model.showsAIStopButton {
+                Button(String(localized: "ai.stop")) {
+                    model.stopAITagging()
+                }
+                .disabled(!model.canStopAITagging)
+                .help(String(localized: "ai.stop.help"))
+                .accessibilityIdentifier("ai.stop")
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
         }
         .padding(14)
         .frame(maxWidth: 520)
@@ -45,7 +56,7 @@ struct ScanProgressBanner: View {
                 .strokeBorder(Color.primary.opacity(0.08))
         }
         .padding(16)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: model.showsAIStopButton ? .contain : .combine)
         .accessibilityLabel(accessibilityText)
     }
 

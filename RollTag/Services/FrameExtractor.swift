@@ -42,6 +42,7 @@ enum FrameExtractor {
         var frames: [Data] = []
         var seen = Set<Data>()
         for seconds in times {
+            if Task.isCancelled { return frames }
             let time = CMTime(seconds: seconds, preferredTimescale: 600)
             guard let cg = try? generator.copyCGImage(at: time, actualTime: nil),
                   let data = jpeg(from: cg),

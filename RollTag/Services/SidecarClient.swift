@@ -6,6 +6,8 @@ final class SidecarClient {
     private var stdinPipe: Pipe?
     private(set) var baseURL: URL?
     private let hasher = FileHasher()
+    private var suggestTask: Task<[String: Any], Error>?
+    private var suggestGeneration = 0
 
     var isRunning: Bool { baseURL != nil }
 
@@ -112,13 +114,37 @@ final class SidecarClient {
             body["examples"] = examplePayload
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
-        if status >= 400 {
-            throw SidecarError.requestFailed(object["error"] as? String ?? "http_\(status)")
+        suggestGeneration += 1
+        let token = suggestGeneration
+        let task = Task { () -> [String: Any] in
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+            if status >= 400 {
+                throw SidecarError.requestFailed(object["error"] as? String ?? "http_\(status)")
+            }
+            return object
         }
-        return object
+        suggestTask = task
+        defer {
+            if suggestGeneration == token {
+                suggestTask = nil
+            }
+        }
+        do {
+            return try await task.value
+        } catch {
+            if AITaggingStop.isCancellation(error) {
+                throw CancellationError()
+            }
+            throw error
+        }
+    }
+
+    func cancelInFlightSuggest() {
+        suggestGeneration += 1
+        suggestTask?.cancel()
+        suggestTask = nil
     }
 
     private func remoteHash(path: String, baseURL: URL) throws -> String {

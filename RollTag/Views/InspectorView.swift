@@ -21,6 +21,13 @@ struct InspectorView: View {
                     .disabled(!model.canTagWithAI)
                     .help(String(localized: "ai.tag.help"))
                 }
+                if model.showsAIStopButton {
+                    Button(String(localized: "ai.stop")) {
+                        model.stopAITagging()
+                    }
+                    .disabled(!model.canStopAITagging)
+                    .help(String(localized: "ai.stop.help"))
+                }
                 if model.pendingAIConfirmation {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(String(localized: "ai.confirm.detail"))

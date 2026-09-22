@@ -86,6 +86,7 @@ final class AppModel {
     var pendingAIConfirmation = false
     private var pendingAINovelTags: [UUID: [TagAssignment]] = [:]
     private var pendingAIBeforeKeys: [UUID: Set<String>] = [:]
+    private var aiStopRequested = false
     var capturingShortcut: ShortcutAction?
     var shortcutCaptureMessage = ""
     let playback = PreviewPlayback()
@@ -554,6 +555,14 @@ final class AppModel {
         hasAITaggingRoute && !isBusy && !pendingAIConfirmation
     }
 
+    var showsAIStopButton: Bool {
+        isBusy && scanProgress?.phase == .tagging && AITaggingStop.offersStop(total: scanProgress?.total ?? 0)
+    }
+
+    var canStopAITagging: Bool {
+        showsAIStopButton && !aiStopRequested
+    }
+
     var scopedUntaggedAITaggableIDs: [UUID] {
         FootageFilter.aiTaggableIDs(
             warehouses: warehouses,
@@ -607,8 +616,10 @@ final class AppModel {
         }
 
         isBusy = true
+        aiStopRequested = false
         defer {
             isBusy = false
+            aiStopRequested = false
             if scanProgress?.phase == .tagging {
                 scanProgress = nil
             }
@@ -625,10 +636,15 @@ final class AppModel {
         var failed = 0
         var skipped = 0
         var lastError = ""
+        var stopped = false
         pendingAINovelTags = [:]
         pendingAIBeforeKeys = [:]
 
         for (index, footage) in items.enumerated() {
+            if shouldStopAITagging {
+                stopped = true
+                break
+            }
             publishProgress(
                 ScanProgress(
                     warehouseName: String(localized: "ai.tag"),
@@ -655,6 +671,10 @@ final class AppModel {
 
             let url = footage.absoluteURL(warehouseRoot: warehouse.preference.url)
             let frames = await FrameExtractor.jpegStills(url: url)
+            if shouldStopAITagging {
+                stopped = true
+                break
+            }
             guard !frames.isEmpty else {
                 skipped += 1
                 lastError = String(localized: "ai.noFrames")
@@ -666,6 +686,10 @@ final class AppModel {
                     url: url,
                     skipImplausibleHeader: preference.ai.skipImplausibleCaptureDates
                 )
+                if shouldStopAITagging {
+                    stopped = true
+                    break
+                }
                 let context = AITagSuggester.contextPayload(
                     footage: footage,
                     warehouseName: warehouse.preference.name,
@@ -708,25 +732,42 @@ final class AppModel {
                 }
                 tagged += 1
             } catch {
+                if AITaggingStop.isCancellation(error) || shouldStopAITagging {
+                    stopped = true
+                    break
+                }
                 failed += 1
                 lastError = error.localizedDescription
             }
         }
 
         reloadFootage()
+        let remaining = max(0, items.count - tagged - skipped - failed)
         statusMessage = aiStatusMessage(
             total: items.count,
             tagged: tagged,
             skipped: skipped,
             failed: failed,
+            remaining: remaining,
+            stopped: stopped,
             lastError: lastError
         )
-        if tagged > 0, requireConfirmation {
+        if tagged > 0, requireConfirmation, !stopped {
             pendingAIConfirmation = true
         } else {
             pendingAINovelTags = [:]
             pendingAIBeforeKeys = [:]
         }
+    }
+
+    func stopAITagging() {
+        guard showsAIStopButton else { return }
+        aiStopRequested = true
+        sidecar.cancelInFlightSuggest()
+    }
+
+    private var shouldStopAITagging: Bool {
+        aiStopRequested || Task.isCancelled
     }
 
     func confirmAITagging() {
@@ -754,7 +795,28 @@ final class AppModel {
         }
     }
 
-    private func aiStatusMessage(total: Int, tagged: Int, skipped: Int, failed: Int, lastError: String) -> String {
+    private func aiStatusMessage(
+        total: Int,
+        tagged: Int,
+        skipped: Int,
+        failed: Int,
+        remaining: Int,
+        stopped: Bool,
+        lastError: String
+    ) -> String {
+        if stopped {
+            if skipped == 0, failed == 0 {
+                return String(format: String(localized: "ai.stopped"), locale: .current, tagged, remaining)
+            }
+            return String(
+                format: String(localized: "ai.stoppedDetail"),
+                locale: .current,
+                tagged,
+                skipped,
+                failed,
+                remaining
+            )
+        }
         if total == 1 {
             if tagged == 1 { return String(localized: "ai.doneOne") }
             if skipped == 1 {
@@ -803,6 +865,9 @@ final class AppModel {
                     examples: examples
                 )
             } catch {
+                if AITaggingStop.isCancellation(error) {
+                    throw error
+                }
                 lastError = error
             }
         }
@@ -1763,6 +1828,18 @@ final class AppModel {
         if let index = warehouses.firstIndex(where: { $0.id == id }) {
             warehouses[index].isReconciling = value
         }
+    }
+}
+
+enum AITaggingStop {
+    static func offersStop(total: Int) -> Bool {
+        total > 10
+    }
+
+    static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 }
 

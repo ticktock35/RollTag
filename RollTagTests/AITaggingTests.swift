@@ -272,6 +272,23 @@ final class AITaggingTests: XCTestCase {
         )
     }
 
+    func testStopButtonOnlyWhenBatchExceedsTen() {
+        XCTAssertFalse(AITaggingStop.offersStop(total: 1))
+        XCTAssertFalse(AITaggingStop.offersStop(total: 10))
+        XCTAssertTrue(AITaggingStop.offersStop(total: 11))
+        XCTAssertTrue(AITaggingStop.offersStop(total: 96))
+    }
+
+    func testCancellationDetectsURLSessionCancel() {
+        XCTAssertTrue(AITaggingStop.isCancellation(CancellationError()))
+        XCTAssertTrue(
+            AITaggingStop.isCancellation(
+                NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled, userInfo: nil)
+            )
+        )
+        XCTAssertFalse(AITaggingStop.isCancellation(SidecarError.unavailable))
+    }
+
     func testFrameFractionsStayInsideClip() {
         let fractions = FrameExtractor.sampleFractions(count: 6)
         XCTAssertEqual(fractions.count, 6)

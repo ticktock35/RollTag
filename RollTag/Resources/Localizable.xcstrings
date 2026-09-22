@@ -414,6 +414,70 @@
         }
       }
     },
+    "ai.stop" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終止"
+          }
+        }
+      }
+    },
+    "ai.stop.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel the current request. Tags already written stay; remaining files are left untagged."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停掉目前這次送出。已打上的標會留下，還沒打的不再送。"
+          }
+        }
+      }
+    },
+    "ai.stopped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped. AI tagged %lld clips, %lld left untagged."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已終止。AI 已打 %lld 支，未處理 %lld 支"
+          }
+        }
+      }
+    },
+    "ai.stoppedDetail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped. AI tagged %lld, skipped %lld, failed %lld, %lld left untagged."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已終止。AI 已打 %lld 支，跳過 %lld 支，失敗 %lld 支，未處理 %lld 支"
+          }
+        }
+      }
+    },
     "ai.tag" : {
       "localizations" : {
         "en" : {
