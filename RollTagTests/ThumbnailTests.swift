@@ -28,6 +28,58 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertLessThanOrEqual(max(size.width, size.height), 64)
     }
 
+    func testAIFrameJPEGHasNoAlpha() throws {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: 1200,
+            height: 675,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return XCTFail("could not make premul source")
+        }
+        context.setFillColor(CGColor(red: 0.1, green: 0.4, blue: 0.8, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 1200, height: 675))
+        guard let source = context.makeImage(),
+              let data = ThumbnailService.jpegData(from: source, maxEdge: 768, quality: 0.7)
+        else {
+            return XCTFail("jpegData failed")
+        }
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, options),
+              let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
+        else {
+            return XCTFail("encoded frame is not readable JPEG")
+        }
+        XCTAssertNotEqual(properties[kCGImagePropertyHasAlpha] as? Bool, true)
+        let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
+        let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
+        XCTAssertLessThanOrEqual(max(width, height), 768)
+        XCTAssertGreaterThan(min(width, height), 0)
+    }
+
+    func testStoredThumbnailJPEGHasNoAlphaAndStaysWithinStoredEdge() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-opaque-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let source = try writePNG(width: 1600, height: 900, in: dir)
+        let dest = dir.appendingPathComponent("thumb.jpg")
+        _ = await ThumbnailService.ensureImageThumbnail(source: source, thumbnailURL: dest, maxEdge: 320)
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let imageSource = CGImageSourceCreateWithURL(dest as CFURL, options),
+              let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
+        else {
+            return XCTFail("stored thumbnail is not readable JPEG")
+        }
+        XCTAssertNotEqual(properties[kCGImagePropertyHasAlpha] as? Bool, true)
+        let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
+        let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
+        XCTAssertLessThanOrEqual(max(width, height), Int(ThumbnailService.storedThumbMaxEdge))
+        XCTAssertGreaterThan(min(width, height), 0)
+    }
+
     func testEnsureCreatesThumbnailWhenCacheMissing() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-make-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

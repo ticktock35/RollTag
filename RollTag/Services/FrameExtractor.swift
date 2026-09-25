@@ -45,7 +45,7 @@ enum FrameExtractor {
             if Task.isCancelled { return frames }
             let time = CMTime(seconds: seconds, preferredTimescale: 600)
             guard let cg = try? generator.copyCGImage(at: time, actualTime: nil),
-                  let data = jpeg(from: cg),
+                  let data = ThumbnailService.jpegData(from: cg, maxEdge: maxEdge, quality: 0.7),
                   seen.insert(data).inserted
             else { continue }
             frames.append(data)
@@ -61,11 +61,6 @@ enum FrameExtractor {
         guard let image = ThumbnailService.stillImage(url: url, maxEdge: maxEdge, preferEmbedded: false),
               let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         else { return nil }
-        return jpeg(from: cg)
-    }
-
-    private static func jpeg(from image: CGImage) -> Data? {
-        let bitmap = NSBitmapImageRep(cgImage: image)
-        return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.7])
+        return ThumbnailService.jpegData(from: cg, maxEdge: maxEdge, quality: 0.7)
     }
 }

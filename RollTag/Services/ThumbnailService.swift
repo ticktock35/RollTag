@@ -62,6 +62,25 @@ enum ThumbnailService {
         decodeStill(url: url, maxEdge: maxEdge)
     }
 
+    static func jpegData(from image: CGImage, maxEdge: CGFloat, quality: Double = 0.7) -> Data? {
+        let size = jpegPixelSize(image, maxEdge: max(Int(maxEdge.rounded()), 1))
+        guard let cg = rasterizeOpaque(image, width: size.width, height: size.height) else { return nil }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else { return nil }
+        CGImageDestinationAddImage(
+            destination,
+            cg,
+            [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary
+        )
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
+    }
+
     static func removeStoredThumbnail(at url: URL) {
         try? FileManager.default.removeItem(at: url)
         ThumbnailMemoryCache.shared.remove(thumbnailURL: url)
@@ -196,6 +215,7 @@ enum ThumbnailService {
     }
 
     static func decodeStill(url: URL, maxEdge: CGFloat, preferEmbedded: Bool = false) -> NSImage? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         if preferEmbedded, let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: true) {
             return image
         }
@@ -280,22 +300,10 @@ enum ThumbnailService {
     }
 
     private static func downscale(_ image: NSImage, maxEdge: CGFloat) -> NSImage? {
-        let sourceSize = image.size
-        guard sourceSize.width > 0, sourceSize.height > 0 else { return nil }
-        let longest = max(sourceSize.width, sourceSize.height)
-        let edge = max(maxEdge, 1)
-        let scale = longest > edge ? edge / longest : 1
-        let scaled = NSSize(
-            width: max(1, (sourceSize.width * scale).rounded()),
-            height: max(1, (sourceSize.height * scale).rounded())
-        )
-        let output = NSImage(size: scaled)
-        output.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .medium
-        image.draw(in: NSRect(origin: .zero, size: scaled), from: .zero, operation: .copy, fraction: 1)
-        output.unlockFocus()
-        output.cacheMode = .never
-        return output
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let size = jpegPixelSize(cg, maxEdge: max(Int(maxEdge.rounded()), 1))
+        guard let resized = rasterizeOpaque(cg, width: size.width, height: size.height) else { return nil }
+        return nsImage(from: resized)
     }
 
     private static func thumbnailMatchesSourceAspect(_ thumbnail: NSImage, source: URL) -> Bool {
@@ -381,16 +389,40 @@ enum ThumbnailService {
     }
 
     private static func writeThumbnail(_ image: NSImage, to url: URL) {
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        guard let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let data = jpegData(from: source, maxEdge: storedThumbMaxEdge, quality: 0.68)
+        else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard let destination = CGImageDestinationCreateWithURL(
-            url as CFURL,
-            UTType.jpeg.identifier as CFString,
-            1,
-            nil
-        ) else { return }
-        CGImageDestinationAddImage(destination, cg, [kCGImageDestinationLossyCompressionQuality: 0.68] as CFDictionary)
-        CGImageDestinationFinalize(destination)
+        try? data.write(to: url, options: .atomic)
+    }
+
+    /// JPEG has no alpha. Writing premultiplied RGBA makes ImageIO keep a 2× decode buffer.
+    private static func rasterizeOpaque(_ image: CGImage, width: Int, height: Int) -> CGImage? {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
+    private static func jpegPixelSize(_ image: CGImage, maxEdge: Int) -> (width: Int, height: Int) {
+        let longest = max(image.width, image.height)
+        guard longest > maxEdge, maxEdge > 0 else {
+            return (image.width, image.height)
+        }
+        let scale = CGFloat(maxEdge) / CGFloat(longest)
+        return (
+            max(1, Int((CGFloat(image.width) * scale).rounded())),
+            max(1, Int((CGFloat(image.height) * scale).rounded()))
+        )
     }
 
     private static func intValue(_ value: Any?) -> Int? {
