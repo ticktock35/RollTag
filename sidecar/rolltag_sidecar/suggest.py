@@ -11,7 +11,7 @@ PROMPT = """You tag B-roll stills for a footage warehouse.
 Choose 3 to 8 tags that clearly match the frames.
 Use only category and value ids from the catalog JSON for "tags". Never invent catalog ids.
 Custom tags (category "custom") may be used for a named subject that is clearly visible, including short non-English labels.
-If CONTEXT is present, use filename, path, warehouse name, duration, file size, capture time, and GPS as hints for place and time tags. Frames remain primary.
+If CONTEXT is present, use filename, path, warehouse name, duration, file size, capture time, GPS, and place as hints for place and time tags. The place field is a reverse-geocoded locality from the file GPS; prefer it for country and city tags when present. Frames remain primary.
 
 People count is mandatory and must be exact:
 - Look at every frame. Count only distinct living humans you can see (face, body, or hands). Ignore statues, posters, mannequins, reflections, and maybe-shapes.

@@ -265,11 +265,15 @@ private struct ScanStatusOverlay: View {
         } else if let progress = model.scanProgress {
             ScanProgressBanner(progress: progress, model: model)
         } else if !model.statusMessage.isEmpty {
-            Text(model.statusMessage)
+            Text(AITaggingProgressCopy.attributedLine(model.statusMessage))
                 .font(.caption)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.ultraThinMaterial, in: Capsule())
+                .multilineTextAlignment(.leading)
+                .lineLimit(4)
+                .tint(.accentColor)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: 480, alignment: .leading)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .padding(12)
         }
     }

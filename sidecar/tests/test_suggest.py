@@ -65,12 +65,15 @@ class SuggestTests(unittest.TestCase):
                 "relative_path": "malaysia/DJI_0029.MP4",
                 "warehouse_name": "Travel",
                 "gps": {"latitude": 1.3, "longitude": 103.8},
+                "place": "Johor Bahru, Johor, Malaysia",
             },
         )
         self.assertIn("CATALOG:", prompt)
         self.assertIn("CONTEXT:", prompt)
         self.assertIn("DJI_0029.MP4", prompt)
         self.assertIn("103.8", prompt)
+        self.assertIn("Johor Bahru", prompt)
+        self.assertIn("place field", prompt)
 
     def test_prompt_includes_getty_keywords(self):
         prompt = build_prompt({"categories": []})

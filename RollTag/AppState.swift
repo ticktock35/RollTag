@@ -97,6 +97,7 @@ final class AppModel {
 
     private let store: PreferenceStore
     private let sidecar = SidecarClient()
+    private let placeLookup = PlaceNameLookup()
     private let volumeMonitor = VolumeMonitor()
     private var databases: [UUID: WarehouseDatabase] = [:]
     private var lastProgressPublish: TimeInterval = 0
@@ -607,7 +608,7 @@ final class AppModel {
         guard !ids.isEmpty, !isBusy, !pendingAIConfirmation else { return }
         let routes = preference.ai.taggingRoutes()
         guard !routes.isEmpty else {
-            statusMessage = String(localized: "ai.missingKey")
+            showTemporaryStatus(String(localized: "ai.missingKey"))
             return
         }
 
@@ -637,6 +638,7 @@ final class AppModel {
         var skipped = 0
         var lastError = ""
         var stopped = false
+        var lastResult = ""
         pendingAINovelTags = [:]
         pendingAIBeforeKeys = [:]
 
@@ -645,20 +647,17 @@ final class AppModel {
                 stopped = true
                 break
             }
-            publishProgress(
-                ScanProgress(
-                    warehouseName: String(localized: "ai.tag"),
-                    warehouseID: footage.warehouseID,
-                    phase: .tagging,
-                    currentFile: footage.filename,
-                    completed: index,
-                    total: items.count
-                ),
-                force: true
+            publishAIProgress(
+                footage: footage,
+                index: index,
+                total: items.count,
+                provider: routes.first?.provider,
+                lastResult: lastResult
             )
 
             guard footage.canAITag else {
                 skipped += 1
+                lastResult = AITaggingProgressCopy.skipped(footage.filename)
                 continue
             }
 
@@ -666,6 +665,7 @@ final class AppModel {
                   warehouse.isOnline
             else {
                 failed += 1
+                lastResult = AITaggingProgressCopy.failed(footage.filename, provider: nil)
                 continue
             }
 
@@ -678,6 +678,7 @@ final class AppModel {
             guard !frames.isEmpty else {
                 skipped += 1
                 lastError = String(localized: "ai.noFrames")
+                lastResult = AITaggingProgressCopy.skipped(footage.filename)
                 continue
             }
 
@@ -690,17 +691,32 @@ final class AppModel {
                     stopped = true
                     break
                 }
+                let place = await resolvedPlace(stored: footage.captureMetadata, live: live)
+                if shouldStopAITagging {
+                    stopped = true
+                    break
+                }
                 let context = AITagSuggester.contextPayload(
                     footage: footage,
                     warehouseName: warehouse.preference.name,
-                    live: live
+                    live: live,
+                    place: place
                 )
-                let payload = try await suggestWithFallback(
+                let (payload, provider) = try await suggestWithFallback(
                     routes: routes,
                     frames: frames,
                     catalog: catalogPayload,
                     context: context,
-                    examples: preference.ai.examples
+                    examples: preference.ai.examples,
+                    onRoute: { provider in
+                        self.publishAIProgress(
+                            footage: footage,
+                            index: index,
+                            total: items.count,
+                            provider: provider,
+                            lastResult: lastResult
+                        )
+                    }
                 )
                 let warehouseCustoms = warehouse.footage.flatMap(\.tags).filter(\.isCustom).map(\.value)
                 let pathTags = PathTagMatcher.assignments(
@@ -731,6 +747,7 @@ final class AppModel {
                     pendingAINovelTags[footage.id, default: []].append(contentsOf: novel)
                 }
                 tagged += 1
+                lastResult = AITaggingProgressCopy.succeeded(footage.filename, provider: provider)
             } catch {
                 if AITaggingStop.isCancellation(error) || shouldStopAITagging {
                     stopped = true
@@ -738,12 +755,16 @@ final class AppModel {
                 }
                 failed += 1
                 lastError = error.localizedDescription
+                lastResult = AITaggingProgressCopy.failed(
+                    footage.filename,
+                    provider: routes.last?.provider
+                )
             }
         }
 
         reloadFootage()
         let remaining = max(0, items.count - tagged - skipped - failed)
-        statusMessage = aiStatusMessage(
+        var toast = aiStatusMessage(
             total: items.count,
             tagged: tagged,
             skipped: skipped,
@@ -752,6 +773,10 @@ final class AppModel {
             stopped: stopped,
             lastError: lastError
         )
+        if !lastResult.isEmpty, !toast.contains(lastResult) {
+            toast += "\n" + lastResult
+        }
+        showTemporaryStatus(toast)
         if tagged > 0, requireConfirmation, !stopped {
             pendingAIConfirmation = true
         } else {
@@ -789,7 +814,7 @@ final class AppModel {
             try? db.removeTags(tags, from: [id])
         }
         reloadFootage()
-        statusMessage = String(localized: "ai.cancelled")
+        showTemporaryStatus(String(localized: "ai.cancelled"))
         if playback.isFullscreen {
             playback.exitFullscreen()
         }
@@ -845,17 +870,51 @@ final class AppModel {
         persistPreference()
     }
 
+    private func resolvedPlace(stored: MediaMetadataSnapshot, live: MediaMetadataSnapshot) async -> String? {
+        let latitude = stored.latitude ?? live.latitude
+        let longitude = stored.longitude ?? live.longitude
+        guard let latitude, let longitude else { return nil }
+        return await placeLookup.placeName(latitude: latitude, longitude: longitude)
+    }
+
+    private func publishAIProgress(
+        footage: Footage,
+        index: Int,
+        total: Int,
+        provider: AIProvider?,
+        lastResult: String
+    ) {
+        let warehouseName = warehouses.first(where: { $0.id == footage.warehouseID })?.preference.name
+            ?? String(localized: "ai.tag")
+        publishProgress(
+            ScanProgress(
+                warehouseName: warehouseName,
+                warehouseID: footage.warehouseID,
+                phase: .tagging,
+                currentFile: footage.filename,
+                completed: index,
+                total: total,
+                currentProvider: provider.map(AITaggingProgressCopy.providerTitle) ?? "",
+                currentProviderID: provider?.rawValue ?? "",
+                lastFileResult: lastResult
+            ),
+            force: true
+        )
+    }
+
     private func suggestWithFallback(
         routes: [AITaggingRoute],
         frames: [Data],
         catalog: [String: Any],
         context: [String: Any],
-        examples: [AITaggingExample]
-    ) async throws -> [String: Any] {
+        examples: [AITaggingExample],
+        onRoute: ((AIProvider) -> Void)? = nil
+    ) async throws -> ([String: Any], AIProvider) {
         var lastError: Error = SidecarError.unavailable
         for route in routes {
+            onRoute?(route.provider)
             do {
-                return try await sidecar.suggestTags(
+                let payload = try await sidecar.suggestTags(
                     provider: route.provider,
                     apiKey: route.apiKey,
                     model: route.model,
@@ -864,6 +923,7 @@ final class AppModel {
                     context: context,
                     examples: examples
                 )
+                return (payload, route.provider)
             } catch {
                 if AITaggingStop.isCancellation(error) {
                     throw error
@@ -1195,7 +1255,7 @@ final class AppModel {
         showTemporaryStatus(String(localized: "status.switchInputSource"))
     }
 
-    private func showTemporaryStatus(_ message: String, seconds: Double = 4) {
+    private func showTemporaryStatus(_ message: String, seconds: Double = 10) {
         statusMessage = message
         let token = UUID()
         statusHintToken = token
@@ -1828,6 +1888,52 @@ final class AppModel {
         if let index = warehouses.firstIndex(where: { $0.id == id }) {
             warehouses[index].isReconciling = value
         }
+    }
+}
+
+enum AITaggingProgressCopy {
+    static func providerTitle(_ provider: AIProvider) -> String {
+        String(localized: String.LocalizationValue(provider.localizationKey))
+    }
+
+    static func succeeded(_ filename: String, provider: AIProvider) -> String {
+        String(
+            format: String(localized: "ai.last.success"),
+            locale: .current,
+            filename,
+            providerTitle(provider)
+        )
+    }
+
+    static func failed(_ filename: String, provider: AIProvider?) -> String {
+        if let provider {
+            return String(
+                format: String(localized: "ai.last.failed"),
+                locale: .current,
+                filename,
+                providerTitle(provider)
+            )
+        }
+        return String(format: String(localized: "ai.last.failedUnknown"), locale: .current, filename)
+    }
+
+    static func skipped(_ filename: String) -> String {
+        String(format: String(localized: "ai.last.skipped"), locale: .current, filename)
+    }
+
+    static func attributedLine(_ string: String) -> AttributedString {
+        var text = AttributedString(string)
+        for provider in AIProvider.taggingPriority {
+            guard let url = provider.usageURL else { continue }
+            let name = providerTitle(provider)
+            var searchStart = text.startIndex
+            while searchStart < text.endIndex, let range = text[searchStart...].range(of: name) {
+                text[range].link = url
+                text[range].underlineStyle = .single
+                searchStart = range.upperBound
+            }
+        }
+        return text
     }
 }
 

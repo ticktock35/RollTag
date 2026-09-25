@@ -156,6 +156,15 @@ struct SettingsView: View {
                     Link(String(localized: "settings.ai.keys.openai"), destination: URL(string: "https://platform.openai.com/api-keys")!)
                 }
                 .font(.callout)
+                HStack(spacing: 16) {
+                    if let url = AIProvider.gemini.usageURL {
+                        Link(String(localized: "settings.ai.usage.gemini"), destination: url)
+                    }
+                    if let url = AIProvider.openai.usageURL {
+                        Link(String(localized: "settings.ai.usage.openai"), destination: url)
+                    }
+                }
+                .font(.callout)
                 Text(String(localized: "settings.ai.keys.warn"))
                     .font(.callout)
                     .foregroundStyle(.secondary)

@@ -15,6 +15,9 @@ struct ScanProgress: Equatable {
     var currentFile: String
     var completed: Int
     var total: Int
+    var currentProvider: String = ""
+    var currentProviderID: String = ""
+    var lastFileResult: String = ""
 
     var phaseFraction: Double? {
         guard total > 0 else { return nil }

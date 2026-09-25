@@ -31,7 +31,8 @@ enum AITagSuggester {
     static func contextPayload(
         footage: Footage,
         warehouseName: String,
-        live: MediaMetadataSnapshot = MediaMetadataSnapshot()
+        live: MediaMetadataSnapshot = MediaMetadataSnapshot(),
+        place: String? = nil
     ) -> [String: Any] {
         var payload: [String: Any] = [
             "filename": footage.filename,
@@ -58,6 +59,9 @@ enum AITagSuggester {
                 gps["altitude"] = altitude
             }
             payload["gps"] = gps
+        }
+        if let place, !place.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            payload["place"] = place.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return payload
     }

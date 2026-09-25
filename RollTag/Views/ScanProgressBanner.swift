@@ -35,6 +35,29 @@ struct ScanProgressBanner: View {
                     .help(progress.currentFile)
             }
 
+            if progress.phase == .tagging {
+                if let provider = AIProvider(rawValue: progress.currentProviderID) {
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text(String(localized: "ai.sending.prefix"))
+                        ProviderUsageLink(provider: provider)
+                    }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                } else if !progress.currentProvider.isEmpty {
+                    Text(String(format: String(localized: "ai.sending"), locale: .current, progress.currentProvider))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                if !progress.lastFileResult.isEmpty {
+                    Text(AITaggingProgressCopy.attributedLine(progress.lastFileResult))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .tint(.accentColor)
+                }
+            }
+
             ProgressView(value: progress.phaseFraction == nil && progress.phase == .scanning ? nil : progress.overallFraction)
                 .progressViewStyle(.linear)
 
@@ -78,6 +101,22 @@ struct ScanProgressBanner: View {
     }
 
     private var accessibilityText: String {
-        "\(phaseTitle) \(progress.percentInt)% \(progress.currentFile)"
+        [phaseTitle, progress.currentProvider, progress.lastFileResult, "\(progress.percentInt)%", progress.currentFile]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+}
+
+struct ProviderUsageLink: View {
+    let provider: AIProvider
+
+    var body: some View {
+        let title = AITaggingProgressCopy.providerTitle(provider)
+        if let url = provider.usageURL {
+            Link(title, destination: url)
+                .help(String(localized: "ai.usage.help"))
+        } else {
+            Text(title)
+        }
     }
 }

@@ -117,6 +117,37 @@ final class AITaggingTests: XCTestCase {
         XCTAssertEqual(gps?["latitude"] as? Double, -1.3)
         XCTAssertEqual(gps?["longitude"] as? Double, 103.8)
         XCTAssertEqual(gps?["altitude"] as? Double, 12)
+        XCTAssertNil(payload["place"])
+    }
+
+    func testContextIncludesResolvedPlace() {
+        let footage = Footage(
+            id: UUID(),
+            warehouseID: UUID(),
+            relativePath: "clip.mp4",
+            filename: "clip.mp4",
+            size: 10,
+            mtime: 1,
+            contentHash: nil,
+            phash: nil,
+            status: .available,
+            duration: nil,
+            width: nil,
+            height: nil,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0),
+            parentID: nil,
+            userNotes: "",
+            tags: [],
+            capturedAt: nil
+        )
+        let payload = AITagSuggester.contextPayload(
+            footage: footage,
+            warehouseName: "A",
+            live: MediaMetadataSnapshot(latitude: 1.37, longitude: 103.86, capturedAt: nil),
+            place: "Johor Bahru, Johor, Malaysia"
+        )
+        XCTAssertEqual(payload["place"] as? String, "Johor Bahru, Johor, Malaysia")
     }
 
     func testISO6709LocationParse() {
@@ -270,6 +301,25 @@ final class AITaggingTests: XCTestCase {
             capturedAt: nil,
             needsReanalysis: needsReanalysis
         )
+    }
+
+    func testProviderUsageLinksGoToOfficialDashboards() {
+        XCTAssertEqual(AIProvider.gemini.usageURL?.absoluteString, "https://aistudio.google.com/usage")
+        XCTAssertEqual(AIProvider.openai.usageURL?.absoluteString, "https://platform.openai.com/usage")
+        XCTAssertNil(AIProvider.anthropic.usageURL)
+        let line = AITaggingProgressCopy.succeeded("clip.mov", provider: .gemini)
+        let attributed = AITaggingProgressCopy.attributedLine(line)
+        XCTAssertNotNil(attributed.runs.first(where: { $0.link != nil })?.link)
+    }
+
+    func testProgressCopyNamesFileAndProvider() {
+        let success = AITaggingProgressCopy.succeeded("clip.mov", provider: .gemini)
+        XCTAssertTrue(success.contains("clip.mov"))
+        let failed = AITaggingProgressCopy.failed("still.jpg", provider: .openai)
+        XCTAssertTrue(failed.contains("still.jpg"))
+        let skipped = AITaggingProgressCopy.skipped("audio.m4a")
+        XCTAssertTrue(skipped.contains("audio.m4a"))
+        XCTAssertFalse(AITaggingProgressCopy.failed("offline.mov", provider: nil).isEmpty)
     }
 
     func testStopButtonOnlyWhenBatchExceedsTen() {

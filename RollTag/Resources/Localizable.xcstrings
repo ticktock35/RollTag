@@ -265,6 +265,70 @@
         }
       }
     },
+    "ai.last.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last clip %1$@ failed (%2$@)."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一支 %1$@ · 失敗（%2$@）"
+          }
+        }
+      }
+    },
+    "ai.last.failedUnknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last clip %@ failed."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一支 %@ · 失敗"
+          }
+        }
+      }
+    },
+    "ai.last.skipped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last clip %@ skipped."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一支 %@ · 跳過"
+          }
+        }
+      }
+    },
+    "ai.last.success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last clip %1$@ succeeded (%2$@)."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一支 %1$@ · 成功（%2$@）"
+          }
+        }
+      }
+    },
     "ai.missingKey" : {
       "localizations" : {
         "en" : {
@@ -378,6 +442,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Twelve Labs"
+          }
+        }
+      }
+    },
+    "ai.sending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending: %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在送出：%@"
+          }
+        }
+      }
+    },
+    "ai.sending.prefix" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending: "
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在送出："
+          }
+        }
+      }
+    },
+    "ai.usage.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open this provider’s usage and quota"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開此平台的用量與配額"
           }
         }
       }
@@ -2397,6 +2509,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存在 ~/rolltag/config.json。不要分享這個檔。"
+          }
+        }
+      }
+    },
+    "settings.ai.usage.gemini" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini usage"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini 用量"
+          }
+        }
+      }
+    },
+    "settings.ai.usage.openai" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI usage"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 用量"
           }
         }
       }

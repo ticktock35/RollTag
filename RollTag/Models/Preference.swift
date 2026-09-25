@@ -70,6 +70,17 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable, Hashable {
     var localizationKey: String { "ai.provider.\(rawValue)" }
     var capabilityKey: String { "ai.capability.\(rawValue)" }
 
+    var usageURL: URL? {
+        switch self {
+        case .gemini:
+            URL(string: "https://aistudio.google.com/usage")
+        case .openai:
+            URL(string: "https://platform.openai.com/usage")
+        default:
+            nil
+        }
+    }
+
     static let taggingPriority: [AIProvider] = [.gemini, .openai]
 
     var supportsFrameTagging: Bool { Self.taggingPriority.contains(self) }
