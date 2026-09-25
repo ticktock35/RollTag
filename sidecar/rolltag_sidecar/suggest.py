@@ -10,11 +10,20 @@ RETRYABLE_STATUS = {429, 500, 502, 503}
 PROMPT = """You tag B-roll stills for a footage warehouse.
 Choose 3 to 8 tags that clearly match the frames.
 Use only category and value ids from the catalog JSON for "tags". Never invent catalog ids.
-Custom tags (category "custom") may be used for a named subject that is clearly visible, including short non-English labels.
-If CONTEXT is present, use filename, path, warehouse name, duration, file size, capture time, GPS, and place as hints for place and time tags. The place field is a reverse-geocoded locality from the file GPS; prefer it for country and city tags when present. Frames remain primary.
+Custom tags (category "custom") may only name an object or sign that is clearly readable in THESE frames (a vessel, product, landmark text). Do not invent personal names. Do not apply a person's name from filename, folder, GPS, place, EXAMPLES, or other clips. Seeing a person is not enough. If unsure who it is, omit the name.
+If CONTEXT is present, use filename, path, warehouse name, duration, file size, capture time, GPS, and place as hints for place and time tags. The place field is a reverse-geocoded locality from the file GPS. Folder and path names are hints only — never copy a folder name as a custom tag. The app writes CONTEXT.place parts (locality, region, country) as custom tags. Still add catalog place types that match (city, nature, rural, forest, ocean) when the location or frames support them. Frames remain primary. Do not turn a place hint into a person's name. Do not tag month or weekday names from captured_at (no march, friday).
+If CONTEXT.vision is present, it is on-device Vision from this Mac (faces, bodies, hands, scene labels, animals, readable text). Treat people, people_count, hands, and face as facts:
+- Set the people count tag to match vision.people. Do not override it from filename, folder, or guesses.
+- If vision.people is none: use people/none only. Do not add portrait, distant, age, hands, or people keywords other than "no people".
+- people/portrait only if vision.face is portrait. people/distant only if vision.face is distant.
+- If vision.hands is true and people is not none, people/hands may apply.
+- scenes and animals are hints, not catalog ids. Confirm them in the frames before tagging.
+- If vision.animals is present and vision.people is none, those detections are live animals (dogs, cats), not humans. Do not add people tags or personal names.
+- text is OCR of signs; a short readable token may become a custom tag. Do not treat OCR as a person's name.
 
 People count is mandatory and must be exact:
-- Look at every frame. Count only distinct living humans you can see (face, body, or hands). Ignore statues, posters, mannequins, reflections, and maybe-shapes.
+- Look at every frame. Count only distinct living humans you can see (body or hands). Ignore statues, posters, mannequins, reflections, drawings, and maybe-shapes.
+- Plush toys, stuffed animals, figurines, and dolls are not living humans and not live animals. Do not tag people/*, animals/pet, or an animal species for a toy.
 - Always include exactly one of people/none, people/one, people/two, people/group, or people/crowd.
 - people/none: no human in any frame. Default when unsure. Do not add portrait, crowd, distant, age tags, or keywords such as people, person, man, woman, crowd.
 - people/one: exactly one person. Not group. Not crowd.
@@ -32,7 +41,7 @@ Also return Getty/Pond5 English keywords in "keywords":
 - include no people, one person, or two people when that is what you see
 - visible nouns, place, weather, people, shot; suitable for stock-footage search
 
-If EXAMPLES are present, they are recent human outcomes: "ai" is what the model tagged, "kept" is what the user left after editing. Follow kept when the current frames are similar. Do not copy examples onto unrelated scenes. Frames remain primary.
+If EXAMPLES are present, they are recent human outcomes: "ai" is what the model tagged, "kept" is what the user left after editing. Follow kept wording only when the current frames show the same subject. Do not copy personal names or custom labels onto unrelated scenes. Frames remain primary.
 
 Return JSON: {"tags":[{"category":"...","value":"..."}],"keywords":["icebreaker","arctic ocean"]}
 

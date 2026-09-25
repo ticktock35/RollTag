@@ -86,6 +86,7 @@ final class AppModel {
     var pendingAIConfirmation = false
     private var pendingAINovelTags: [UUID: [TagAssignment]] = [:]
     private var pendingAIBeforeKeys: [UUID: Set<String>] = [:]
+    private var pendingAIReplacedTags: [UUID: [TagAssignment]] = [:]
     private var aiStopRequested = false
     var capturingShortcut: ShortcutAction?
     var shortcutCaptureMessage = ""
@@ -626,12 +627,16 @@ final class AppModel {
             }
         }
 
+        let customValues = Set(knownCustomTags.map(\.value))
+        let blockedCustomKeys = AITagSuggester.blockedCustomKeys(
+            customValues: knownCustomTags.map(\.value),
+            glossary: preference.glossary
+        )
         let catalogPayload = AITagSuggester.catalogPayload(
             catalog: catalog,
             locale: localeID,
-            customValues: knownCustomTags.map(\.value)
+            customValues: []
         )
-        let customValues = Set(knownCustomTags.map(\.value))
         let items = warehouses.flatMap(\.footage).filter { ids.contains($0.id) }
         var tagged = 0
         var failed = 0
@@ -641,6 +646,7 @@ final class AppModel {
         var lastResult = ""
         pendingAINovelTags = [:]
         pendingAIBeforeKeys = [:]
+        pendingAIReplacedTags = [:]
 
         for (index, footage) in items.enumerated() {
             if shouldStopAITagging {
@@ -670,44 +676,59 @@ final class AppModel {
             }
 
             let url = footage.absoluteURL(warehouseRoot: warehouse.preference.url)
+            let live = await MediaMetadata.read(
+                url: url,
+                skipImplausibleHeader: preference.ai.skipImplausibleCaptureDates
+            )
+            if shouldStopAITagging {
+                stopped = true
+                break
+            }
+            let place = await resolvedPlace(stored: footage.captureMetadata, live: live)
+            if shouldStopAITagging {
+                stopped = true
+                break
+            }
+            let gpsTags = expandTags(
+                PathTagMatcher.geocodeAssignments(place, catalog: catalog),
+                includeEnglishKeywords: true
+            )
             let frames = await FrameExtractor.jpegStills(url: url)
             if shouldStopAITagging {
                 stopped = true
                 break
             }
-            guard !frames.isEmpty else {
-                skipped += 1
-                lastError = String(localized: "ai.noFrames")
-                lastResult = AITaggingProgressCopy.skipped(footage.filename)
+            if frames.isEmpty {
+                if !gpsTags.isEmpty, let db = databases[footage.warehouseID] {
+                    try? db.addTags(gpsTags, to: [footage.id])
+                    tagged += 1
+                    lastResult = AITaggingProgressCopy.succeeded(footage.filename, provider: nil)
+                } else {
+                    skipped += 1
+                    lastError = String(localized: "ai.noFrames")
+                    lastResult = AITaggingProgressCopy.skipped(footage.filename)
+                }
                 continue
             }
 
             do {
-                let live = await MediaMetadata.read(
-                    url: url,
-                    skipImplausibleHeader: preference.ai.skipImplausibleCaptureDates
-                )
-                if shouldStopAITagging {
-                    stopped = true
-                    break
-                }
-                let place = await resolvedPlace(stored: footage.captureMetadata, live: live)
-                if shouldStopAITagging {
-                    stopped = true
-                    break
-                }
+                let vision = await VisionFrameAnalyzer.observe(frames: frames)
                 let context = AITagSuggester.contextPayload(
                     footage: footage,
                     warehouseName: warehouse.preference.name,
                     live: live,
-                    place: place
+                    place: place,
+                    vision: vision
                 )
                 let (payload, provider) = try await suggestWithFallback(
                     routes: routes,
                     frames: frames,
                     catalog: catalogPayload,
                     context: context,
-                    examples: preference.ai.examples,
+                    examples: AITaggingExample.strippingBlockedCustoms(
+                        preference.ai.examples,
+                        blockedCustomKeys: blockedCustomKeys
+                    ),
                     onRoute: { provider in
                         self.publishAIProgress(
                             footage: footage,
@@ -719,32 +740,68 @@ final class AppModel {
                     }
                 )
                 let warehouseCustoms = warehouse.footage.flatMap(\.tags).filter(\.isCustom).map(\.value)
+                let userCustomKeys = Set(
+                    warehouse.footage.flatMap(\.tags)
+                        .filter { $0.isCustom && $0.source == "user" }
+                        .map { KeywordGlossary.lookupKey($0.value) }
+                        .filter { !$0.isEmpty }
+                )
                 let pathTags = PathTagMatcher.assignments(
                     relativePath: footage.relativePath,
                     catalog: catalog,
-                    customValues: warehouseCustoms
+                    customValues: PathTagMatcher.inheritableCustoms(
+                        warehouseCustoms,
+                        relativePath: footage.relativePath,
+                        userCustomKeys: userCustomKeys
+                    ),
+                    blockedCustomKeys: blockedCustomKeys
+                )
+                let staleFolderTags = PathTagMatcher.staleFolderNameTags(
+                    footage.tags,
+                    relativePath: footage.relativePath,
+                    userCustomKeys: userCustomKeys
                 )
                 let aiTags = AITagSuggester.assignments(
                     from: payload,
                     catalog: catalog,
-                    customValues: customValues
+                    customValues: customValues,
+                    blockedCustomKeys: blockedCustomKeys,
+                    vision: vision
                 )
                 let incoming = TagAssignment.uniqued(pathTags + aiTags)
-                let expanded = expandTags(incoming, includeEnglishKeywords: true)
+                let expanded = TagAssignment.uniqued(
+                    gpsTags + AITagSuggester.finalize(
+                        expandTags(incoming, includeEnglishKeywords: true),
+                        blockedCustomKeys: blockedCustomKeys,
+                        vision: vision
+                    )
+                )
                 let existingByKey = Dictionary(
                     footage.tags.map { ($0.identityKey, $0) },
                     uniquingKeysWith: { TagAssignment.sourceRank($0.source) <= TagAssignment.sourceRank($1.source) ? $0 : $1 }
                 )
-                let novel = expanded.filter { tag in
+                let written = expanded.filter { tag in
                     guard let current = existingByKey[tag.identityKey] else { return true }
-                    return TagAssignment.sourceRank(tag.source) < TagAssignment.sourceRank(current.source)
+                    return TagAssignment.sourceRank(tag.source) <= TagAssignment.sourceRank(current.source)
                 }
-                if !novel.isEmpty, let db = databases[footage.warehouseID] {
+                if let db = databases[footage.warehouseID] {
+                    if pendingAIReplacedTags[footage.id] == nil {
+                        pendingAIReplacedTags[footage.id] = footage.tags.filter { $0.source == "ai" }
+                    }
                     if pendingAIBeforeKeys[footage.id] == nil {
                         pendingAIBeforeKeys[footage.id] = Set(footage.tags.map(\.identityKey))
                     }
-                    try db.addTags(novel, to: [footage.id])
-                    pendingAINovelTags[footage.id, default: []].append(contentsOf: novel)
+                    try db.removeTags(source: "ai", from: [footage.id])
+                    if !staleFolderTags.isEmpty {
+                        try db.removeTags(staleFolderTags, from: [footage.id])
+                    }
+                    if !written.isEmpty {
+                        try db.addTags(written, to: [footage.id])
+                        let gpsKeys = Set(gpsTags.map(\.identityKey))
+                        pendingAINovelTags[footage.id, default: []].append(
+                            contentsOf: written.filter { !gpsKeys.contains($0.identityKey) }
+                        )
+                    }
                 }
                 tagged += 1
                 lastResult = AITaggingProgressCopy.succeeded(footage.filename, provider: provider)
@@ -752,6 +809,9 @@ final class AppModel {
                 if AITaggingStop.isCancellation(error) || shouldStopAITagging {
                     stopped = true
                     break
+                }
+                if !gpsTags.isEmpty, let db = databases[footage.warehouseID] {
+                    try? db.addTags(gpsTags, to: [footage.id])
                 }
                 failed += 1
                 lastError = error.localizedDescription
@@ -777,11 +837,12 @@ final class AppModel {
             toast += "\n" + lastResult
         }
         showTemporaryStatus(toast)
-        if tagged > 0, requireConfirmation, !stopped {
+        if tagged > 0, requireConfirmation, !stopped, !pendingAINovelTags.isEmpty {
             pendingAIConfirmation = true
         } else {
             pendingAINovelTags = [:]
             pendingAIBeforeKeys = [:]
+            pendingAIReplacedTags = [:]
         }
     }
 
@@ -800,18 +861,31 @@ final class AppModel {
         pendingAIConfirmation = false
         pendingAINovelTags = [:]
         pendingAIBeforeKeys = [:]
+        pendingAIReplacedTags = [:]
         statusMessage = ""
     }
 
     func cancelAITagging() {
         guard pendingAIConfirmation else { return }
+        let replaced = pendingAIReplacedTags
         let novel = pendingAINovelTags
+        let before = pendingAIBeforeKeys
         pendingAIConfirmation = false
         pendingAINovelTags = [:]
         pendingAIBeforeKeys = [:]
-        for (id, tags) in novel where !tags.isEmpty {
+        pendingAIReplacedTags = [:]
+        for (id, previous) in replaced {
             guard let db = database(forFootage: id) else { continue }
-            try? db.removeTags(tags, from: [id])
+            try? db.removeTags(source: "ai", from: [id])
+            if !previous.isEmpty {
+                try? db.addTags(previous, to: [id])
+            }
+            let newPath = (novel[id] ?? []).filter { tag in
+                tag.source == "path" && !(before[id] ?? []).contains(tag.identityKey)
+            }
+            if !newPath.isEmpty {
+                try? db.removeTags(newPath, from: [id])
+            }
         }
         reloadFootage()
         showTemporaryStatus(String(localized: "ai.cancelled"))
@@ -1896,13 +1970,16 @@ enum AITaggingProgressCopy {
         String(localized: String.LocalizationValue(provider.localizationKey))
     }
 
-    static func succeeded(_ filename: String, provider: AIProvider) -> String {
-        String(
-            format: String(localized: "ai.last.success"),
-            locale: .current,
-            filename,
-            providerTitle(provider)
-        )
+    static func succeeded(_ filename: String, provider: AIProvider?) -> String {
+        if let provider {
+            return String(
+                format: String(localized: "ai.last.success"),
+                locale: .current,
+                filename,
+                providerTitle(provider)
+            )
+        }
+        return String(format: String(localized: "ai.last.successUnknown"), locale: .current, filename)
     }
 
     static func failed(_ filename: String, provider: AIProvider?) -> String {

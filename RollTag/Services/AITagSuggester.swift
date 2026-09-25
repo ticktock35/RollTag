@@ -15,16 +15,7 @@ enum AITagSuggester {
                 },
             ]
         }
-        let customs = customValues
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        if !customs.isEmpty {
-            categories.append([
-                "id": TagAssignment.customCategory,
-                "name": "custom",
-                "tags": customs.map { ["id": $0, "name": $0] },
-            ])
-        }
+        _ = customValues
         return ["categories": categories]
     }
 
@@ -32,7 +23,8 @@ enum AITagSuggester {
         footage: Footage,
         warehouseName: String,
         live: MediaMetadataSnapshot = MediaMetadataSnapshot(),
-        place: String? = nil
+        place: String? = nil,
+        vision: VisionObservation? = nil
     ) -> [String: Any] {
         var payload: [String: Any] = [
             "filename": footage.filename,
@@ -63,6 +55,9 @@ enum AITagSuggester {
         if let place, !place.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             payload["place"] = place.trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        if let vision, vision.isReliable {
+            payload["vision"] = vision.contextPayload
+        }
         return payload
     }
 
@@ -86,14 +81,22 @@ enum AITagSuggester {
         from raw: [[String: String]],
         catalog: TagCatalog,
         customValues: Set<String>,
-        keywords: [String] = []
+        keywords: [String] = [],
+        blockedCustomKeys: Set<String> = [],
+        vision: VisionObservation? = nil
     ) -> [TagAssignment] {
         var seen = Set<String>()
         var result: [TagAssignment] = []
         for item in raw {
             let category = item["category"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let value = item["value"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard isAllowed(category: category, value: value, catalog: catalog, customValues: customValues) else {
+            guard isAllowed(
+                category: category,
+                value: value,
+                catalog: catalog,
+                customValues: customValues,
+                blockedCustomKeys: blockedCustomKeys
+            ) else {
                 continue
             }
             let key = "\(category)/\(value)"
@@ -102,24 +105,60 @@ enum AITagSuggester {
         }
         for keyword in keywords {
             guard let formatted = StockKeywordExpander.gettyKeyword(keyword) else { continue }
+            guard !isBlockedCustom(formatted, blockedCustomKeys: blockedCustomKeys) else { continue }
             let key = "\(TagAssignment.customCategory)/\(formatted)"
             guard seen.insert(key).inserted else { continue }
             result.append(.ai(category: TagAssignment.customCategory, value: formatted))
         }
-        return result
+        return finalize(result, blockedCustomKeys: blockedCustomKeys, vision: vision)
+    }
+
+    static func finalize(
+        _ tags: [TagAssignment],
+        blockedCustomKeys: Set<String>,
+        vision: VisionObservation?
+    ) -> [TagAssignment] {
+        let dropped = tags.filter { tag in
+            if tag.source == "user" { return true }
+            if tag.isCustom, isBlockedCustom(tag.value, blockedCustomKeys: blockedCustomKeys) {
+                return false
+            }
+            return true
+        }
+        return VisionFrameAnalyzer.applyGate(dropped, vision: vision)
     }
 
     static func assignments(
         from payload: [String: Any],
         catalog: TagCatalog,
-        customValues: Set<String>
+        customValues: Set<String>,
+        blockedCustomKeys: Set<String> = [],
+        vision: VisionObservation? = nil
     ) -> [TagAssignment] {
         assignments(
             from: suggestedTags(in: payload),
             catalog: catalog,
             customValues: customValues,
-            keywords: suggestedKeywords(in: payload)
+            keywords: suggestedKeywords(in: payload),
+            blockedCustomKeys: blockedCustomKeys,
+            vision: vision
         )
+    }
+
+    static func blockedCustomKeys(customValues: [String], glossary: KeywordGlossary) -> Set<String> {
+        var keys = Set<String>()
+        func insert(_ raw: String) {
+            let key = KeywordGlossary.lookupKey(raw)
+            if !key.isEmpty {
+                keys.insert(key)
+            }
+        }
+        customValues.forEach(insert)
+        for pair in glossary.pairs {
+            insert(pair.native)
+            insert(pair.english)
+        }
+        return keys
     }
 
     static func suggestedTags(in payload: [String: Any]) -> [[String: String]] {
@@ -147,15 +186,24 @@ enum AITagSuggester {
         category: String,
         value: String,
         catalog: TagCatalog,
-        customValues: Set<String>
+        customValues: Set<String>,
+        blockedCustomKeys: Set<String>
     ) -> Bool {
         if category == TagAssignment.customCategory {
+            if isBlockedCustom(value, blockedCustomKeys: blockedCustomKeys) {
+                return false
+            }
             if customValues.contains(value) { return true }
             return StockKeywordExpander.isVisibleCustomLabel(value)
         }
         return catalog.categories.contains { group in
             group.id == category && group.tags.contains { $0.id == value }
         }
+    }
+
+    static func isBlockedCustom(_ value: String, blockedCustomKeys: Set<String>) -> Bool {
+        let key = KeywordGlossary.lookupKey(value)
+        return !key.isEmpty && blockedCustomKeys.contains(key)
     }
 
     private static func stringValue(_ value: Any?) -> String? {

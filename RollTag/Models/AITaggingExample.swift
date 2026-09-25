@@ -67,4 +67,23 @@ struct AITaggingExample: Codable, Equatable {
     static func payloadList(_ examples: [AITaggingExample]) -> [[String: Any]] {
         examples.prefix(maxStored).map(\.payload)
     }
+
+    static func strippingBlockedCustoms(
+        _ examples: [AITaggingExample],
+        blockedCustomKeys: Set<String>
+    ) -> [AITaggingExample] {
+        guard !blockedCustomKeys.isEmpty else { return examples }
+        return examples.compactMap { example in
+            let ai = example.ai.filter { !isBlockedCustom($0, blockedCustomKeys: blockedCustomKeys) }
+            let kept = example.kept.filter { !isBlockedCustom($0, blockedCustomKeys: blockedCustomKeys) }
+            guard !ai.isEmpty, !kept.isEmpty else { return nil }
+            return AITaggingExample(ai: ai, kept: kept)
+        }
+    }
+
+    private static func isBlockedCustom(_ tag: AITagRef, blockedCustomKeys: Set<String>) -> Bool {
+        guard tag.category == TagAssignment.customCategory else { return false }
+        let key = KeywordGlossary.lookupKey(tag.value)
+        return !key.isEmpty && blockedCustomKeys.contains(key)
+    }
 }

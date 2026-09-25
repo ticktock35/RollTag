@@ -207,6 +207,15 @@ final class WarehouseDatabase {
         }
     }
 
+    func removeTags(source: String, from ids: [UUID]) throws {
+        for id in ids {
+            try execute(
+                "DELETE FROM tags WHERE footage_id = ? AND source = ?;",
+                params: [id.uuidString, source]
+            )
+        }
+    }
+
     func duplicateGroups() throws -> [DuplicateGroup] {
         let groups = try query("SELECT id, content_hash, resolution FROM duplicate_groups;")
         let members = try query("SELECT group_id, footage_id FROM duplicate_members;")

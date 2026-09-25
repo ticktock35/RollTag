@@ -56,6 +56,87 @@ final class PathTagTests: XCTestCase {
         XCTAssertTrue(tags.isEmpty)
     }
 
+    func testBlockedPersonNamesAreNotInheritedFromFolder() {
+        let blocked = AITagSuggester.blockedCustomKeys(
+            customValues: ["皓皓", "linus", "clubmed"],
+            glossary: KeywordGlossary(pairs: [.init(native: "皓皓", english: "linus")])
+        )
+        let tags = PathTagMatcher.assignments(
+            relativePath: "Travel/皓皓/linus-sled/clip.jpg",
+            catalog: catalog,
+            customValues: ["皓皓", "linus", "clubmed"],
+            blockedCustomKeys: blocked
+        )
+        XCTAssertFalse(tags.contains { $0.value == "皓皓" || $0.value == "linus" })
+        XCTAssertFalse(tags.contains { $0.category == TagAssignment.customCategory })
+    }
+
+    func testExactFolderNameCustomsAreNotInheritedUnlessUserMade() {
+        let inherited = PathTagMatcher.inheritableCustoms(
+            ["huntingtrip", "clubmed"],
+            relativePath: "Travel/huntingtrip/Club Med Ria/clip.jpg",
+            userCustomKeys: ["clubmed"]
+        )
+        XCTAssertEqual(inherited, ["clubmed"])
+        let stale = PathTagMatcher.staleFolderNameTags(
+            [
+                .path(category: TagAssignment.customCategory, value: "huntingtrip"),
+                .path(category: TagAssignment.customCategory, value: "clubmed"),
+                .user(category: TagAssignment.customCategory, value: "馬來西亞"),
+            ],
+            relativePath: "Travel/huntingtrip/clip.jpg",
+            userCustomKeys: ["clubmed"]
+        )
+        XCTAssertEqual(stale.map(\.value), ["huntingtrip"])
+    }
+
+    func testFolderNamesAreHintsAndNotWrittenAsTags() {
+        let tags = PathTagMatcher.assignments(
+            relativePath: "Travel/Finland/Lapland/huntingtrip/clip.jpg",
+            catalog: catalog,
+            customValues: []
+        )
+        XCTAssertFalse(tags.contains { $0.isCustom })
+        XCTAssertFalse(tags.contains { $0.value == "Finland" || $0.value == "huntingtrip" })
+    }
+
+    func testGeocodedPlacePartsAreWritten() {
+        let tags = PathTagMatcher.geocodeAssignments(
+            "Rovaniemi, Lapland, Finland",
+            catalog: catalog
+        )
+        XCTAssertEqual(
+            tags.filter(\.isCustom).map(\.value).sorted(),
+            ["Finland", "Lapland", "Rovaniemi"]
+        )
+        XCTAssertTrue(tags.allSatisfy { $0.source == "path" })
+    }
+
+    func testGeocodeWritesEvenWhenNameMatchesBlockedCustom() {
+        let blocked = AITagSuggester.blockedCustomKeys(
+            customValues: ["Finland"],
+            glossary: .empty
+        )
+        let viaAssignments = PathTagMatcher.assignments(
+            relativePath: "clip.jpg",
+            catalog: catalog,
+            customValues: [],
+            blockedCustomKeys: blocked,
+            geocodedPlace: "Sodankylä, Lapland, Finland"
+        )
+        XCTAssertTrue(viaAssignments.contains { $0.value == "Finland" })
+        XCTAssertTrue(viaAssignments.contains { $0.value == "Sodankylä" })
+    }
+
+    func testGenericCameraFoldersAreSkipped() {
+        let tags = PathTagMatcher.assignments(
+            relativePath: "DCIM/100APPLE/IMG_0001.HEIC",
+            catalog: catalog,
+            customValues: []
+        )
+        XCTAssertTrue(tags.isEmpty)
+    }
+
     func testFilenameIsNotAFolderSegment() {
         let tags = PathTagMatcher.assignments(
             relativePath: "DJI_20260919143022_0029_D.MP4",

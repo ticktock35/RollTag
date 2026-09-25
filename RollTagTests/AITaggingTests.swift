@@ -120,6 +120,198 @@ final class AITaggingTests: XCTestCase {
         XCTAssertNil(payload["place"])
     }
 
+    func testContextIncludesReliableVisionAndOmitsUnreliable() {
+        let footage = Footage(
+            id: UUID(),
+            warehouseID: UUID(),
+            relativePath: "clip.mp4",
+            filename: "clip.mp4",
+            size: 10,
+            mtime: 1,
+            contentHash: nil,
+            phash: nil,
+            status: .available,
+            duration: nil,
+            width: nil,
+            height: nil,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0),
+            parentID: nil,
+            userNotes: "",
+            tags: [],
+            capturedAt: nil
+        )
+        let vision = VisionObservation(
+            people: "none",
+            peopleCount: 0,
+            hasHands: false,
+            face: "none",
+            scenes: ["ocean"],
+            animals: [],
+            text: ["ICEBREAKER"],
+            isReliable: true
+        )
+        let payload = AITagSuggester.contextPayload(footage: footage, warehouseName: "A", vision: vision)
+        let facts = payload["vision"] as? [String: Any]
+        XCTAssertEqual(facts?["people"] as? String, "none")
+        XCTAssertEqual(facts?["people_count"] as? Int, 0)
+        XCTAssertEqual(facts?["scenes"] as? [String], ["ocean"])
+        XCTAssertEqual(facts?["text"] as? [String], ["ICEBREAKER"])
+        XCTAssertNil(AITagSuggester.contextPayload(footage: footage, warehouseName: "A", vision: .unreliable)["vision"])
+    }
+
+    func testVisionGateForcesPeopleCountAndDropsConflicts() {
+        let catalog = TagCatalogLoader.load()
+        let vision = VisionObservation(
+            people: "none",
+            peopleCount: 0,
+            hasHands: false,
+            face: "none",
+            scenes: [],
+            animals: [],
+            text: [],
+            isReliable: true
+        )
+        let tags = AITagSuggester.assignments(
+            from: [
+                ["category": "nature", "value": "ocean"],
+                ["category": "people", "value": "one"],
+                ["category": "people", "value": "portrait"],
+                ["category": "people", "value": "child"],
+                ["category": "custom", "value": "破冰船"],
+            ],
+            catalog: catalog,
+            customValues: [],
+            keywords: ["one person", "no people", "icebreaker"],
+            vision: vision
+        )
+        XCTAssertTrue(tags.contains { $0.category == "people" && $0.value == "none" })
+        XCTAssertFalse(tags.contains { $0.category == "people" && $0.value == "one" })
+        XCTAssertFalse(tags.contains { $0.category == "people" && $0.value == "portrait" })
+        XCTAssertFalse(tags.contains { $0.value == "one person" })
+        XCTAssertTrue(tags.contains { $0.value == "no people" })
+        XCTAssertTrue(tags.contains { $0.category == "nature" && $0.value == "ocean" })
+        XCTAssertTrue(tags.contains { $0.isCustom && $0.value == "破冰船" })
+    }
+
+    func testVisionGateDropsToyFalsePositivesAndCalendarKeywords() {
+        let catalog = TagCatalogLoader.load()
+        let vision = VisionObservation(
+            people: "none",
+            peopleCount: 0,
+            hasHands: false,
+            face: "none",
+            scenes: ["window"],
+            animals: [],
+            text: [],
+            isReliable: true
+        )
+        let tags = AITagSuggester.assignments(
+            from: [
+                ["category": "people", "value": "one"],
+                ["category": "animals", "value": "pet"],
+                ["category": "lifestyle", "value": "family"],
+                ["category": "travel", "value": "windowView"],
+                ["category": "nature", "value": "snowscape"],
+            ],
+            catalog: catalog,
+            customValues: [],
+            keywords: ["one person", "pet", "march", "window view", "snowscape"],
+            vision: vision
+        )
+        XCTAssertEqual(tags.filter { $0.category == "people" }.map(\.value), ["none"])
+        XCTAssertFalse(tags.contains { $0.category == "animals" })
+        XCTAssertFalse(tags.contains { $0.category == "lifestyle" && $0.value == "family" })
+        XCTAssertFalse(tags.contains { $0.value == "march" || $0.value == "pet" })
+        XCTAssertTrue(tags.contains { $0.category == "travel" && $0.value == "windowView" })
+        XCTAssertTrue(tags.contains { $0.category == "nature" && $0.value == "snowscape" })
+        XCTAssertTrue(VisionFrameAnalyzer.isCalendarKeyword("March"))
+        XCTAssertTrue(VisionFrameAnalyzer.isPetKeyword("house pet"))
+        XCTAssertFalse(VisionFrameAnalyzer.isPetKeyword("fox squirrel"))
+    }
+
+    func testUnreliableVisionFailsClosedToNoPeople() {
+        let catalog = TagCatalogLoader.load()
+        let tags = AITagSuggester.assignments(
+            from: [
+                ["category": "people", "value": "one"],
+                ["category": "nature", "value": "snowscape"],
+            ],
+            catalog: catalog,
+            customValues: [],
+            keywords: ["one person", "march"],
+            vision: .unreliable
+        )
+        XCTAssertEqual(tags.filter { $0.category == "people" }.map(\.value), ["none"])
+        XCTAssertFalse(tags.contains { $0.value == "one person" || $0.value == "march" })
+        XCTAssertTrue(tags.contains { $0.category == "nature" && $0.value == "snowscape" })
+    }
+
+    func testDogsWithoutFacesAreNotCountedAsPeople() {
+        XCTAssertEqual(
+            VisionFrameAnalyzer.resolvedPeopleCount(bodies: 2, faces: 0, animals: ["dog"], hasHands: true),
+            0
+        )
+        XCTAssertEqual(
+            VisionFrameAnalyzer.resolvedPeopleCount(bodies: 1, faces: 1, animals: ["dog"], hasHands: false),
+            1
+        )
+        XCTAssertEqual(
+            VisionFrameAnalyzer.resolvedPeopleCount(bodies: 1, faces: 0, animals: [], hasHands: false),
+            1
+        )
+    }
+
+    func testVisionGateAddsHandsAndKeepsPortraitOnlyWhenFaceIsLarge() {
+        let catalog = TagCatalogLoader.load()
+        let vision = VisionObservation(
+            people: "one",
+            peopleCount: 1,
+            hasHands: true,
+            face: "distant",
+            scenes: [],
+            animals: [],
+            text: [],
+            isReliable: true
+        )
+        let tags = AITagSuggester.assignments(
+            from: [
+                ["category": "people", "value": "two"],
+                ["category": "people", "value": "portrait"],
+                ["category": "people", "value": "distant"],
+            ],
+            catalog: catalog,
+            customValues: [],
+            vision: vision
+        )
+        XCTAssertEqual(tags.filter { $0.category == "people" }.map(\.value).sorted(), ["distant", "hands", "one"])
+    }
+
+    func testVisionPickFramesAndPeopleBuckets() {
+        XCTAssertEqual(VisionFrameAnalyzer.pickFrames([1, 2, 3, 4, 5, 6]), [1, 6])
+        XCTAssertEqual(VisionFrameAnalyzer.pickFrames(["only"]), ["only"])
+        XCTAssertEqual(VisionFrameAnalyzer.peopleID(count: 0), "none")
+        XCTAssertEqual(VisionFrameAnalyzer.peopleID(count: 1), "one")
+        XCTAssertEqual(VisionFrameAnalyzer.peopleID(count: 2), "two")
+        XCTAssertEqual(VisionFrameAnalyzer.peopleID(count: 6), "group")
+        XCTAssertEqual(VisionFrameAnalyzer.peopleID(count: 20), "crowd")
+        XCTAssertEqual(VisionFrameAnalyzer.faceID(maxFaceArea: 0.2, peopleCount: 1), "portrait")
+        XCTAssertEqual(VisionFrameAnalyzer.faceID(maxFaceArea: 0.01, peopleCount: 1), "distant")
+        XCTAssertEqual(VisionFrameAnalyzer.faceID(maxFaceArea: 0, peopleCount: 0), "none")
+        XCTAssertTrue(VisionFrameAnalyzer.isPeopleKeyword("one person"))
+        XCTAssertFalse(VisionFrameAnalyzer.isPeopleKeyword("no people"))
+        XCTAssertFalse(VisionFrameAnalyzer.isPeopleKeyword("icebreaker"))
+    }
+
+    func testBlankJPEGCountsAsNoPeople() async {
+        let data = solidJPEG()
+        let observation = await VisionFrameAnalyzer.observe(frames: [data])
+        XCTAssertTrue(observation.isReliable)
+        XCTAssertEqual(observation.people, "none")
+        XCTAssertEqual(observation.peopleCount, 0)
+        XCTAssertFalse(observation.hasHands)
+    }
+
     func testContextIncludesResolvedPlace() {
         let footage = Footage(
             id: UUID(),
@@ -179,12 +371,40 @@ final class AITaggingTests: XCTestCase {
                 ["category": "custom", "value": "invented"],
             ],
             catalog: catalog,
-            customValues: ["測試"]
+            customValues: ["測試"],
+            blockedCustomKeys: AITagSuggester.blockedCustomKeys(customValues: ["測試"], glossary: .empty)
         )
         XCTAssertEqual(tags, [
             .ai(category: "nature", value: "ocean"),
-            .ai(category: "custom", value: "測試"),
         ])
+    }
+
+    func testAssignmentsRejectExistingCustomAndGlossaryNames() {
+        let catalog = TagCatalog(categories: [
+            TagCategory(
+                id: "nature",
+                names: ["en": "Nature"],
+                tags: [TagDefinition(id: "ocean", names: ["en": "Ocean"])]
+            ),
+        ])
+        let glossary = KeywordGlossary(pairs: [.init(native: "小美", english: "xiaomei")])
+        let blocked = AITagSuggester.blockedCustomKeys(
+            customValues: ["小美", "clubmed"],
+            glossary: glossary
+        )
+        let tags = AITagSuggester.assignments(
+            from: [
+                ["category": "nature", "value": "ocean"],
+                ["category": "custom", "value": "小美"],
+                ["category": "custom", "value": "Xiaomei"],
+                ["category": "custom", "value": "clubmed"],
+                ["category": "custom", "value": "破冰船"],
+            ],
+            catalog: catalog,
+            customValues: ["小美", "clubmed"],
+            blockedCustomKeys: blocked
+        )
+        XCTAssertEqual(tags.map(\.value), ["ocean", "破冰船"])
     }
 
     func testAssignmentsKeepGettyKeywordsAndVisibleChinese() {
@@ -219,12 +439,14 @@ final class AITaggingTests: XCTestCase {
                 tags: [TagDefinition(id: "ocean", names: ["zh-Hant": "海", "en": "Ocean"])]
             ),
         ])
-        let payload = AITagSuggester.catalogPayload(catalog: catalog, locale: "zh-Hant", customValues: [])
+        let payload = AITagSuggester.catalogPayload(catalog: catalog, locale: "zh-Hant", customValues: ["小美"])
         let categories = payload["categories"] as? [[String: Any]]
         let tags = categories?.first?["tags"] as? [[String: Any]]
+        XCTAssertEqual(categories?.count, 1)
         XCTAssertEqual(tags?.first?["id"] as? String, "ocean")
         XCTAssertEqual(tags?.first?["name"] as? String, "海")
         XCTAssertEqual(tags?.first?["en"] as? String, "Ocean")
+        XCTAssertFalse((categories ?? []).contains { ($0["id"] as? String) == TagAssignment.customCategory })
     }
 
     func testPreviewUsesParallelQuickLookPath() {
@@ -346,6 +568,17 @@ final class AITaggingTests: XCTestCase {
         XCTAssertEqual(fractions.last ?? -1, 0.95, accuracy: 0.001)
         XCTAssertEqual(fractions, fractions.sorted())
         XCTAssertTrue(fractions.allSatisfy { $0 >= 0.049 && $0 <= 0.951 })
+    }
+
+    private func solidJPEG() -> Data {
+        let image = NSImage(size: NSSize(width: 64, height: 64))
+        image.lockFocus()
+        NSColor.red.setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 64, height: 64)).fill()
+        image.unlockFocus()
+        let tiff = image.tiffRepresentation
+        let rep = tiff.flatMap { NSBitmapImageRep(data: $0) }
+        return rep?.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) ?? Data()
     }
 
     private func withKeys(_ ai: AIPreference, gemini: String, openai: String) -> AIPreference {

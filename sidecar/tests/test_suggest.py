@@ -74,11 +74,17 @@ class SuggestTests(unittest.TestCase):
         self.assertIn("103.8", prompt)
         self.assertIn("Johor Bahru", prompt)
         self.assertIn("place field", prompt)
+        self.assertIn("Folder and path names are hints only", prompt)
 
     def test_prompt_includes_getty_keywords(self):
         prompt = build_prompt({"categories": []})
         self.assertIn("keywords", prompt)
         self.assertIn("Getty/Pond5", prompt)
+
+    def test_prompt_does_not_apply_personal_names_from_context(self):
+        prompt = build_prompt({"categories": []})
+        self.assertIn("Do not invent personal names", prompt)
+        self.assertIn("Seeing a person is not enough", prompt)
 
     def test_prompt_requires_exact_people_count(self):
         prompt = build_prompt({"categories": []})
@@ -86,6 +92,22 @@ class SuggestTests(unittest.TestCase):
         self.assertIn("people/one", prompt)
         self.assertIn("people/two", prompt)
         self.assertIn("exactly one", prompt)
+
+    def test_prompt_ignores_toys_and_calendar_from_date(self):
+        prompt = build_prompt({"categories": []})
+        self.assertIn("Plush toys", prompt)
+        self.assertIn("month or weekday", prompt)
+        self.assertIn("not live animals", prompt)
+        self.assertIn("those detections are live animals", prompt)
+
+    def test_prompt_follows_on_device_vision_facts(self):
+        prompt = build_prompt(
+            {"categories": []},
+            {"vision": {"people": "none", "people_count": 0, "hands": False, "face": "none"}},
+        )
+        self.assertIn("CONTEXT.vision", prompt)
+        self.assertIn("on-device Vision", prompt)
+        self.assertIn('"people": "none"', prompt)
 
     def test_parse_keywords(self):
         from rolltag_sidecar.suggest import parse_keywords

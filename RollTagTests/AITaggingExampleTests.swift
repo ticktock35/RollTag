@@ -45,4 +45,24 @@ final class AITaggingExampleTests: XCTestCase {
         XCTAssertEqual(next.first, correction)
         XCTAssertEqual(next.dropFirst().first, accepted)
     }
+
+    func testStrippingBlockedCustomsDropsNamesFromExamples() {
+        let example = AITaggingExample(
+            ai: [
+                AITagRef(category: "nature", value: "ocean"),
+                AITagRef(category: "custom", value: "小美"),
+            ],
+            kept: [
+                AITagRef(category: "nature", value: "ocean"),
+                AITagRef(category: "custom", value: "xiaomei"),
+            ]
+        )
+        let blocked = AITagSuggester.blockedCustomKeys(
+            customValues: ["小美"],
+            glossary: KeywordGlossary(pairs: [.init(native: "小美", english: "xiaomei")])
+        )
+        let cleaned = AITaggingExample.strippingBlockedCustoms([example], blockedCustomKeys: blocked)
+        XCTAssertEqual(cleaned.first?.ai.map(\.value), ["ocean"])
+        XCTAssertEqual(cleaned.first?.kept.map(\.value), ["ocean"])
+    }
 }

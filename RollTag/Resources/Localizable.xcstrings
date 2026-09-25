@@ -313,6 +313,22 @@
         }
       }
     },
+    "ai.last.successUnknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last clip %@ succeeded."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一支 %@ · 成功"
+          }
+        }
+      }
+    },
     "ai.last.success" : {
       "localizations" : {
         "en" : {

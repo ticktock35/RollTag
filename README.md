@@ -77,7 +77,7 @@ open RollTag.xcodeproj
 
 ### AI 打標
 
-**AI 給的標可能錯**（人數、地點、情緒、關鍵字都可能不對）。請自己看過，不對的點掉。匯入**不會**自動打標。
+**AI 給的標可能錯**（地點、情緒、關鍵字都可能不對；人數先由這台 Mac 的 Vision 判斷，仍請看過）。不對的點掉。匯入**不會**自動打標。
 
 先到設定 → AI（⌘,）填一把 key（有兩把更好）：
 
@@ -90,8 +90,8 @@ open RollTag.xcodeproj
 
 1. 選**影片或照片**（已打過的也可再送）。音訊、太小或解不開的會跳過。
 2. 按右側「AI 打標」或 **⌥⌘T**。模型回來後：按「完成」或 Enter 保留；按「取消」或 Esc 拿掉這次標。
-3. 或在側欄「未打標」、或媒體區選一支／多支後按右鍵「**AI 批次打標**」。一支一支送，打完就留下，不必再確認，所以更要事後檢查。
-4. 一次超過 10 檔時，進度條有「**終止**」：停掉目前這次送出，已打的留下，還沒打的不再送。進行中會寫正在用哪個平台，以及上一支是成功還是失敗。平台名可點進去看該帳號用量。檔裡有 GPS 時會先查出地名再送給 AI；附近約 1 公里內的座標會記住，不必每支都查。
+3. 或在側欄「未打標」、或媒體區選一支／多支後按右鍵「**AI 批次打標**」。一支一支送，打完就留下，不必再確認，所以更要事後檢查。側欄「未打標」只會打**身上還沒有任何標**的檔；已經打錯的請在格線選起來再右鍵批次，才會換掉舊 AI 標。
+4. 一次超過 10 檔時，進度條有「**終止**」：停掉目前這次送出，已打的留下，還沒打的不再送。進行中會寫正在用哪個平台，以及上一支是成功還是失敗。平台名可點進去看該帳號用量。檔裡有 GPS 時會先查出地名並寫成標（城市／地區／國家），模型失敗也寫。目錄只當暗示，不會把資料夾名寫成標。附近約 1 公里內的座標會記住，不必每支都查。送出前會先用這台 Mac 的 Vision 數**人體**（玩偶臉不算）；沒人就不寫人像或人名。再打一次會換掉上次的 AI 標，手打的留下。人名等已有自訂標請自己點或手打。
 
 大批次後面幾支可能因平台配額或逾時失敗，檔案本身往往沒問題。狀態列會寫成功與失敗支數，約 10 秒後消失。等幾分鐘再對還沒打的跑一次即可。
 
@@ -141,7 +141,7 @@ Run the RollTag scheme (⌘R).
 1. Drop a footage folder or drive on the window, or press **⌘O**. Removing a warehouse only unregisters it; files on disk stay. Unplugged drives go offline until you plug them back in. Rescan with ⌘R.
 2. Browse the sidebar lists and folders. Search and sort sit above the grid. Click a clip to play it (photos show a still). Space plays/pauses; P toggles fullscreen; ⌘/ lists shortcuts.
 3. **Hand tags:** select one clip or a similar group, click a preset on the right, or type your own word and press Return. Click a tag to remove it.
-4. **AI tags:** paste a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key in Settings → AI. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag** (keeps tags immediately). A batch of more than 10 files shows **Stop**. While it runs, the banner shows which provider is sending and whether the last clip succeeded or failed; the provider name opens that platform’s usage page. Files with GPS get a place name first; nearby shots within about 1 km reuse that result. **AI tags can be wrong — review them.** Later files in a large batch may fail on quota; the status line clears after about 10 seconds. Wait and retry what is still untagged.
+4. **AI tags:** paste a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key in Settings → AI. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag** (keeps tags immediately). Sidebar **Untagged** only sends files with no tags yet; to replace bad AI tags, select those clips in the grid and batch again. A batch of more than 10 files shows **Stop**. While it runs, the banner shows which provider is sending and whether the last clip succeeded or failed; the provider name opens that platform’s usage page. Files with GPS get a place name first and those locality parts are always written as tags (even if the model fails); nearby shots within about 1 km reuse that result. Folder names are hints only and are not written as tags. On-device Vision counts human bodies (toy faces and dog bodies do not count); empty scenes do not get portrait or name tags. Running AI again replaces the previous AI tags and keeps hand / path tags. Existing custom labels such as people’s names are not auto-applied by AI — add those by hand. **AI tags can be wrong — review them.** Later files in a large batch may fail on quota; the status line clears after about 10 seconds. Wait and retry what is still untagged.
 5. **Duplicates:** sidebar or ⌘⇧D. A / D keep one side, S keeps all, Enter sends the rest to Trash. **Trim** on a single video writes a new clip in the warehouse.
 
 Settings: `~/rolltag/config.json` (do not share). Place-name cache: `~/rolltag/geocode-cache.json`. Tags and thumbs: `<warehouse>/.rolltag/`. Full contract: [SPEC.md](SPEC.md).

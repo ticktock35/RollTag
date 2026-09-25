@@ -72,6 +72,40 @@ final class WarehouseDatabaseTests: XCTestCase {
         XCTAssertTrue(try db.allFootage()[0].tags.isEmpty)
     }
 
+    func testRemoveTagsBySourceLeavesUserAndPath() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-db-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let db = try WarehouseDatabase(rootURL: root, warehouseID: UUID())
+        let snap = FootageSnapshot(
+            id: UUID(),
+            relativePath: "a.mov",
+            filename: "a.mov",
+            size: 1,
+            mtime: 1,
+            contentHash: "h",
+            phash: nil,
+            status: .available,
+            tags: [
+                .user(category: TagAssignment.customCategory, value: "手打"),
+                .path(category: "place", value: "indoor"),
+                .ai(category: "people", value: "one"),
+                .ai(category: "animals", value: "pet"),
+            ],
+            userNotes: "",
+            parentID: nil,
+            duration: nil,
+            width: nil,
+            height: nil,
+            capturedAt: nil,
+            needsReanalysis: false
+        )
+        try db.insert(snap)
+        try db.removeTags(source: "ai", from: [snap.id])
+        let remaining = try db.allFootage()[0].tags
+        XCTAssertEqual(Set(remaining.map(\.source)), ["user", "path"])
+        XCTAssertFalse(remaining.contains { $0.category == "people" })
+    }
+
     func testRemoveFootageDeletesRow() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-db-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
