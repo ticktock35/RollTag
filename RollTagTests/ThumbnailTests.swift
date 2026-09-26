@@ -160,6 +160,21 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertGreaterThan(size.height, size.width)
     }
 
+    func testVideoPreviewCapsResolutionBelow4K() {
+        XCTAssertEqual(ThumbnailService.previewMaxResolution.width, ThumbnailService.playerMaxEdge)
+        XCTAssertEqual(ThumbnailService.previewMaxResolution.height, ThumbnailService.playerMaxEdge)
+        XCTAssertEqual(ThumbnailService.hoverMaxResolution.width, ThumbnailService.storedThumbMaxEdge)
+        XCTAssertLessThanOrEqual(ThumbnailService.previewMaxResolution.width, 1280)
+    }
+
+    func testDecodeStillNeverKeepsSourceLargerThanMaxEdge() throws {
+        let source = try writePNG(width: 2400, height: 1800)
+        let image = ThumbnailService.decodeStill(url: source, maxEdge: 96, preferEmbedded: false)
+        let size = pixelSize(image)
+        XCTAssertNotNil(image)
+        XCTAssertLessThanOrEqual(max(size.width, size.height), 96)
+    }
+
     func testPreviewStillDoesNotReplaceGridThumb() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-preview-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

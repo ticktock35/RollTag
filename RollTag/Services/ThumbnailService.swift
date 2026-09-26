@@ -19,6 +19,8 @@ enum ThumbnailService {
     static let gridMaxEdge: CGFloat = 320
     static let storedThumbMaxEdge: CGFloat = 480
     static let playerMaxEdge: CGFloat = 1280
+    static let previewMaxResolution = CGSize(width: playerMaxEdge, height: playerMaxEdge)
+    static let hoverMaxResolution = CGSize(width: storedThumbMaxEdge, height: storedThumbMaxEdge)
     private static let generationLock = NSLock()
     private static var deferGenerationFlag = false
 
@@ -219,16 +221,15 @@ enum ThumbnailService {
         if preferEmbedded, let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: true) {
             return image
         }
-        if let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: false) {
-            return image
-        }
-        guard let original = NSImage(contentsOf: url) else { return nil }
-        return downscale(original, maxEdge: maxEdge) ?? original
+        return imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: false)
     }
 
     /// Pixel size after EXIF/TIFF orientation (iPhone portrait is often stored landscape).
     static func orientedPixelSize(url: URL) -> (width: Int, height: Int)? {
-        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        let options = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldAllowFloat: false,
+        ] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, options)
             ?? mappedImageSource(url: url, options: options),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
@@ -278,32 +279,33 @@ enum ThumbnailService {
 
     private static func imageSourceThumbnail(url: URL, maxEdge: CGFloat, preferEmbedded: Bool) -> NSImage? {
         let pixelSize = max(Int(maxEdge.rounded()), 1)
-        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        let sourceOptions = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceShouldAllowFloat: false,
+        ] as CFDictionary
         let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions)
             ?? mappedImageSource(url: url, options: sourceOptions)
         guard let source, CGImageSourceGetCount(source) > 0 else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceShouldCache: false,
             kCGImageSourceShouldCacheImmediately: false,
+            kCGImageSourceShouldAllowFloat: false,
             kCGImageSourceCreateThumbnailFromImageAlways: !preferEmbedded,
             kCGImageSourceCreateThumbnailFromImageIfAbsent: preferEmbedded,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize: pixelSize,
         ]
         guard let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        let size = jpegPixelSize(cg, maxEdge: pixelSize)
+        if let flattened = rasterizeOpaque(cg, width: size.width, height: size.height) {
+            return nsImage(from: flattened)
+        }
         return nsImage(from: cg)
     }
 
     private static func mappedImageSource(url: URL, options: CFDictionary) -> CGImageSource? {
         guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return nil }
         return CGImageSourceCreateWithData(data as CFData, options)
-    }
-
-    private static func downscale(_ image: NSImage, maxEdge: CGFloat) -> NSImage? {
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
-        let size = jpegPixelSize(cg, maxEdge: max(Int(maxEdge.rounded()), 1))
-        guard let resized = rasterizeOpaque(cg, width: size.width, height: size.height) else { return nil }
-        return nsImage(from: resized)
     }
 
     private static func thumbnailMatchesSourceAspect(_ thumbnail: NSImage, source: URL) -> Bool {

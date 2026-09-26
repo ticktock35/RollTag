@@ -26,7 +26,7 @@ struct TrimSession: Equatable, Identifiable {
 @MainActor
 @Observable
 final class PreviewPlayback {
-    let player: AVPlayer
+    private(set) var player: AVPlayer
     var media: PreviewMedia?
     var isPlaying = false
     var isFullscreen = false
@@ -45,10 +45,10 @@ final class PreviewPlayback {
     private var resumeAfterScrub = false
 
     init() {
-        let player = AVPlayer()
-        player.automaticallyWaitsToMinimizeStalling = false
-        self.player = player
+        player = Self.makePlayer()
     }
+
+    var isItemLoaded: Bool { loadedURL != nil && player.currentItem != nil }
 
     var canPlay: Bool {
         guard let media, !isIncompleteFile, !didFailToLoad else { return false }
@@ -58,28 +58,25 @@ final class PreviewPlayback {
     func present(_ next: PreviewMedia?) {
         media = next
         presentGeneration += 1
-        let token = presentGeneration
-        guard let next, next.kind == .video || next.kind == .audio else {
-            unloadPlayer()
+        detachPlayer()
+        currentSeconds = 0
+        didFailToLoad = false
+        guard let next else {
+            duration = 0
+            isIncompleteFile = false
             return
         }
+        duration = next.duration ?? 0
         if next.kind == .video, next.fileSize < MediaConstants.minimumPlayableVideoBytes {
-            unloadPlayer()
-            media = next
             isIncompleteFile = true
             return
         }
-        guard loadedURL != next.url else { return }
-        pause()
-        Task { @MainActor in
-            await Task.yield()
-            guard token == presentGeneration else { return }
-            replaceCurrentItem(url: next.url)
-        }
+        isIncompleteFile = false
     }
 
     func play() {
         guard canPlay, !isPlaying else { return }
+        ensureItemLoaded()
         player.play()
         isPlaying = true
     }
@@ -87,11 +84,9 @@ final class PreviewPlayback {
     func togglePlayPause() {
         guard canPlay else { return }
         if isPlaying {
-            player.pause()
-            isPlaying = false
+            pause()
         } else {
-            player.play()
-            isPlaying = true
+            play()
         }
     }
 
@@ -102,6 +97,7 @@ final class PreviewPlayback {
 
     func beginScrubbing() {
         guard canPlay else { return }
+        ensureItemLoaded()
         isScrubbing = true
         resumeAfterScrub = isPlaying
         if isPlaying {
@@ -161,8 +157,18 @@ final class PreviewPlayback {
     func unload() {
         presentGeneration += 1
         media = nil
-        unloadPlayer()
+        detachPlayer()
+        duration = 0
+        currentSeconds = 0
+        isIncompleteFile = false
+        didFailToLoad = false
         exitFullscreen()
+    }
+
+    private func ensureItemLoaded() {
+        guard let media, canPlay else { return }
+        if loadedURL == media.url, player.currentItem != nil { return }
+        replaceCurrentItem(url: media.url)
     }
 
     private func replaceCurrentItem(url: URL) {
@@ -178,6 +184,7 @@ final class PreviewPlayback {
         isIncompleteFile = false
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let item = AVPlayerItem(asset: asset)
+        item.preferredMaximumResolution = ThumbnailService.previewMaxResolution
         observeItem(item)
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
@@ -194,14 +201,10 @@ final class PreviewPlayback {
         ensureTimeObserver()
     }
 
-    private func unloadPlayer() {
+    private func detachPlayer() {
         pause()
         isScrubbing = false
         resumeAfterScrub = false
-        currentSeconds = 0
-        duration = 0
-        didFailToLoad = false
-        isIncompleteFile = false
         if let endObserver {
             NotificationCenter.default.removeObserver(endObserver)
             self.endObserver = nil
@@ -211,8 +214,19 @@ final class PreviewPlayback {
             player.removeTimeObserver(timeObserver)
             self.timeObserver = nil
         }
+        let hadItem = loadedURL != nil || player.currentItem != nil
         loadedURL = nil
+        player.currentItem?.asset.cancelLoading()
         player.replaceCurrentItem(with: nil)
+        if hadItem {
+            player = Self.makePlayer()
+        }
+    }
+
+    private static func makePlayer() -> AVPlayer {
+        let player = AVPlayer()
+        player.automaticallyWaitsToMinimizeStalling = false
+        return player
     }
 
     private func ensureTimeObserver() {

@@ -536,9 +536,12 @@ final class AppModel {
         )
     }
 
+    var warehouseCustomTags: [TagAssignment] {
+        TagAssignment.uniqued(warehouses.flatMap(\.footage).flatMap(\.tags).filter(\.isCustom))
+    }
+
     var knownCustomTags: [TagAssignment] {
-        let tags = warehouses.flatMap(\.footage).flatMap(\.tags).filter(\.isCustom)
-        return TagAssignment.uniqued(tags).sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
+        TagAssignment.recentUsed(warehouseCustomTags, recentValues: preference.recentCustomTags)
     }
 
     var hasAITaggingRoute: Bool {
@@ -590,6 +593,7 @@ final class AppModel {
         applyToSelection { db, ids in
             try db.addTags(expanded, to: ids)
         }
+        rememberRecentCustomTags(tags.filter(\.isCustom).map(\.value))
     }
 
     func tagSelectedWithAI() {
@@ -627,9 +631,9 @@ final class AppModel {
             }
         }
 
-        let customValues = Set(knownCustomTags.map(\.value))
+        let customValues = Set(warehouseCustomTags.map(\.value))
         let blockedCustomKeys = AITagSuggester.blockedCustomKeys(
-            customValues: knownCustomTags.map(\.value),
+            customValues: warehouseCustomTags.map(\.value),
             glossary: preference.glossary
         )
         let catalogPayload = AITagSuggester.catalogPayload(
@@ -1421,6 +1425,13 @@ final class AppModel {
         if failed > 0 {
             statusMessage = String(format: String(localized: "missing.deleteFailed"), locale: .current, failed)
         }
+    }
+
+    private func rememberRecentCustomTags(_ values: [String]) {
+        let next = TagAssignment.rememberRecent(preference.recentCustomTags, used: values)
+        guard next != preference.recentCustomTags else { return }
+        preference.recentCustomTags = next
+        persistPreference()
     }
 
     func persistPreference() {

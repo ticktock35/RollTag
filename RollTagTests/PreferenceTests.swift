@@ -105,6 +105,24 @@ final class PreferenceTests: XCTestCase {
         XCTAssertEqual(loaded.ai.examples.first?.kept.first?.value, "lake")
     }
 
+    func testRecentCustomTagsRoundTripAndLegacyStaysEmpty() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
+        let store = PreferenceStore(homeDirectory: home)
+        var file = PreferenceFile.empty
+        file.recentCustomTags = ["小美", "clubmed"]
+        try store.save(file)
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.recentCustomTags, ["小美", "clubmed"])
+
+        let legacy = """
+        {"version":1,"warehouses":[]}
+        """
+        try Data(legacy.utf8).write(to: store.configURL)
+        let migrated = try store.load()
+        XCTAssertTrue(migrated.recentCustomTags.isEmpty)
+    }
+
     func testDuplicatePathIsNotAddedTwice() {
         let store = PreferenceStore(homeDirectory: FileManager.default.temporaryDirectory)
         var file = store.addWarehouse(named: "A", path: "/tmp/wh", to: .empty)

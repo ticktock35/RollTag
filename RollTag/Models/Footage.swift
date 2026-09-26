@@ -70,6 +70,49 @@ struct TagAssignment: Codable, Hashable, Identifiable, Sendable {
         }
         return order.map { best[$0]! }
     }
+
+    static let recentUsedLimit = 50
+
+    static func rememberRecent(_ recent: [String], used values: [String], limit: Int = recentUsedLimit) -> [String] {
+        var next = recent
+        for value in values {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            next.removeAll { $0 == trimmed }
+            next.insert(trimmed, at: 0)
+        }
+        if next.count > limit {
+            return Array(next.prefix(limit))
+        }
+        return next
+    }
+
+    static func recentUsed(
+        _ tags: [TagAssignment],
+        recentValues: [String],
+        limit: Int = recentUsedLimit
+    ) -> [TagAssignment] {
+        let unique = uniqued(tags.filter(\.isCustom))
+        var rank: [String: Int] = [:]
+        for (index, value) in recentValues.enumerated() where rank[value] == nil {
+            rank[value] = index
+        }
+        let sorted = unique.sorted { lhs, rhs in
+            let left = rank[lhs.value]
+            let right = rank[rhs.value]
+            switch (left, right) {
+            case let (l?, r?) where l != r:
+                return l < r
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            default:
+                return lhs.value.localizedStandardCompare(rhs.value) == .orderedAscending
+            }
+        }
+        return Array(sorted.prefix(limit))
+    }
 }
 
 struct Footage: Identifiable, Hashable {

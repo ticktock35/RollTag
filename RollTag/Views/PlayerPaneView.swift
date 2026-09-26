@@ -51,7 +51,14 @@ struct PlayerPaneView: View {
             switch media.kind {
             case .video:
                 ZStack {
-                    SharedPlayerLayer(player: model.playback.player)
+                    if model.playback.isItemLoaded {
+                        SharedPlayerLayer(player: model.playback.player)
+                    } else {
+                        PlayerPosterView(
+                            footageID: media.id,
+                            warehouseRoot: model.onlineRoot(for: media.id)
+                        )
+                    }
                     if let message = previewMessage {
                         previewMessageOverlay(message)
                     }
@@ -69,7 +76,10 @@ struct PlayerPaneView: View {
                         .padding(.horizontal, 16)
                 }
             case .image:
-                PlayerImageView(media: media, warehouseRoot: model.onlineRoot(for: media.id))
+                PlayerPosterView(
+                    footageID: media.id,
+                    warehouseRoot: model.onlineRoot(for: media.id)
+                )
             }
         } else {
             VStack(spacing: 8) {
@@ -264,8 +274,8 @@ final class PlayerLayerView: NSView {
     }
 }
 
-private struct PlayerImageView: View {
-    let media: PreviewMedia
+private struct PlayerPosterView: View {
+    let footageID: UUID
     let warehouseRoot: URL?
     @State private var image: NSImage?
 
@@ -274,29 +284,17 @@ private struct PlayerImageView: View {
             if let image {
                 Image(nsImage: image)
                     .resizable()
-                    .interpolation(.high)
+                    .interpolation(.medium)
                     .scaledToFit()
             } else {
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(.white)
+                Color.clear
             }
         }
-        .task(id: media.id) {
-            if let warehouseRoot {
-                let thumbURL = ThumbnailService.thumbnailFileURL(warehouseRoot: warehouseRoot, footageID: media.id)
-                if let cached = ThumbnailService.loadThumbnail(at: thumbURL, maxEdge: ThumbnailService.storedThumbMaxEdge) {
-                    image = cached
-                } else {
-                    image = nil
-                }
-            } else {
-                image = nil
-            }
-            guard warehouseRoot != nil else { return }
-            if let large = await ThumbnailService.previewStill(url: media.url, maxEdge: ThumbnailService.playerMaxEdge) {
-                image = large
-            }
+        .task(id: footageID) {
+            image = nil
+            guard let warehouseRoot else { return }
+            let thumbURL = ThumbnailService.thumbnailFileURL(warehouseRoot: warehouseRoot, footageID: footageID)
+            image = ThumbnailService.loadThumbnail(at: thumbURL, maxEdge: ThumbnailService.storedThumbMaxEdge)
         }
     }
 }

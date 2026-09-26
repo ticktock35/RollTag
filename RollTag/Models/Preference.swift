@@ -6,6 +6,7 @@ struct PreferenceFile: Codable, Equatable {
     var ai: AIPreference
     var shortcuts: ShortcutPreference
     var glossary: KeywordGlossary
+    var recentCustomTags: [String]
 
     static let currentVersion = 1
 
@@ -15,6 +16,7 @@ struct PreferenceFile: Codable, Equatable {
         case ai
         case shortcuts
         case glossary
+        case recentCustomTags
     }
 
     static var empty: PreferenceFile {
@@ -26,13 +28,15 @@ struct PreferenceFile: Codable, Equatable {
         warehouses: [WarehousePreference],
         ai: AIPreference = .empty,
         shortcuts: ShortcutPreference = .empty,
-        glossary: KeywordGlossary = .empty
+        glossary: KeywordGlossary = .empty,
+        recentCustomTags: [String] = []
     ) {
         self.version = version
         self.warehouses = warehouses
         self.ai = ai
         self.shortcuts = shortcuts
         self.glossary = glossary
+        self.recentCustomTags = recentCustomTags
     }
 
     init(from decoder: Decoder) throws {
@@ -42,6 +46,7 @@ struct PreferenceFile: Codable, Equatable {
         ai = try container.decodeIfPresent(AIPreference.self, forKey: .ai) ?? .empty
         shortcuts = try container.decodeIfPresent(ShortcutPreference.self, forKey: .shortcuts) ?? .empty
         glossary = try container.decodeIfPresent(KeywordGlossary.self, forKey: .glossary) ?? .empty
+        recentCustomTags = try container.decodeIfPresent([String].self, forKey: .recentCustomTags) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -54,6 +59,9 @@ struct PreferenceFile: Codable, Equatable {
         }
         if glossary != .empty {
             try container.encode(glossary, forKey: .glossary)
+        }
+        if !recentCustomTags.isEmpty {
+            try container.encode(recentCustomTags, forKey: .recentCustomTags)
         }
     }
 }

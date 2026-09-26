@@ -10,14 +10,12 @@ struct HoverPlayerView: NSViewRepresentable {
     func makeNSView(context: Context) -> PlayerContainer {
         let view = PlayerContainer()
         view.isMuted = isMuted
-        view.load(url)
         return view
     }
 
     func updateNSView(_ nsView: PlayerContainer, context: Context) {
         nsView.isMuted = isMuted
-        nsView.load(url)
-        nsView.setPlaying(isPlaying)
+        nsView.setPlaying(isPlaying, url: url)
     }
 
     final class PlayerContainer: NSView {
@@ -52,8 +50,9 @@ struct HoverPlayerView: NSViewRepresentable {
             guard currentURL != url else { return }
             currentURL = url
             statusObservation = nil
-            let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+            let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
             let item = AVPlayerItem(asset: asset)
+            item.preferredMaximumResolution = ThumbnailService.hoverMaxResolution
             statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
                 guard let self, self.wantsPlaying, item.status == .readyToPlay else { return }
                 self.player.play()
@@ -61,16 +60,25 @@ struct HoverPlayerView: NSViewRepresentable {
             player.replaceCurrentItem(with: item)
         }
 
-        func setPlaying(_ playing: Bool) {
+        func setPlaying(_ playing: Bool, url: URL) {
             wantsPlaying = playing
             if playing {
+                load(url)
                 if player.currentItem?.status == .readyToPlay {
                     player.play()
                 }
             } else {
-                player.pause()
-                player.seek(to: .zero)
+                unload()
             }
+        }
+
+        private func unload() {
+            wantsPlaying = false
+            statusObservation = nil
+            currentURL = nil
+            player.pause()
+            player.currentItem?.asset.cancelLoading()
+            player.replaceCurrentItem(with: nil)
         }
     }
 }
@@ -83,15 +91,12 @@ struct IndependentPlayerView: NSViewRepresentable {
     func makeNSView(context: Context) -> Container {
         let view = Container()
         view.isMuted = isMuted
-        view.load(url)
-        view.setPlaying(isPlaying)
         return view
     }
 
     func updateNSView(_ nsView: Container, context: Context) {
         nsView.isMuted = isMuted
-        nsView.load(url)
-        nsView.setPlaying(isPlaying)
+        nsView.setPlaying(isPlaying, url: url)
     }
 
     final class Container: NSView {
@@ -129,6 +134,7 @@ struct IndependentPlayerView: NSViewRepresentable {
             statusObservation = nil
             let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
             let item = AVPlayerItem(asset: asset)
+            item.preferredMaximumResolution = ThumbnailService.previewMaxResolution
             statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
                 guard let self, self.wantsPlaying, item.status == .readyToPlay else { return }
                 self.player.play()
@@ -136,15 +142,25 @@ struct IndependentPlayerView: NSViewRepresentable {
             player.replaceCurrentItem(with: item)
         }
 
-        func setPlaying(_ playing: Bool) {
+        func setPlaying(_ playing: Bool, url: URL) {
             wantsPlaying = playing
             if playing {
+                load(url)
                 if player.currentItem?.status == .readyToPlay {
                     player.play()
                 }
             } else {
-                player.pause()
+                unload()
             }
+        }
+
+        private func unload() {
+            wantsPlaying = false
+            statusObservation = nil
+            currentURL = nil
+            player.pause()
+            player.currentItem?.asset.cancelLoading()
+            player.replaceCurrentItem(with: nil)
         }
     }
 }

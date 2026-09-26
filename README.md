@@ -52,8 +52,8 @@ open RollTag.xcodeproj
 
 - 左側是智慧列表（全部、已打標、未打標、找不到、重複檔）與已用過的分類。
 - 倉庫可展開看目錄。點一層或勾幾個資料夾，搜尋、打標與重複檔只先做那些範圍；點倉庫名或「看整倉」回到整庫。
-- 格線上方可搜尋與排序。只搜現在插著、讀得到的倉庫。
-- 點一支：左上播放（影片／音訊可拉時間軸；照片看大圖），右側看路徑、拍攝時間、GPS（有才顯示）與標籤。
+- 右半最上緣有加框的搜尋欄與排序。只搜現在插著、讀得到的倉庫。
+- 點一支：左上看已存縮圖，右側看路徑、拍攝時間、GPS（有才顯示）與標籤。影片／音訊按播放或空白鍵才載入原檔。
 - 滑過格子可預覽影片／音訊。
 
 常用快捷鍵（可在設定 → 快捷鍵改；⌘/ 看全部）：
@@ -139,7 +139,7 @@ Run the RollTag scheme (⌘R).
 ### Use
 
 1. Drop a footage folder or drive on the window, or press **⌘O**. Removing a warehouse only unregisters it; files on disk stay. Unplugged drives go offline until you plug them back in. Rescan with ⌘R.
-2. Browse the sidebar lists and folders. Search and sort sit above the grid. Click a clip to play it (photos show a still). Space plays/pauses; P toggles fullscreen; ⌘/ lists shortcuts.
+2. Browse the sidebar lists and folders. Search and sort sit in a boxed field at the top of the right pane. Click a clip to see its stored thumb. Space or Play loads video/audio. Drag the bar between the player and the file info pane to resize them. P toggles fullscreen; ⌘/ lists shortcuts.
 3. **Hand tags:** select one clip or a similar group, click a preset on the right, or type your own word and press Return. Click a tag to remove it.
 4. **AI tags:** paste a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key in Settings → AI. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag** (keeps tags immediately). Sidebar **Untagged** only sends files with no tags yet; to replace bad AI tags, select those clips in the grid and batch again. A batch of more than 10 files shows **Stop**. While it runs, the banner shows which provider is sending and whether the last clip succeeded or failed; the provider name opens that platform’s usage page. Files with GPS get a place name first and those locality parts are always written as tags (even if the model fails); nearby shots within about 1 km reuse that result. Folder names are hints only and are not written as tags. On-device Vision counts human bodies (toy faces and dog bodies do not count); empty scenes do not get portrait or name tags. Running AI again replaces the previous AI tags and keeps hand / path tags. Existing custom labels such as people’s names are not auto-applied by AI — add those by hand. **AI tags can be wrong — review them.** Later files in a large batch may fail on quota; the status line clears after about 10 seconds. Wait and retry what is still untagged.
 5. **Duplicates:** sidebar or ⌘⇧D. A / D keep one side, S keeps all, Enter sends the rest to Trash. **Trim** on a single video writes a new clip in the warehouse.

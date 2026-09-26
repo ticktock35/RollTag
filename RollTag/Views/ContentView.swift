@@ -79,27 +79,28 @@ struct ContentView: View {
                 DuplicatesWorkspace(model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                VSplitView {
-                    HStack(spacing: 0) {
-                        PlayerPaneView(model: model)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .frame(minWidth: 280, minHeight: 180)
-                        Divider()
-                        InspectorView(model: model)
-                            .frame(width: 300)
-                            .frame(maxHeight: .infinity)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 220)
+                VStack(spacing: 0) {
+                    libraryBar
+                    VSplitView {
+                        HSplitView {
+                            PlayerPaneView(model: model)
+                                .frame(minWidth: 280, minHeight: 180)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            InspectorView(model: model)
+                                .frame(minWidth: 220, idealWidth: 300, maxWidth: 560)
+                                .frame(maxHeight: .infinity)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 220)
 
-                    VStack(spacing: 0) {
-                        WorkScopeBanner(model: model)
-                        libraryBar
-                        FootageGridView(model: model)
-                            .frame(maxWidth: .infinity, minHeight: 160)
+                        VStack(spacing: 0) {
+                            WorkScopeBanner(model: model)
+                            FootageGridView(model: model)
+                                .frame(maxWidth: .infinity, minHeight: 160)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -111,20 +112,32 @@ struct ContentView: View {
     }
 
     private var libraryBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField(searchPrompt, text: $model.searchText)
-                .textFieldStyle(.plain)
-            if !model.searchText.isEmpty {
-                Button {
-                    model.searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                TextField(searchPrompt, text: $model.searchText)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                if !model.searchText.isEmpty {
+                    Button {
+                        model.searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.22), lineWidth: 1)
+            }
+
             Menu {
                 ForEach(LibrarySort.allCases) { option in
                     Button {
@@ -167,6 +180,13 @@ struct ContentView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.22), lineWidth: 1)
+            }
             .help(String(localized: "sort.title"))
             if model.sidebarSelection == .collection(.missing), !model.visibleMissingIDs.isEmpty {
                 Button(String(localized: "missing.deleteAll"), role: .destructive) {
@@ -176,11 +196,8 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .textBackgroundColor))
-        .overlay(alignment: .top) {
-            Divider()
-        }
+        .padding(.vertical, 10)
+        .background(.bar)
         .overlay(alignment: .bottom) {
             Divider()
         }

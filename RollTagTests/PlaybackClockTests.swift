@@ -16,4 +16,45 @@ final class PlaybackClockTests: XCTestCase {
         XCTAssertEqual(PlaybackClock.format(-3), "00:00")
         XCTAssertEqual(PlaybackClock.format(.nan), "00:00")
     }
+
+    @MainActor
+    func testPresentVideoDoesNotAttachPlayerItem() {
+        let playback = PreviewPlayback()
+        playback.present(
+            PreviewMedia(
+                id: UUID(),
+                url: URL(fileURLWithPath: "/tmp/clip.mov"),
+                kind: .video,
+                filename: "clip.mov",
+                width: 3840,
+                height: 2160,
+                duration: 8,
+                fileSize: 5_000_000
+            )
+        )
+        XCTAssertNil(playback.player.currentItem)
+        XCTAssertFalse(playback.isItemLoaded)
+        XCTAssertEqual(playback.duration, 8)
+        XCTAssertTrue(playback.canPlay)
+    }
+
+    @MainActor
+    func testPresentImageLeavesPlayerEmpty() {
+        let playback = PreviewPlayback()
+        playback.present(
+            PreviewMedia(
+                id: UUID(),
+                url: URL(fileURLWithPath: "/tmp/still.jpg"),
+                kind: .image,
+                filename: "still.jpg",
+                width: 2048,
+                height: 1365,
+                duration: nil,
+                fileSize: 320_000
+            )
+        )
+        XCTAssertNil(playback.player.currentItem)
+        XCTAssertFalse(playback.isItemLoaded)
+        XCTAssertFalse(playback.canPlay)
+    }
 }
