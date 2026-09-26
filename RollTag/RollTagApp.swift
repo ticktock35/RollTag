@@ -68,9 +68,13 @@ struct RollTagApp: App {
             }
             CommandMenu(String(localized: "menu.playback")) {
                 Button(String(localized: "player.playPause")) {
-                    model.playback.togglePlayPause()
+                    if AppModel.isTrimKeyWindow {
+                        NotificationCenter.default.post(name: .trimTogglePlay, object: nil)
+                    } else {
+                        model.playback.togglePlayPause()
+                    }
                 }
-                .disabled(!model.playback.canPlay)
+                .disabled(!model.playback.canPlay && !AppModel.isTrimKeyWindow)
                 Button(String(localized: "player.fullscreen")) {
                     model.toggleSelectedFullscreen()
                 }
@@ -120,6 +124,6 @@ struct RollTagApp: App {
                 .frame(minWidth: 480, minHeight: 320)
             }
         }
-        .defaultSize(width: 760, height: 560)
+        .defaultSize(width: 800, height: 720)
     }
 }

@@ -167,6 +167,20 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertLessThanOrEqual(ThumbnailService.previewMaxResolution.width, 1280)
     }
 
+    func testPlayerStillMaxEdgeStaysWithinScreenAndHardCap() {
+        let edge = ThumbnailService.playerStillMaxEdge(
+            for: CGSize(width: 800, height: 500),
+            scale: 2
+        )
+        XCTAssertGreaterThanOrEqual(edge, ThumbnailService.playerMaxEdge)
+        XCTAssertLessThanOrEqual(edge, ThumbnailService.playerDisplayMaxEdge)
+        let huge = ThumbnailService.playerStillMaxEdge(
+            for: CGSize(width: 10_000, height: 10_000),
+            scale: 2
+        )
+        XCTAssertLessThanOrEqual(huge, ThumbnailService.playerDisplayMaxEdge)
+    }
+
     func testDecodeStillNeverKeepsSourceLargerThanMaxEdge() throws {
         let source = try writePNG(width: 2400, height: 1800)
         let image = ThumbnailService.decodeStill(url: source, maxEdge: 96, preferEmbedded: false)

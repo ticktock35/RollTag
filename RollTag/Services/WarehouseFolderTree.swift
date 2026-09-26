@@ -58,6 +58,22 @@ enum WarehouseFolderTree {
         return root.childNodes(warehouseID: warehouseID)
     }
 
+    static func flattenedPaths(from nodes: [WarehouseFolderNode]) -> [String] {
+        var paths: [String] = []
+        func walk(_ nodes: [WarehouseFolderNode]) {
+            for node in nodes {
+                if !node.relativePath.isEmpty {
+                    paths.append(node.relativePath)
+                }
+                if let children = node.children {
+                    walk(children)
+                }
+            }
+        }
+        walk(nodes)
+        return paths.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     static func outlineRoot(warehouseID: UUID, name: String, footage: [Footage]) -> WarehouseFolderNode {
         let folders = nodes(warehouseID: warehouseID, from: footage)
         return WarehouseFolderNode(

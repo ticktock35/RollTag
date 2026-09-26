@@ -19,7 +19,16 @@ enum ThumbnailService {
     static let gridMaxEdge: CGFloat = 320
     static let storedThumbMaxEdge: CGFloat = 480
     static let playerMaxEdge: CGFloat = 1280
+    static let playerDisplayMaxEdge: CGFloat = 3840
     static let previewMaxResolution = CGSize(width: playerMaxEdge, height: playerMaxEdge)
+
+    static func playerStillMaxEdge(for size: CGSize, scale: CGFloat) -> CGFloat {
+        let viewEdge = max(size.width, size.height) * max(scale, 1)
+        let screenEdge = NSScreen.screens
+            .map { max($0.frame.width, $0.frame.height) * $0.backingScaleFactor }
+            .max() ?? playerDisplayMaxEdge
+        return min(max(viewEdge, playerMaxEdge), min(screenEdge, playerDisplayMaxEdge))
+    }
     static let hoverMaxResolution = CGSize(width: storedThumbMaxEdge, height: storedThumbMaxEdge)
     private static let generationLock = NSLock()
     private static var deferGenerationFlag = false

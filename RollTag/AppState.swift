@@ -193,6 +193,7 @@ final class AppModel {
         guard canBeginTrim, let footage = focusedFootage,
               let warehouse = warehouses.first(where: { $0.id == footage.warehouseID })
         else { return }
+        playback.pause()
         trimSession = TrimSession(
             footageID: footage.id,
             warehouseID: footage.warehouseID,
@@ -1145,43 +1146,193 @@ final class AppModel {
         rebuildVisibleResults()
     }
 
-    func trimSelected(start: Double, end: Double) async {
+    func trimSelected(start: Double, end: Double, destination: URL) async {
         let id = trimSession?.footageID ?? focusedFootage?.id
         guard let id else { return }
-        await exportTrim(footageID: id, start: start, end: end)
+        await exportTrim(footageID: id, start: start, end: end, destination: destination)
     }
 
-    func exportTrim(footageID: UUID, start: Double, end: Double) async {
-        guard let footage = footage(id: footageID) else { return }
-        guard let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }), warehouse.isOnline else { return }
-        let source = footage.absoluteURL(warehouseRoot: warehouse.preference.url)
-        let folder = warehouse.preference.url
-            .appendingPathComponent(MediaConstants.rolltagDirectory)
-            .appendingPathComponent(MediaConstants.trimmedDirectory)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let stamp = Int(Date().timeIntervalSince1970)
-        let destination = folder.appendingPathComponent("\(footage.filename.removingExtension())_trim_\(stamp).mp4")
+    @discardableResult
+    func exportTrim(
+        footageID: UUID,
+        start: Double,
+        end: Double,
+        destination: URL
+    ) async -> Bool {
+        guard let footage = footage(id: footageID) else { return false }
+        guard let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }), warehouse.isOnline else { return false }
+        let root = warehouse.preference.url
+        let source = footage.absoluteURL(warehouseRoot: root)
+        if source.standardizedFileURL.resolvingSymlinksInPath() == destination.standardizedFileURL.resolvingSymlinksInPath() {
+            statusMessage = String(localized: "trim.save.overwriteSource")
+            return false
+        }
+        let relative = TrimService.warehouseRelativePath(of: destination, warehouseRoot: root)
         isBusy = true
+        defer { isBusy = false }
         do {
+            let accessed = destination.startAccessingSecurityScopedResource()
+            defer {
+                if accessed { destination.stopAccessingSecurityScopedResource() }
+            }
             try await TrimService.exportClip(source: source, destination: destination, start: start, end: end)
-            await reconcile(warehouseID: footage.warehouseID)
-            if var created = warehouses.first(where: { $0.id == footage.warehouseID })?.footage.first(where: {
-                $0.relativePath.hasSuffix(destination.lastPathComponent)
-            }) {
-                created.parentID = footage.id
-                if let db = databases[footage.warehouseID] {
-                    try? db.update(created.snapshot())
-                    reloadFootage()
-                }
-                selectedIDs = [created.id]
-                focusedFootageID = created.id
+            if let relative {
+                let created = try registerTrimmedClip(
+                    footage: footage,
+                    warehouse: warehouse,
+                    relative: relative,
+                    destination: destination,
+                    start: start,
+                    end: end
+                )
+                selectOnly(created.id)
+                presentFocusedMedia()
+                Task { await enrichRegisteredClip(created, warehouseRoot: root) }
+            } else {
+                selectOnly(footage.id)
                 presentFocusedMedia()
             }
             trimSession = nil
+            statusMessage = ""
+            return true
         } catch {
             statusMessage = error.localizedDescription
+            return false
         }
-        isBusy = false
+    }
+
+    private func registerTrimmedClip(
+        footage: Footage,
+        warehouse: WarehouseRuntime,
+        relative: String,
+        destination: URL,
+        start: Double,
+        end: Double
+    ) throws -> Footage {
+        let attrs = try FileManager.default.attributesOfItem(atPath: destination.path)
+        let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
+        let mtime = Int64((attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? Date().timeIntervalSince1970)
+        let existing = warehouse.footage.first { $0.relativePath == relative }
+        let createdID = existing?.id ?? UUID()
+        let snap = FootageSnapshot(
+            id: createdID,
+            relativePath: relative,
+            filename: destination.lastPathComponent,
+            size: size,
+            mtime: mtime,
+            contentHash: nil,
+            phash: nil,
+            status: .available,
+            tags: existing?.tags ?? [],
+            userNotes: existing?.userNotes ?? "",
+            parentID: footage.id,
+            duration: max(end - start, TrimService.minimumDuration),
+            width: footage.width,
+            height: footage.height,
+            capturedAt: footage.capturedAt,
+            needsReanalysis: true,
+            capturedAtLocal: footage.capturedAtLocal,
+            capturedAtHasTimeZone: footage.capturedAtHasTimeZone,
+            capturedAtSource: footage.capturedAtSource,
+            latitude: footage.latitude,
+            longitude: footage.longitude,
+            altitude: footage.altitude
+        )
+        let db = try openDatabase(for: warehouse.preference)
+        if existing == nil {
+            try db.insert(snap)
+        } else {
+            try db.update(snap)
+        }
+        let created = Footage(
+            id: createdID,
+            warehouseID: footage.warehouseID,
+            relativePath: relative,
+            filename: snap.filename,
+            size: size,
+            mtime: mtime,
+            contentHash: nil,
+            phash: nil,
+            status: .available,
+            duration: snap.duration,
+            width: footage.width,
+            height: footage.height,
+            createdAt: existing?.createdAt ?? Date(),
+            updatedAt: Date(),
+            parentID: footage.id,
+            userNotes: snap.userNotes,
+            tags: snap.tags,
+            capturedAt: footage.capturedAt,
+            capturedAtLocal: footage.capturedAtLocal,
+            capturedAtHasTimeZone: footage.capturedAtHasTimeZone,
+            capturedAtSource: footage.capturedAtSource,
+            latitude: footage.latitude,
+            longitude: footage.longitude,
+            altitude: footage.altitude
+        )
+        upsertFootage(created)
+        return created
+    }
+
+    private func selectOnly(_ id: UUID) {
+        selectedIDs = [id]
+        focusedFootageID = id
+    }
+
+    private func upsertFootage(_ footage: Footage) {
+        guard let index = warehouses.firstIndex(where: { $0.id == footage.warehouseID }) else { return }
+        let current = warehouses[index]
+        var list = current.footage
+        if let existing = list.firstIndex(where: { $0.id == footage.id }) {
+            list[existing] = footage
+        } else {
+            list.append(footage)
+        }
+        warehouses[index] = WarehouseRuntime(
+            preference: current.preference,
+            isOnline: current.isOnline,
+            isReconciling: current.isReconciling,
+            footage: list,
+            groups: current.groups
+        )
+        rebuildVisibleResults()
+    }
+
+    private func enrichRegisteredClip(_ footage: Footage, warehouseRoot: URL) async {
+        let source = footage.absoluteURL(warehouseRoot: warehouseRoot)
+        let thumb = ThumbnailService.thumbnailFileURL(warehouseRoot: warehouseRoot, footageID: footage.id)
+        let hash = await Task.detached(priority: .utility) {
+            try? FileHasher().hashFile(at: source)
+        }.value
+        let analysis = await ThumbnailService.analyze(url: source, thumbnailURL: thumb)
+        guard let db = databases[footage.warehouseID] else { return }
+        if let hash {
+            var snap = footage.snapshot()
+            snap.contentHash = hash
+            snap.phash = analysis.phash
+            snap.duration = analysis.duration ?? footage.duration
+            snap.width = analysis.width ?? footage.width
+            snap.height = analysis.height ?? footage.height
+            snap.needsReanalysis = false
+            try? db.update(snap)
+        } else {
+            try? db.updateAnalysis(
+                id: footage.id,
+                phash: analysis.phash,
+                duration: analysis.duration,
+                width: analysis.width,
+                height: analysis.height
+            )
+        }
+        if var latest = self.footage(id: footage.id) {
+            latest.contentHash = hash ?? latest.contentHash
+            latest.phash = analysis.phash ?? latest.phash
+            latest.duration = analysis.duration ?? latest.duration
+            latest.width = analysis.width ?? latest.width
+            latest.height = analysis.height ?? latest.height
+            upsertFootage(latest)
+        }
+        thumbRefreshToken += 1
     }
 
     func selectSingle(_ id: UUID, modifiers: NSEvent.ModifierFlags) {
@@ -1242,6 +1393,16 @@ final class AppModel {
             nextIndex = (direction == .left || direction == .up) ? ids.count - 1 : 0
         }
         selectSingle(ids[nextIndex], modifiers: extend ? .shift : [])
+    }
+
+    func stepLibraryMedia(_ delta: Int) {
+        let ids = visibleResults.map(\.id)
+        guard !ids.isEmpty else { return }
+        let current = focusedFootageID.flatMap { ids.firstIndex(of: $0) }
+            ?? ids.firstIndex(where: { selectedIDs.contains($0) })
+        let start = current ?? (delta > 0 ? -1 : ids.count)
+        guard let nextIndex = GridNavigation.linearIndex(moving: delta, from: start, count: ids.count) else { return }
+        selectSingle(ids[nextIndex], modifiers: [])
     }
 
     func stepFullscreenMedia(_ delta: Int) {
@@ -1516,6 +1677,7 @@ final class AppModel {
         setReconciling(warehouseID, false)
         ThumbnailService.deferGeneration = false
         thumbRefreshToken += 1
+        await Task.yield()
         reloadFootage()
         scanProgress = nil
         statusMessage = ""
@@ -1802,6 +1964,7 @@ final class AppModel {
     private func handlePlaybackKey(_ event: NSEvent) -> NSEvent? {
         if applyCapturedShortcut(event) { return nil }
         if Self.isSettingsKeyWindow { return event }
+        if Self.isTrimKeyWindow { return event }
         if Self.isEditingText { return event }
         let shortcuts = preference.shortcuts
         if handleLibraryArrowKey(event) {
@@ -1814,6 +1977,18 @@ final class AppModel {
             hintSwitchInputSourceIfNeeded(event)
             stepFullscreenMedia(delta)
             return nil
+        }
+        if Self.isLibraryKeyWindow, !playback.isFullscreen, duplicatePendingDelete == nil {
+            if shortcuts.matches(event, .previousMedia) {
+                hintSwitchInputSourceIfNeeded(event)
+                stepLibraryMedia(-1)
+                return nil
+            }
+            if shortcuts.matches(event, .nextMedia) {
+                hintSwitchInputSourceIfNeeded(event)
+                stepLibraryMedia(1)
+                return nil
+            }
         }
         if shortcuts.matches(event, .clearSelection) || shortcuts.matches(event, .duplicateCancelTrash) {
             if playback.isFullscreen {
@@ -1934,10 +2109,17 @@ final class AppModel {
         NSApp.keyWindow?.identifier?.rawValue == settingsWindowID
     }
 
+    static var isTrimKeyWindow: Bool {
+        guard let window = NSApp.keyWindow else { return false }
+        if window.identifier?.rawValue == "trim" { return true }
+        return window.title == String(localized: "trim.title")
+    }
+
     static var isLibraryKeyWindow: Bool {
         guard let window = NSApp.keyWindow else { return false }
+        if isTrimKeyWindow || isSettingsKeyWindow { return false }
         let id = window.identifier?.rawValue ?? ""
-        return id != "duplicates" && id != "shortcuts" && id != "trim" && id != settingsWindowID
+        return id != "duplicates" && id != "shortcuts"
     }
 
     static func isFocusInSidebar(_ window: NSWindow? = NSApp.keyWindow) -> Bool {
@@ -2037,8 +2219,3 @@ enum AITaggingStop {
     }
 }
 
-private extension String {
-    func removingExtension() -> String {
-        (self as NSString).deletingPathExtension
-    }
-}

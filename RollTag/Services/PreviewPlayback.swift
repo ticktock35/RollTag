@@ -72,6 +72,9 @@ final class PreviewPlayback {
             return
         }
         isIncompleteFile = false
+        if next.kind == .video || next.kind == .audio {
+            ensureItemLoaded()
+        }
     }
 
     func play() {
@@ -184,7 +187,6 @@ final class PreviewPlayback {
         isIncompleteFile = false
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let item = AVPlayerItem(asset: asset)
-        item.preferredMaximumResolution = ThumbnailService.previewMaxResolution
         observeItem(item)
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
@@ -299,5 +301,19 @@ enum PlaybackClock {
             return String(format: "%d:%02d:%02d", hours, minutes, remainder)
         }
         return String(format: "%02d:%02d", minutes, remainder)
+    }
+
+    static func formatPrecise(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds >= 0 else { return "00:00.0" }
+        let tenths = Int((seconds * 10).rounded(.towardZero))
+        let total = tenths / 10
+        let tenth = tenths % 10
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let remainder = total % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d.%d", hours, minutes, remainder, tenth)
+        }
+        return String(format: "%02d:%02d.%d", minutes, remainder, tenth)
     }
 }

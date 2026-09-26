@@ -76,10 +76,7 @@ struct PlayerPaneView: View {
                         .padding(.horizontal, 16)
                 }
             case .image:
-                PlayerPosterView(
-                    footageID: media.id,
-                    warehouseRoot: model.onlineRoot(for: media.id)
-                )
+                PlayerOriginalStillView(url: media.url)
             }
         } else {
             VStack(spacing: 8) {
@@ -271,6 +268,32 @@ final class PlayerLayerView: NSView {
     override func layout() {
         super.layout()
         playerLayer.frame = bounds
+    }
+}
+
+private struct PlayerOriginalStillView: View {
+    let url: URL
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            Color.black
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+            }
+        }
+        .task(id: url) {
+            image = nil
+            let screen = NSScreen.main
+            let edge = ThumbnailService.playerStillMaxEdge(
+                for: screen?.frame.size ?? CGSize(width: 1920, height: 1080),
+                scale: screen?.backingScaleFactor ?? 2
+            )
+            image = await ThumbnailService.previewStill(url: url, maxEdge: edge)
+        }
     }
 }
 

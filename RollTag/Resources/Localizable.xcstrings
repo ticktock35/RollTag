@@ -52,6 +52,38 @@
         }
       }
     },
+    "ai.cancel" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
+    "ai.cancelled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discarded this AI tagging batch."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消這次 AI 打標。"
+          }
+        }
+      }
+    },
     "ai.capability.anthropic" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -133,38 +165,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "原生讀影片（專做影片理解）"
-          }
-        }
-      }
-    },
-    "ai.cancel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cancel"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消"
-          }
-        }
-      }
-    },
-    "ai.cancelled" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Discarded this AI tagging batch."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已取消這次 AI 打標。"
           }
         }
       }
@@ -313,22 +313,6 @@
         }
       }
     },
-    "ai.last.successUnknown" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last clip %@ succeeded."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "上一支 %@ · 成功"
-          }
-        }
-      }
-    },
     "ai.last.success" : {
       "localizations" : {
         "en" : {
@@ -341,6 +325,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上一支 %1$@ · 成功（%2$@）"
+          }
+        }
+      }
+    },
+    "ai.last.successUnknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last clip %@ succeeded."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上一支 %@ · 成功"
           }
         }
       }
@@ -490,22 +490,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在送出："
-          }
-        }
-      }
-    },
-    "ai.usage.help" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open this provider’s usage and quota"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打開此平台的用量與配額"
           }
         }
       }
@@ -698,6 +682,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI 打標選取"
+          }
+        }
+      }
+    },
+    "ai.usage.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open this provider’s usage and quota"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開此平台的用量與配額"
           }
         }
       }
@@ -3837,6 +3837,22 @@
         }
       }
     },
+    "trim.endTime" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束時間"
+          }
+        }
+      }
+    },
     "trim.export" : {
       "localizations" : {
         "en" : {
@@ -3853,7 +3869,59 @@
         }
       }
     },
+    "trim.filename" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檔名"
+          }
+        }
+      }
+    },
+    "trim.folder" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目錄"
+          }
+        }
+      }
+    },
+    "trim.folderRoot" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warehouse root"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "倉庫根目錄"
+          }
+        }
+      }
+    },
     "trim.in" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3886,6 +3954,7 @@
       }
     },
     "trim.out" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3897,6 +3966,71 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "出點"
+          }
+        }
+      }
+    },
+    "trim.save.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The default is the original clip’s folder. Saving inside the warehouse adds this clip to the library; saving outside only writes the file."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預設是原檔所在的資料夾。存進倉庫會寫入這支的資料；存到倉庫外只輸出影片。"
+          }
+        }
+      }
+    },
+    "trim.save.outside" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save the clip inside this warehouse. Hidden folders such as .rolltag cannot be used."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請存進這個倉庫裡的目錄。不能存到倉庫外，也不能存進 .rolltag。"
+          }
+        }
+      }
+    },
+    "trim.save.overwriteSource" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a new filename. The original clip cannot be overwritten."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請另存新檔，不能覆蓋原來的影片。"
+          }
+        }
+      }
+    },
+    "trim.startTime" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "起始時間"
           }
         }
       }
@@ -3913,6 +4047,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "切段"
+          }
+        }
+      }
+    },
+    "trim.totalDuration" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duration"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總時長"
           }
         }
       }

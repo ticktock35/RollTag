@@ -17,8 +17,16 @@ final class PlaybackClockTests: XCTestCase {
         XCTAssertEqual(PlaybackClock.format(.nan), "00:00")
     }
 
+    func testFormatsTenthsForTrim() {
+        XCTAssertEqual(PlaybackClock.formatPrecise(0), "00:00.0")
+        XCTAssertEqual(PlaybackClock.formatPrecise(5.2), "00:05.2")
+        XCTAssertEqual(PlaybackClock.formatPrecise(75.9), "01:15.9")
+        XCTAssertEqual(PlaybackClock.formatPrecise(3661.4), "1:01:01.4")
+        XCTAssertEqual(PlaybackClock.formatPrecise(-1), "00:00.0")
+    }
+
     @MainActor
-    func testPresentVideoDoesNotAttachPlayerItem() {
+    func testPresentVideoAttachesPlayerItem() {
         let playback = PreviewPlayback()
         playback.present(
             PreviewMedia(
@@ -32,8 +40,8 @@ final class PlaybackClockTests: XCTestCase {
                 fileSize: 5_000_000
             )
         )
-        XCTAssertNil(playback.player.currentItem)
-        XCTAssertFalse(playback.isItemLoaded)
+        XCTAssertNotNil(playback.player.currentItem)
+        XCTAssertTrue(playback.isItemLoaded)
         XCTAssertEqual(playback.duration, 8)
         XCTAssertTrue(playback.canPlay)
     }
