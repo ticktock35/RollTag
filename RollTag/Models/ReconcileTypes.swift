@@ -110,8 +110,11 @@ enum MediaKind: String, Equatable, Sendable {
 }
 
 enum MediaConstants {
-    static let videoExtensions: Set<String> = ["mov", "mp4", "m4v", "avi", "mkv", "mxf"]
-    static let imageExtensions: Set<String> = ["heic", "heif", "hif", "jpg", "jpeg", "png", "webp", "gif"]
+    static let videoExtensions: Set<String> = ["mov", "mp4", "m4v", "avi", "mkv", "mxf", "webm", "mpg", "mpeg"]
+    static let imageExtensions: Set<String> = [
+        "heic", "heif", "hif", "jpg", "jpeg", "png", "webp", "gif", "tif", "tiff", "avif",
+        "arw", "dng", "cr2", "cr3", "nef", "raf", "raw",
+    ]
     static let audioExtensions: Set<String> = ["mp3", "m4a", "aac", "wav"]
     static let supportedExtensions: Set<String> = videoExtensions.union(imageExtensions).union(audioExtensions)
     static let rolltagDirectory = ".rolltag"

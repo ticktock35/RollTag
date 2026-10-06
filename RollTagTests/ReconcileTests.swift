@@ -119,16 +119,35 @@ final class ReconcileTests: XCTestCase {
     func testScanAcceptsPhotosAudioAndVideo() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-scan-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root.appendingPathComponent("DCIM"), withIntermediateDirectories: true)
-        for name in ["IMG_0001.HEIC", "DSC02288.HIF", "shot.JPEG", "pic.png", "sticker.webp", "voice.mp3", "clip.MP4", "notes.txt"] {
+        for name in [
+            "IMG_0001.HEIC", "DSC02288.HIF", "DSC02290.ARW", "still.TIF", "photo.AVIF",
+            "shot.JPEG", "pic.png", "sticker.webp", "voice.mp3", "clip.MP4", "screen.webm", "old.mpg",
+            "from.DNG", "canon.CR3", "nikon.NEF", "fuji.RAF", "notes.txt",
+        ] {
             try Data("x".utf8).write(to: root.appendingPathComponent("DCIM").appendingPathComponent(name))
         }
         let entries = ReconcileService.scanDisk(root: root)
         XCTAssertEqual(
             Set(entries.map(\.filename)),
-            ["IMG_0001.HEIC", "DSC02288.HIF", "shot.JPEG", "pic.png", "sticker.webp", "voice.mp3", "clip.MP4"]
+            [
+                "IMG_0001.HEIC", "DSC02288.HIF", "DSC02290.ARW", "still.TIF", "photo.AVIF",
+                "shot.JPEG", "pic.png", "sticker.webp", "voice.mp3", "clip.MP4", "screen.webm", "old.mpg",
+                "from.DNG", "canon.CR3", "nikon.NEF", "fuji.RAF",
+            ]
         )
         XCTAssertEqual(MediaKind.of(filename: "IMG_0001.HEIC"), .image)
         XCTAssertEqual(MediaKind.of(filename: "DSC02288.HIF"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "DSC02290.ARW"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "still.tiff"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "photo.avif"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "from.dng"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "canon.cr2"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "canon.CR3"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "nikon.NEF"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "fuji.raf"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "clip.RAW"), .image)
+        XCTAssertEqual(MediaKind.of(filename: "screen.WEBM"), .video)
+        XCTAssertEqual(MediaKind.of(filename: "old.MPEG"), .video)
         XCTAssertEqual(MediaKind.of(filename: "voice.mp3"), .audio)
         XCTAssertEqual(MediaKind.of(filename: "clip.MP4"), .video)
         XCTAssertFalse(MediaKind.of(filename: "photo.jpg").canHoverPlay)
