@@ -232,6 +232,23 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(String(localized: "settings.playback.pan"))
+                    .font(.headline)
+                Picker(String(localized: "settings.playback.pan"), selection: Binding(
+                    get: { model.preference.invertTwoFingerPan },
+                    set: { model.updateInvertTwoFingerPan($0) }
+                )) {
+                    Text(String(localized: "settings.playback.pan.followFingers")).tag(false)
+                    Text(String(localized: "settings.playback.pan.inverted")).tag(true)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                Text(String(localized: "settings.playback.pan.detail"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if !model.shortcutCaptureMessage.isEmpty {
                 Text(model.shortcutCaptureMessage)
                     .font(.callout)

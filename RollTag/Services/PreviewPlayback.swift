@@ -353,3 +353,14 @@ enum PlaybackClock {
         return String(format: "%02d:%02d.%d", minutes, remainder, tenth)
     }
 }
+
+enum MediaPan {
+    /// Two-finger trackpad pan. Default matches Preview: content follows fingers and honors System Settings → Natural scrolling.
+    static func twoFingerDelta(x: CGFloat, y: CGFloat, invert: Bool) -> CGSize {
+        let followFingers = CGSize(width: -x, height: y)
+        if invert {
+            return CGSize(width: -followFingers.width, height: -followFingers.height)
+        }
+        return followFingers
+    }
+}

@@ -94,4 +94,13 @@ final class PlaybackClockTests: XCTestCase {
         XCTAssertEqual(playback.zoomScale, 1)
         XCTAssertEqual(playback.zoomOffset, .zero)
     }
+
+    func testTwoFingerPanDefaultFollowsFingersAndInvertFlipsBothAxes() {
+        let follow = MediaPan.twoFingerDelta(x: 4, y: -3, invert: false)
+        XCTAssertEqual(follow.width, -4)
+        XCTAssertEqual(follow.height, -3)
+        let inverted = MediaPan.twoFingerDelta(x: 4, y: -3, invert: true)
+        XCTAssertEqual(inverted.width, 4)
+        XCTAssertEqual(inverted.height, 3)
+    }
 }

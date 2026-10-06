@@ -9,7 +9,7 @@ struct PlayerPaneView: View {
     var body: some View {
         ZStack {
             Color.black
-            ZoomableMediaView(playback: model.playback) {
+            ZoomableMediaView(playback: model.playback, invertTwoFingerPan: model.preference.invertTwoFingerPan) {
                 mediaContent
             }
             if !fillsScreen {
@@ -323,6 +323,7 @@ struct FullscreenPlayerView: View {
 
 private struct ZoomableMediaView<Content: View>: View {
     @Bindable var playback: PreviewPlayback
+    var invertTwoFingerPan: Bool
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -332,7 +333,7 @@ private struct ZoomableMediaView<Content: View>: View {
                     .frame(width: geo.size.width, height: geo.size.height)
                     .scaleEffect(playback.zoomScale)
                     .offset(playback.zoomOffset)
-                MediaZoomCatcher(playback: playback, viewport: geo.size)
+                MediaZoomCatcher(playback: playback, viewport: geo.size, invertTwoFingerPan: invertTwoFingerPan)
             }
         }
         .clipped()
@@ -342,6 +343,7 @@ private struct ZoomableMediaView<Content: View>: View {
 private struct MediaZoomCatcher: NSViewRepresentable {
     var playback: PreviewPlayback
     var viewport: CGSize
+    var invertTwoFingerPan: Bool
 
     func makeNSView(context: Context) -> MediaZoomCatcherView {
         let view = MediaZoomCatcherView()
@@ -352,21 +354,24 @@ private struct MediaZoomCatcher: NSViewRepresentable {
     func updateNSView(_ nsView: MediaZoomCatcherView, context: Context) {
         context.coordinator.playback = playback
         context.coordinator.viewport = viewport
+        context.coordinator.invertTwoFingerPan = invertTwoFingerPan
         nsView.coordinator = context.coordinator
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(playback: playback, viewport: viewport)
+        Coordinator(playback: playback, viewport: viewport, invertTwoFingerPan: invertTwoFingerPan)
     }
 
     @MainActor
     final class Coordinator {
         var playback: PreviewPlayback
         var viewport: CGSize
+        var invertTwoFingerPan: Bool
 
-        init(playback: PreviewPlayback, viewport: CGSize) {
+        init(playback: PreviewPlayback, viewport: CGSize, invertTwoFingerPan: Bool) {
             self.playback = playback
             self.viewport = viewport
+            self.invertTwoFingerPan = invertTwoFingerPan
         }
 
         func magnify(by factor: CGFloat) {
@@ -401,8 +406,13 @@ private final class MediaZoomCatcherView: NSView {
 
     override func scrollWheel(with event: NSEvent) {
         if event.hasPreciseScrollingDeltas, coordinator?.playback.zoomScale ?? 1 > 1 {
+            let invert = coordinator?.invertTwoFingerPan ?? false
             coordinator?.pan(
-                by: CGSize(width: event.scrollingDeltaX, height: -event.scrollingDeltaY)
+                by: MediaPan.twoFingerDelta(
+                    x: event.scrollingDeltaX,
+                    y: event.scrollingDeltaY,
+                    invert: invert
+                )
             )
             return
         }

@@ -121,6 +121,18 @@ final class PreferenceTests: XCTestCase {
         try Data(legacy.utf8).write(to: store.configURL)
         let migrated = try store.load()
         XCTAssertTrue(migrated.recentCustomTags.isEmpty)
+        XCTAssertFalse(migrated.invertTwoFingerPan)
+    }
+
+    func testInvertTwoFingerPanRoundTrip() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
+        let store = PreferenceStore(homeDirectory: home)
+        var file = PreferenceFile.empty
+        file.invertTwoFingerPan = true
+        try store.save(file)
+        let loaded = try store.load()
+        XCTAssertTrue(loaded.invertTwoFingerPan)
     }
 
     func testDuplicatePathIsNotAddedTwice() {

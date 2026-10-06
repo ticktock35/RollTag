@@ -433,6 +433,11 @@ final class AppModel {
         persistPreference()
     }
 
+    func updateInvertTwoFingerPan(_ invert: Bool) {
+        preference.invertTwoFingerPan = invert
+        persistPreference()
+    }
+
     func beginCapturingShortcut(_ action: ShortcutAction) {
         capturingShortcut = action
         shortcutCaptureMessage = ""

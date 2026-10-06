@@ -7,6 +7,7 @@ struct PreferenceFile: Codable, Equatable {
     var shortcuts: ShortcutPreference
     var glossary: KeywordGlossary
     var recentCustomTags: [String]
+    var invertTwoFingerPan: Bool
 
     static let currentVersion = 1
 
@@ -17,10 +18,11 @@ struct PreferenceFile: Codable, Equatable {
         case shortcuts
         case glossary
         case recentCustomTags
+        case invertTwoFingerPan
     }
 
     static var empty: PreferenceFile {
-        PreferenceFile(version: currentVersion, warehouses: [], ai: .empty, shortcuts: .empty, glossary: .empty)
+        PreferenceFile(version: currentVersion, warehouses: [], ai: .empty, shortcuts: .empty, glossary: .empty, invertTwoFingerPan: false)
     }
 
     init(
@@ -29,7 +31,8 @@ struct PreferenceFile: Codable, Equatable {
         ai: AIPreference = .empty,
         shortcuts: ShortcutPreference = .empty,
         glossary: KeywordGlossary = .empty,
-        recentCustomTags: [String] = []
+        recentCustomTags: [String] = [],
+        invertTwoFingerPan: Bool = false
     ) {
         self.version = version
         self.warehouses = warehouses
@@ -37,6 +40,7 @@ struct PreferenceFile: Codable, Equatable {
         self.shortcuts = shortcuts
         self.glossary = glossary
         self.recentCustomTags = recentCustomTags
+        self.invertTwoFingerPan = invertTwoFingerPan
     }
 
     init(from decoder: Decoder) throws {
@@ -47,6 +51,7 @@ struct PreferenceFile: Codable, Equatable {
         shortcuts = try container.decodeIfPresent(ShortcutPreference.self, forKey: .shortcuts) ?? .empty
         glossary = try container.decodeIfPresent(KeywordGlossary.self, forKey: .glossary) ?? .empty
         recentCustomTags = try container.decodeIfPresent([String].self, forKey: .recentCustomTags) ?? []
+        invertTwoFingerPan = try container.decodeIfPresent(Bool.self, forKey: .invertTwoFingerPan) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -62,6 +67,9 @@ struct PreferenceFile: Codable, Equatable {
         }
         if !recentCustomTags.isEmpty {
             try container.encode(recentCustomTags, forKey: .recentCustomTags)
+        }
+        if invertTwoFingerPan {
+            try container.encode(invertTwoFingerPan, forKey: .invertTwoFingerPan)
         }
     }
 }

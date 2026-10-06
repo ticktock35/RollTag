@@ -1789,6 +1789,70 @@
         }
       }
     },
+    "settings.playback.pan" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Two-finger pan"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "雙指移動"
+          }
+        }
+      }
+    },
+    "settings.playback.pan.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After zooming, two-finger moves follow macOS Natural scrolling, like Preview. Change it here if you want the opposite."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大後雙指移動跟系統「自然捲動」相同，和預覽程式一樣。若要反過來，在這裡改。"
+          }
+        }
+      }
+    },
+    "settings.playback.pan.followFingers" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follow fingers (Mac default)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟著手指（Mac 預設）"
+          }
+        }
+      }
+    },
+    "settings.playback.pan.inverted" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inverted"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "反向"
+          }
+        }
+      }
+    },
     "player.fit" : {
       "localizations" : {
         "en" : {
