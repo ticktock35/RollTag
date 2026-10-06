@@ -83,7 +83,7 @@ open RollTag.xcodeproj
 支援：
 
 - 影片：`mov`、`mp4`、`m4v`、`avi`、`mkv`、`mxf`
-- 照片：`heic`、`heif`、`jpg`、`jpeg`、`png`、`webp`、`gif`
+- 照片：`heic`、`heif`、`hif`、`jpg`、`jpeg`、`png`、`webp`、`gif`
 - 音訊：`mp3`、`m4a`、`aac`、`wav`
 
 ### 找片子與預覽
