@@ -14,7 +14,7 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 
 ### 用現成的 App
 
-1. 到 [GitHub Releases](https://github.com/ticktock35/RollTag/releases) 下載最新的 `.app` 壓縮檔，解壓後放到「應用程式」或任何資料夾。
+1. 到 [GitHub Releases](https://github.com/ticktock35/RollTag/releases) 下載最新的 `.app` 壓縮檔，解壓後**拖進「應用程式」（Applications）**。放在下載區或專案資料夾時，Finder 的應用程式清單不會列出它。macOS 26 的 Apps／Gemini 圖示格子常略過未公證的本機簽章 App，請用格子搜尋、Finder → 應用程式，或拖到 Dock。
 2. 第一次開啟若被系統擋下：在 Finder 對 App **按右鍵 → 打開**，再按打開。這是因為目前用本機簽章，不是 App Store。
 3. 關閉最後一個視窗或按 ⌘Q 就會結束。
 
@@ -38,18 +38,18 @@ sudo xcodebuild -license accept
 ```bash
 git clone https://github.com/ticktock35/RollTag.git
 cd RollTag
-./scripts/build.sh
-open build/RollTag.app
+./scripts/build.sh --install
 ```
 
-建好的 App 在 `build/RollTag.app`。本機簽章，不必選 Team。
+建好的 App 會在 `build/RollTag.app`，`--install` 再複製到「應用程式」並打開。本機簽章，不必選 Team。macOS 26 的 Apps 格子不一定會列出它。
 
 | 指令 | 做什麼 |
 |---|---|
 | `./scripts/build.sh` | Release 建置，輸出 `build/RollTag.app` |
 | `./scripts/build.sh --debug` | Debug 建置 |
 | `./scripts/build.sh --test` | 建置後跑單元測試 |
-| `./scripts/build.sh --run` | 建完就打開 App |
+| `./scripts/build.sh --run` | 建完就打開 App（仍在專案 `build/`） |
+| `./scripts/build.sh --install` | 複製到 `/Applications`（或 `~/Applications`）並打開 |
 
 **用 Xcode**
 
@@ -63,7 +63,8 @@ open RollTag.xcodeproj
 
 - `xcodebuild not found`：還沒裝完整 Xcode，或還沒 `xcode-select` 指到 Xcode。
 - 打開 Xcode 一直要你選 Team：關掉自動簽章，改用專案裡的本機簽章即可；或改跑 `./scripts/build.sh`。
-- 第一次開自己編的 App 被擋：Finder 對 `build/RollTag.app` 按右鍵 → 打開。
+- 第一次開自己編的 App 被擋：Finder 對 App 按右鍵 → 打開。
+- `./scripts/build.sh --install` 成功了，Apps／Gemini 格子還是沒有 RollTag：這是正常的。App 已在「應用程式」，分類是「影片／娛樂」，但 macOS 26 的圖示格子常不列出本機簽章、Gatekeeper 標 rejected 的 App。用格子上方搜尋、Finder → 應用程式，或把 `/Applications/RollTag.app` 拖到 Dock。腳本現在安裝完會直接打開。要穩定出現在格子裡需要付費 Developer 帳號做公證。
 - AI 打標說 sidecar 不可用：確認這台 Mac 有 `/usr/bin/python3`。不必另外 `pip install`。
 
 ---
@@ -164,7 +165,7 @@ open RollTag.xcodeproj
 
 Requires **macOS 14+**. AI tagging also needs **Python 3** on this Mac (`/usr/bin/python3` is fine).
 
-**Ready-made app:** download the latest `.app` zip from [Releases](https://github.com/ticktock35/RollTag/releases), unzip, and move it wherever you like. If Gatekeeper blocks the first launch, right-click the app in Finder → **Open**.
+**Ready-made app:** download the latest `.app` zip from [Releases](https://github.com/ticktock35/RollTag/releases), unzip, and drag it into **Applications**. A copy left in Downloads or the repo will not show up in Finder’s Applications list. On macOS 26 the Apps / Gemini icon grids often hide unsigned local builds — use the grid search field, Finder → Applications, or the Dock. If Gatekeeper blocks the first launch, right-click the app in Finder → **Open**.
 
 **From source** (no Apple Developer account):
 
@@ -181,11 +182,10 @@ sudo xcodebuild -license accept
 ```bash
 git clone https://github.com/ticktock35/RollTag.git
 cd RollTag
-./scripts/build.sh
-open build/RollTag.app
+./scripts/build.sh --install
 ```
 
-The app lands at `build/RollTag.app`. Use `--debug`, `--test`, or `--run` if you want. Or open `RollTag.xcodeproj` and press ⌘R — signing is already set to Sign to Run Locally, so you do not pick a Team.
+That copies the app into Applications and opens it. Finder lists it there. On macOS 26 the old Launchpad is gone; the new Apps grid often hides ad-hoc (not notarized) builds, so use the grid’s search field, Finder → Applications, or drag `/Applications/RollTag.app` to the Dock. Use `--debug`, `--test`, or `--run` if you want. Or open `RollTag.xcodeproj` and press ⌘R — signing is already set to Sign to Run Locally, so you do not pick a Team.
 
 AI tagging uses the system `/usr/bin/python3`. No `pip install`.
 

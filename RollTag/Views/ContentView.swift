@@ -20,6 +20,7 @@ struct ContentView: View {
             }
             .navigationSplitViewStyle(.prominentDetail)
             .navigationTitle(title)
+            .toolbar(model.playback.isFullscreen ? .hidden : .automatic)
 
             FullscreenOverlay(model: model)
         }

@@ -8,6 +8,7 @@ cd "$root"
 configuration="Release"
 run_tests=0
 open_app=0
+install_app=0
 
 usage() {
   cat <<'EOF'
@@ -18,12 +19,15 @@ Usage:
   ./scripts/build.sh --debug
   ./scripts/build.sh --test
   ./scripts/build.sh --run
+  ./scripts/build.sh --install
 
 Options:
-  --debug   Build the Debug configuration
-  --test    Run unit tests after building
-  --run     Open the app when the build finishes
-  -h        Show this help
+  --debug    Build the Debug configuration
+  --test     Run unit tests after building
+  --run      Open the app when the build finishes
+  --install  Copy to /Applications (or ~/Applications) and open it.
+             Finder lists it there. macOS Apps / Gemini grids often hide unsigned local builds.
+  -h         Show this help
 EOF
 }
 
@@ -32,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --debug) configuration="Debug" ;;
     --test) run_tests=1 ;;
     --run) open_app=1 ;;
+    --install) install_app=1 ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "Unknown option: $1" >&2
@@ -101,11 +106,43 @@ if [[ "$run_tests" -eq 1 ]]; then
     test
 fi
 
+install_dest=""
+if [[ "$install_app" -eq 1 ]]; then
+  if [[ -d /Applications && -w /Applications ]]; then
+    install_dest="/Applications/RollTag.app"
+  else
+    mkdir -p "$HOME/Applications"
+    install_dest="$HOME/Applications/RollTag.app"
+  fi
+  rm -rf "$install_dest"
+  ditto "$dest" "$install_dest"
+  xattr -cr "$install_dest" 2>/dev/null || true
+  lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [[ -x "$lsregister" ]]; then
+    "$lsregister" -f "$install_dest" >/dev/null 2>&1 || true
+  fi
+  if [[ ! -d "$install_dest" ]]; then
+    echo "Install failed: $install_dest was not created." >&2
+    exit 1
+  fi
+fi
+
 echo
 echo "App: $dest"
-echo "Open it with:"
-echo "  open \"$dest\""
-
-if [[ "$open_app" -eq 1 ]]; then
+if [[ -n "$install_dest" ]]; then
+  echo "Installed: $install_dest"
+  echo "Finder → Applications has it. macOS Apps / Gemini icon grids often hide unsigned local builds."
+  echo "Search in that grid, open Finder’s Applications folder, or drag the app to the Dock."
+  echo "Opening it now."
+  open "$install_dest"
+elif [[ "$open_app" -eq 1 ]]; then
+  echo "Opening this repo build (not in Applications):"
+  echo "  $dest"
   open "$dest"
+else
+  echo "This copy is only in the repo build folder. Finder → Applications will not show it until you install."
+  echo "To copy it there and open it:"
+  echo "  ./scripts/build.sh --install"
+  echo "Open this copy with:"
+  echo "  open \"$dest\""
 fi

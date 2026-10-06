@@ -6,6 +6,7 @@ final class ShortcutBindingTests: XCTestCase {
         let shortcuts = ShortcutPreference.empty
         XCTAssertEqual(shortcuts.binding(for: .playPause).keyCode, ShortcutKeys.space)
         XCTAssertEqual(shortcuts.binding(for: .fullscreen).keyCode, ShortcutKeys.p)
+        XCTAssertEqual(shortcuts.binding(for: .fitZoom).keyCode, ShortcutKeys.z)
         XCTAssertEqual(shortcuts.binding(for: .duplicateKeepLeft).keyCode, ShortcutKeys.a)
         XCTAssertEqual(shortcuts.binding(for: .duplicateKeepRight).keyCode, ShortcutKeys.d)
         XCTAssertEqual(shortcuts.binding(for: .duplicateKeepAll).keyCode, ShortcutKeys.s)

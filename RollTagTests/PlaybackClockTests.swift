@@ -44,6 +44,14 @@ final class PlaybackClockTests: XCTestCase {
         XCTAssertTrue(playback.isItemLoaded)
         XCTAssertEqual(playback.duration, 8)
         XCTAssertTrue(playback.canPlay)
+        XCTAssertEqual(playback.zoomScale, 1)
+        XCTAssertFalse(playback.showsDecodedVideoFrame)
+        playback.play()
+        XCTAssertTrue(playback.showsDecodedVideoFrame)
+        playback.pause()
+        XCTAssertFalse(playback.showsDecodedVideoFrame)
+        playback.scrub(to: 1.2)
+        XCTAssertTrue(playback.showsDecodedVideoFrame)
     }
 
     @MainActor
@@ -64,5 +72,26 @@ final class PlaybackClockTests: XCTestCase {
         XCTAssertNil(playback.player.currentItem)
         XCTAssertFalse(playback.isItemLoaded)
         XCTAssertFalse(playback.canPlay)
+    }
+
+    @MainActor
+    func testZoomClampsAndResetReturnsToFit() {
+        let playback = PreviewPlayback()
+        playback.setZoom(0.2)
+        XCTAssertEqual(playback.zoomScale, 1)
+        playback.setZoom(12)
+        XCTAssertEqual(playback.zoomScale, 8)
+        playback.zoomOffset = CGSize(width: 40, height: -20)
+        playback.resetZoom()
+        XCTAssertEqual(playback.zoomScale, 1)
+        XCTAssertEqual(playback.zoomOffset, .zero)
+        playback.setZoom(3)
+        playback.zoomOffset = CGSize(width: 400, height: 400)
+        playback.clampOffset(in: CGSize(width: 200, height: 100))
+        XCTAssertLessThanOrEqual(abs(playback.zoomOffset.width), 200)
+        XCTAssertLessThanOrEqual(abs(playback.zoomOffset.height), 100)
+        playback.present(nil)
+        XCTAssertEqual(playback.zoomScale, 1)
+        XCTAssertEqual(playback.zoomOffset, .zero)
     }
 }

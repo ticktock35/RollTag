@@ -201,7 +201,39 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertEqual(before, after)
     }
 
-    private func writeJPEG(width: Int, height: Int, orientation: Int, in directory: URL? = nil) throws -> URL {
+    func testPreviewStillDecodesFullImageInsteadOfEmbeddedThumbnail() async throws {
+        let source = try writeJPEG(width: 1600, height: 1200, orientation: 1, embedThumbnail: true)
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let imageSource = CGImageSourceCreateWithURL(source as CFURL, options) else {
+            return XCTFail("source is not readable")
+        }
+        let embedOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: false,
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1280,
+        ]
+        if let embedded = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, embedOptions as CFDictionary) {
+            let embedEdge = max(embedded.width, embedded.height)
+            if embedEdge < 400 {
+                let preview = await ThumbnailService.previewStill(url: source, maxEdge: 1280)
+                let size = pixelSize(preview)
+                XCTAssertGreaterThan(max(size.width, size.height), 800)
+            }
+        }
+        let preview = await ThumbnailService.previewStill(url: source, maxEdge: 800)
+        let size = pixelSize(preview)
+        XCTAssertGreaterThan(max(size.width, size.height), 400)
+        XCTAssertLessThanOrEqual(max(size.width, size.height), 800)
+    }
+
+    func testPreviewFrameOnMissingVideoReturnsNil() async {
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("missing-\(UUID().uuidString).mov")
+        let image = await ThumbnailService.previewFrame(url: missing, maxEdge: 1280)
+        XCTAssertNil(image)
+    }
+
+    private func writeJPEG(width: Int, height: Int, orientation: Int, in directory: URL? = nil, embedThumbnail: Bool = false) throws -> URL {
         let dir = directory ?? FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-jpg-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent("src-\(orientation)-\(UUID().uuidString).jpg")
@@ -229,7 +261,8 @@ final class ThumbnailTests: XCTestCase {
             cg,
             [
                 kCGImagePropertyOrientation: orientation,
-                kCGImageDestinationLossyCompressionQuality: 0.92
+                kCGImageDestinationLossyCompressionQuality: 0.92,
+                kCGImageDestinationEmbedThumbnail: embedThumbnail,
             ] as CFDictionary
         )
         guard CGImageDestinationFinalize(destination) else {

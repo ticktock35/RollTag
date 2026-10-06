@@ -9,7 +9,9 @@ struct PlayerPaneView: View {
     var body: some View {
         ZStack {
             Color.black
-            mediaContent
+            ZoomableMediaView(playback: model.playback) {
+                mediaContent
+            }
             if !fillsScreen {
                 chrome
             }
@@ -51,13 +53,9 @@ struct PlayerPaneView: View {
             switch media.kind {
             case .video:
                 ZStack {
-                    if model.playback.isItemLoaded {
+                    PlayerOriginalStillView(url: media.url)
+                    if model.playback.showsDecodedVideoFrame {
                         SharedPlayerLayer(player: model.playback.player)
-                    } else {
-                        PlayerPosterView(
-                            footageID: media.id,
-                            warehouseRoot: model.onlineRoot(for: media.id)
-                        )
                     }
                     if let message = previewMessage {
                         previewMessageOverlay(message)
@@ -218,17 +216,213 @@ private struct PlaybackControls: View {
 
 struct FullscreenPlayerView: View {
     @Bindable var model: AppModel
+    @State private var chromeVisible = true
+    @State private var hoveringTop = false
+    @State private var hoveringBottom = false
+    @State private var hideTask: Task<Void, Never>?
 
     var body: some View {
-        PlayerPaneView(model: model, fillsScreen: true)
-            .overlay(alignment: .bottom) {
+        ZStack {
+            PlayerPaneView(model: model, fillsScreen: true)
+            VStack(spacing: 0) {
+                hoverStrip(height: 56) { hoveringTop = $0 }
+                Spacer()
+                hoverStrip(height: 96) { hoveringBottom = $0 }
+            }
+            VStack(spacing: 0) {
+                topBanner
+                    .opacity(chromeVisible ? 1 : 0)
+                    .onHover { hoveringTop = $0 }
+                Spacer()
                 PlaybackControls(
                     playback: model.playback,
                     compact: false,
                     shortcutHint: model.preference.shortcuts.playbackHint
                 )
-                    .padding(16)
+                .padding(16)
+                .opacity(chromeVisible ? 1 : 0)
+                .onHover { hoveringBottom = $0 }
             }
+            .allowsHitTesting(chromeVisible)
+            .animation(.easeInOut(duration: 0.22), value: chromeVisible)
+        }
+        .onAppear { revealChrome() }
+        .onChange(of: model.focusedFootage?.id) { revealChrome() }
+        .onChange(of: hoveringTop) { updateChromeHover() }
+        .onChange(of: hoveringBottom) { updateChromeHover() }
+        .onChange(of: model.playback.isScrubbing) { _, scrubbing in
+            if scrubbing {
+                revealChrome()
+            } else {
+                scheduleHide()
+            }
+        }
+        .onDisappear { hideTask?.cancel() }
+    }
+
+    private var topTitle: String {
+        guard let footage = model.focusedFootage else {
+            return model.playback.media?.filename ?? ""
+        }
+        let warehouse = model.warehouses.first { $0.id == footage.warehouseID }?.preference.name ?? ""
+        let folder = footage.directoryPath
+        if !warehouse.isEmpty, !folder.isEmpty {
+            return "\(warehouse)/\(folder)"
+        }
+        if !warehouse.isEmpty { return warehouse }
+        if !folder.isEmpty { return folder }
+        return footage.filename
+    }
+
+    private var topBanner: some View {
+        Text(topTitle)
+            .font(.headline)
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(Color.black.opacity(0.42))
+    }
+
+    private func hoverStrip(height: CGFloat, setHover: @escaping (Bool) -> Void) -> some View {
+        Color.clear
+            .frame(height: height)
+            .contentShape(Rectangle())
+            .onHover(perform: setHover)
+    }
+
+    private func updateChromeHover() {
+        if hoveringTop || hoveringBottom {
+            revealChrome()
+        } else {
+            scheduleHide()
+        }
+    }
+
+    private func revealChrome() {
+        chromeVisible = true
+        scheduleHide()
+    }
+
+    private func scheduleHide() {
+        hideTask?.cancel()
+        if hoveringTop || hoveringBottom || model.playback.isScrubbing {
+            return
+        }
+        hideTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            guard !Task.isCancelled else { return }
+            if hoveringTop || hoveringBottom || model.playback.isScrubbing {
+                return
+            }
+            chromeVisible = false
+        }
+    }
+}
+
+private struct ZoomableMediaView<Content: View>: View {
+    @Bindable var playback: PreviewPlayback
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                content
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .scaleEffect(playback.zoomScale)
+                    .offset(playback.zoomOffset)
+                MediaZoomCatcher(playback: playback, viewport: geo.size)
+            }
+        }
+        .clipped()
+    }
+}
+
+private struct MediaZoomCatcher: NSViewRepresentable {
+    var playback: PreviewPlayback
+    var viewport: CGSize
+
+    func makeNSView(context: Context) -> MediaZoomCatcherView {
+        let view = MediaZoomCatcherView()
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateNSView(_ nsView: MediaZoomCatcherView, context: Context) {
+        context.coordinator.playback = playback
+        context.coordinator.viewport = viewport
+        nsView.coordinator = context.coordinator
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(playback: playback, viewport: viewport)
+    }
+
+    @MainActor
+    final class Coordinator {
+        var playback: PreviewPlayback
+        var viewport: CGSize
+
+        init(playback: PreviewPlayback, viewport: CGSize) {
+            self.playback = playback
+            self.viewport = viewport
+        }
+
+        func magnify(by factor: CGFloat) {
+            playback.setZoom(playback.zoomScale * factor)
+            playback.clampOffset(in: viewport)
+        }
+
+        func pan(by delta: CGSize) {
+            guard playback.zoomScale > 1 else { return }
+            playback.zoomOffset = CGSize(
+                width: playback.zoomOffset.width + delta.width,
+                height: playback.zoomOffset.height + delta.height
+            )
+            playback.clampOffset(in: viewport)
+        }
+    }
+}
+
+private final class MediaZoomCatcherView: NSView {
+    var coordinator: MediaZoomCatcher.Coordinator?
+    private var lastDrag: NSPoint?
+
+    override var acceptsFirstResponder: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        self
+    }
+
+    override func magnify(with event: NSEvent) {
+        coordinator?.magnify(by: 1 + event.magnification)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.hasPreciseScrollingDeltas, coordinator?.playback.zoomScale ?? 1 > 1 {
+            coordinator?.pan(
+                by: CGSize(width: event.scrollingDeltaX, height: -event.scrollingDeltaY)
+            )
+            return
+        }
+        super.scrollWheel(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        lastDrag = convert(event.locationInWindow, from: nil)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        let now = convert(event.locationInWindow, from: nil)
+        if let last = lastDrag {
+            coordinator?.pan(by: CGSize(width: now.x - last.x, height: now.y - last.y))
+        }
+        lastDrag = now
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        lastDrag = nil
     }
 }
 
@@ -292,32 +486,7 @@ private struct PlayerOriginalStillView: View {
                 for: screen?.frame.size ?? CGSize(width: 1920, height: 1080),
                 scale: screen?.backingScaleFactor ?? 2
             )
-            image = await ThumbnailService.previewStill(url: url, maxEdge: edge)
-        }
-    }
-}
-
-private struct PlayerPosterView: View {
-    let footageID: UUID
-    let warehouseRoot: URL?
-    @State private var image: NSImage?
-
-    var body: some View {
-        Group {
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.medium)
-                    .scaledToFit()
-            } else {
-                Color.clear
-            }
-        }
-        .task(id: footageID) {
-            image = nil
-            guard let warehouseRoot else { return }
-            let thumbURL = ThumbnailService.thumbnailFileURL(warehouseRoot: warehouseRoot, footageID: footageID)
-            image = ThumbnailService.loadThumbnail(at: thumbURL, maxEdge: ThumbnailService.storedThumbMaxEdge)
+            image = await ThumbnailService.previewFrame(url: url, maxEdge: edge)
         }
     }
 }

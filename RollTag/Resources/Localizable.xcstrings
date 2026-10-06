@@ -1789,6 +1789,22 @@
         }
       }
     },
+    "player.fit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剛好放下"
+          }
+        }
+      }
+    },
     "player.fullscreen" : {
       "localizations" : {
         "en" : {
@@ -1876,13 +1892,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ play/pause · %2$@ previous · %3$@ next · %4$@ or %5$@ exit"
+            "value" : "%1$@ play/pause · %2$@ previous · %3$@ next · %4$@ fit · %5$@ or %6$@ exit"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ 播放／暫停 · %2$@ 上一則 · %3$@ 下一則 · %4$@ 或 %5$@ 離開"
+            "value" : "%1$@ 播放／暫停 · %2$@ 上一則 · %3$@ 下一則 · %4$@ 剛好放下 · %5$@ 或 %6$@ 離開"
           }
         }
       }

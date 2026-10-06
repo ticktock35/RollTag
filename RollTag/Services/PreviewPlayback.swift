@@ -35,6 +35,8 @@ final class PreviewPlayback {
     var isScrubbing = false
     var didFailToLoad = false
     var isIncompleteFile = false
+    var zoomScale: CGFloat = 1
+    var zoomOffset: CGSize = .zero
 
     private var loadedURL: URL?
     private var presentGeneration = 0
@@ -50,6 +52,11 @@ final class PreviewPlayback {
 
     var isItemLoaded: Bool { loadedURL != nil && player.currentItem != nil }
 
+    /// Paused on the first frame: AVPlayer often shows a soft proxy. Use a still from the original instead.
+    var showsDecodedVideoFrame: Bool {
+        isItemLoaded && (isPlaying || currentSeconds > 0.05)
+    }
+
     var canPlay: Bool {
         guard let media, !isIncompleteFile, !didFailToLoad else { return false }
         return media.kind == .video || media.kind == .audio
@@ -61,6 +68,7 @@ final class PreviewPlayback {
         detachPlayer()
         currentSeconds = 0
         didFailToLoad = false
+        resetZoom()
         guard let next else {
             duration = 0
             isIncompleteFile = false
@@ -165,8 +173,36 @@ final class PreviewPlayback {
         currentSeconds = 0
         isIncompleteFile = false
         didFailToLoad = false
+        resetZoom()
         exitFullscreen()
     }
+
+    func resetZoom() {
+        zoomScale = 1
+        zoomOffset = .zero
+    }
+
+    func setZoom(_ scale: CGFloat) {
+        let next = min(max(scale, Self.minZoom), Self.maxZoom)
+        zoomScale = next
+        if next <= Self.minZoom + 0.001 {
+            zoomOffset = .zero
+        }
+    }
+
+    func clampOffset(in viewport: CGSize) {
+        guard zoomScale > Self.minZoom, viewport.width > 0, viewport.height > 0 else {
+            zoomOffset = .zero
+            return
+        }
+        let extraX = max(0, viewport.width * (zoomScale - 1) / 2)
+        let extraY = max(0, viewport.height * (zoomScale - 1) / 2)
+        zoomOffset.width = min(max(zoomOffset.width, -extraX), extraX)
+        zoomOffset.height = min(max(zoomOffset.height, -extraY), extraY)
+    }
+
+    private static let minZoom: CGFloat = 1
+    private static let maxZoom: CGFloat = 8
 
     private func ensureItemLoaded() {
         guard let media, canPlay else { return }

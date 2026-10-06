@@ -8,6 +8,7 @@ enum ShortcutKeys {
     static let f: UInt16 = 3
     static let w: UInt16 = 13
     static let p: UInt16 = 35
+    static let z: UInt16 = 6
     static let leftBracket: UInt16 = 33
     static let rightBracket: UInt16 = 30
     static let comma: UInt16 = 43

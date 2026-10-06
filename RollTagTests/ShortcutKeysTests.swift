@@ -7,6 +7,7 @@ final class ShortcutKeysTests: XCTestCase {
         XCTAssertEqual(ShortcutKeys.latinLetter(keyCode: ShortcutKeys.s), "s")
         XCTAssertEqual(ShortcutKeys.latinLetter(keyCode: ShortcutKeys.d), "d")
         XCTAssertEqual(ShortcutKeys.latinLetter(keyCode: ShortcutKeys.p), "p")
+        XCTAssertEqual(ShortcutKeys.latinLetter(keyCode: ShortcutKeys.z), "z")
         XCTAssertEqual(ShortcutKeys.latinLetter(keyCode: ShortcutKeys.space), " ")
         XCTAssertNil(ShortcutKeys.latinLetter(keyCode: ShortcutKeys.escape))
         XCTAssertEqual(ShortcutKeys.arrowDirection(keyCode: ShortcutKeys.leftArrow), .left)

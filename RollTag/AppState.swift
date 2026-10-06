@@ -2057,6 +2057,11 @@ final class AppModel {
                 playback.togglePlayPause()
                 return nil
             }
+            if shortcuts.matches(event, .fitZoom) {
+                hintSwitchInputSourceIfNeeded(event)
+                playback.resetZoom()
+                return nil
+            }
             if ShortcutKeys.looksLikeIMECharacter(event.characters) {
                 hintSwitchInputSourceIfNeeded(event)
                 return nil
@@ -2072,6 +2077,11 @@ final class AppModel {
         if shortcuts.matches(event, .fullscreen) {
             hintSwitchInputSourceIfNeeded(event)
             toggleSelectedFullscreen()
+            return nil
+        }
+        if shortcuts.matches(event, .fitZoom) {
+            hintSwitchInputSourceIfNeeded(event)
+            playback.resetZoom()
             return nil
         }
         if ShortcutKeys.looksLikeIMECharacter(event.characters) {

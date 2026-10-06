@@ -110,10 +110,21 @@ enum ThumbnailService {
         }
     }
 
+    /// Player-pane still: decode from the original, never a camera-embedded or grid thumbnail.
     static func previewStill(url: URL, maxEdge: CGFloat = playerMaxEdge) async -> NSImage? {
+        await previewFrame(url: url, maxEdge: maxEdge)
+    }
+
+    static func previewFrame(url: URL, maxEdge: CGFloat = playerMaxEdge) async -> NSImage? {
         await Task.detached(priority: .userInitiated) { () -> NSImage? in
-            stillImage(url: url, maxEdge: maxEdge, preferEmbedded: true)
-                ?? stillImage(url: url, maxEdge: maxEdge, preferEmbedded: false)
+            switch MediaKind.of(filename: url.lastPathComponent) {
+            case .image:
+                return stillImage(url: url, maxEdge: maxEdge, preferEmbedded: false)
+            case .video:
+                return posterFallback(url: url, maxEdge: maxEdge)
+            case .audio:
+                return nil
+            }
         }.value
     }
 
@@ -227,7 +238,9 @@ enum ThumbnailService {
 
     static func decodeStill(url: URL, maxEdge: CGFloat, preferEmbedded: Bool = false) -> NSImage? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        if preferEmbedded, let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: true) {
+        if preferEmbedded,
+           let image = imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: true),
+           stillMeetsRequestedEdge(image, url: url, maxEdge: maxEdge) {
             return image
         }
         return imageSourceThumbnail(url: url, maxEdge: maxEdge, preferEmbedded: false)
@@ -284,6 +297,16 @@ enum ThumbnailService {
         case .audio:
             return nil
         }
+    }
+
+    private static func stillMeetsRequestedEdge(_ image: NSImage, url: URL, maxEdge: CGFloat) -> Bool {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
+        let got = max(cg.width, cg.height)
+        let requested = max(Int(maxEdge.rounded()), 1)
+        let sourceLongest = orientedPixelSize(url: url).map { max($0.width, $0.height) } ?? requested
+        let target = min(requested, sourceLongest)
+        guard target > Int(storedThumbMaxEdge.rounded()) else { return got > 0 }
+        return got * 2 >= target
     }
 
     private static func imageSourceThumbnail(url: URL, maxEdge: CGFloat, preferEmbedded: Bool) -> NSImage? {
@@ -419,7 +442,7 @@ enum ThumbnailService {
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
         ) else { return nil }
-        context.interpolationQuality = .medium
+        context.interpolationQuality = max(width, height) > Int(storedThumbMaxEdge.rounded()) ? .high : .medium
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return context.makeImage()
     }

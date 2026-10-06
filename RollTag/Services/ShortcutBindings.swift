@@ -79,6 +79,7 @@ enum ShortcutContext: String, CaseIterable, Identifiable {
 enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
     case playPause
     case fullscreen
+    case fitZoom
     case previousMedia
     case nextMedia
     case confirmAI
@@ -97,7 +98,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
 
     var context: ShortcutContext {
         switch self {
-        case .playPause, .fullscreen, .previousMedia, .nextMedia:
+        case .playPause, .fullscreen, .fitZoom, .previousMedia, .nextMedia:
             return .playback
         case .confirmAI, .clearSelection, .gridLeft, .gridRight, .gridUp, .gridDown:
             return .library
@@ -110,6 +111,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .playPause: return "player.playPause"
         case .fullscreen: return "player.fullscreen"
+        case .fitZoom: return "player.fit"
         case .previousMedia: return "player.previous"
         case .nextMedia: return "player.next"
         case .confirmAI: return "ai.confirm"
@@ -130,6 +132,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .playPause: return ShortcutBinding(keyCode: ShortcutKeys.space)
         case .fullscreen: return ShortcutBinding(keyCode: ShortcutKeys.p)
+        case .fitZoom: return ShortcutBinding(keyCode: ShortcutKeys.z)
         case .previousMedia: return ShortcutBinding(keyCode: ShortcutKeys.leftBracket)
         case .nextMedia: return ShortcutBinding(keyCode: ShortcutKeys.rightBracket)
         case .confirmAI, .duplicateConfirmTrash: return ShortcutBinding(keyCode: ShortcutKeys.return)
@@ -167,7 +170,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable, Codable {
 
     static func conflictPool(for action: ShortcutAction) -> [ShortcutAction] {
         switch action {
-        case .playPause, .fullscreen, .previousMedia, .nextMedia:
+        case .playPause, .fullscreen, .fitZoom, .previousMedia, .nextMedia:
             return actions(in: .playback) + actions(in: .library) + actions(in: .duplicates)
         case .confirmAI, .clearSelection, .gridLeft, .gridRight, .gridUp, .gridDown:
             return actions(in: .playback) + actions(in: .library)
@@ -221,7 +224,7 @@ struct ShortcutPreference: Codable, Equatable {
         let mods = modifiers.intersection(ShortcutBinding.significantModifiers)
         guard mods.subtracting(.shift).isEmpty else { return nil }
         guard let direction = ShortcutKeys.wasdDirection(keyCode: keyCode) else { return nil }
-        for action: ShortcutAction in [.playPause, .fullscreen, .previousMedia, .nextMedia, .confirmAI, .clearSelection] {
+        for action: ShortcutAction in [.playPause, .fullscreen, .fitZoom, .previousMedia, .nextMedia, .confirmAI, .clearSelection] {
             if matches(keyCode: keyCode, modifiers: modifiers, action) {
                 return nil
             }
@@ -235,7 +238,7 @@ struct ShortcutPreference: Codable, Equatable {
         let mods = modifiers.intersection(ShortcutBinding.significantModifiers)
         guard mods.subtracting(.shift).isEmpty else { return nil }
         for action: ShortcutAction in [
-            .playPause, .fullscreen, .previousMedia, .nextMedia, .confirmAI, .clearSelection,
+            .playPause, .fullscreen, .fitZoom, .previousMedia, .nextMedia, .confirmAI, .clearSelection,
             .gridLeft, .gridRight, .gridUp, .gridDown,
             .duplicateKeepLeft, .duplicateKeepRight, .duplicateKeepAll, .duplicateConfirmTrash, .duplicateCancelTrash,
         ] {
@@ -313,6 +316,7 @@ struct ShortcutPreference: Codable, Equatable {
             displayLabel(for: .playPause),
             cheatsheetLabel(for: .previousMedia),
             cheatsheetLabel(for: .nextMedia),
+            displayLabel(for: .fitZoom),
             displayLabel(for: .fullscreen),
             displayLabel(for: .clearSelection)
         )
