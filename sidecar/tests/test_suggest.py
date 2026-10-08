@@ -1,6 +1,7 @@
 import unittest
 
 from rolltag_sidecar.suggest import (
+    _gemini_payload,
     _http_error_message,
     build_prompt,
     parse_tags,
@@ -133,6 +134,26 @@ class SuggestTests(unittest.TestCase):
         body = '{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"8s"}]}}'
         self.assertEqual(parsed_retry_delay(body), 8.0)
         self.assertIsNone(parsed_retry_delay("not json"))
+
+    def test_gemini_payload_omits_deprecated_sampling_and_thinking_budget(self):
+        payload = _gemini_payload("tag this", ["aaa"])
+        config = payload["generationConfig"]
+        self.assertEqual(config.get("responseMimeType"), "application/json")
+        for key in (
+            "temperature",
+            "topP",
+            "topK",
+            "top_p",
+            "top_k",
+            "thinkingBudget",
+            "thinking_budget",
+            "thinkingConfig",
+            "thinking_level",
+            "thinkingLevel",
+        ):
+            self.assertNotIn(key, config)
+            self.assertNotIn(key, payload)
+        self.assertEqual(payload["contents"][0]["parts"][1]["inlineData"]["data"], "aaa")
 
     def test_pick_frames_keeps_start_mid_end(self):
         frames = ["a", "b", "c", "d", "e", "f"]

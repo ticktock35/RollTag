@@ -213,17 +213,22 @@ def pick_frames(frames: list, limit: int) -> list:
     return [frames[round(index * step)] for index in range(limit)]
 
 
-def _gemini(api_key: str, model: str, prompt: str, frames: list) -> str:
+def _gemini_payload(prompt: str, frames: list) -> dict:
     parts = [{"text": prompt}]
     for frame in frames:
         parts.append({"inlineData": {"mimeType": "image/jpeg", "data": frame}})
-    payload = {
+    # Upcoming Gemini models reject thinking_budget, temperature, top_p, and top_k.
+    # Omit thinking_level so the model uses its default.
+    return {
         "contents": [{"parts": parts}],
         "generationConfig": {
-            "temperature": 0.2,
             "responseMimeType": "application/json",
         },
     }
+
+
+def _gemini(api_key: str, model: str, prompt: str, frames: list) -> str:
+    payload = _gemini_payload(prompt, frames)
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent?key={api_key}"
