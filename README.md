@@ -70,7 +70,7 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 
 ## 安裝
 
-需要 **macOS 14 或更新** 的 Mac。不必有 Apple Developer 帳號。AI 打標還需要本機 **Python 3**（系統內建的 `/usr/bin/python3` 即可，不用 pip）。
+需要 **macOS 14 或更新** 的 Mac。不必有 Apple Developer 帳號。
 
 ### 用現成的 App
 
@@ -125,7 +125,6 @@ open RollTag.xcodeproj
 - 打開 Xcode 一直要你選 Team：關掉自動簽章，改用專案裡的本機簽章即可；或改跑 `./scripts/build.sh`。
 - 第一次開自己編的 App 被擋：Finder 對 App 按右鍵 → 打開。
 - `./scripts/build.sh --install` 成功了，Apps／Gemini 格子還是沒有 RollTag：這是正常的。App 已在「應用程式」，分類是「影片／娛樂」，但 macOS 26 的圖示格子常不列出本機簽章、Gatekeeper 標 rejected 的 App。用格子上方搜尋、Finder → 應用程式，或把 `/Applications/RollTag.app` 拖到 Dock。腳本現在安裝完會直接打開。要穩定出現在格子裡需要付費 Developer 帳號做公證。
-- AI 打標說 sidecar 不可用：確認這台 Mac 有 `/usr/bin/python3`。不必另外 `pip install`。
 
 ---
 
@@ -237,7 +236,7 @@ This version is a single-Mac tool. It does not finish a film, host a shared clou
 
 ### Install
 
-Requires **macOS 14+**. AI tagging also needs **Python 3** on this Mac (`/usr/bin/python3` is fine).
+Requires **macOS 14+**.
 
 **Ready-made app:** download the latest `.app` zip from [Releases](https://github.com/ticktock35/RollTag/releases), unzip, and drag it into **Applications**. A copy left in Downloads or the repo will not show up in Finder’s Applications list. On macOS 26 the Apps / Gemini icon grids often hide unsigned local builds — use the grid search field, Finder → Applications, or the Dock. If Gatekeeper blocks the first launch, right-click the app in Finder → **Open**.
 
@@ -260,8 +259,6 @@ cd RollTag
 ```
 
 That copies the app into Applications and opens it. Finder lists it there. On macOS 26 the old Launchpad is gone; the new Apps grid often hides ad-hoc (not notarized) builds, so use the grid’s search field, Finder → Applications, or drag `/Applications/RollTag.app` to the Dock. Use `--debug`, `--test`, or `--run` if you want. Or open `RollTag.xcodeproj` and press ⌘R — signing is already set to Sign to Run Locally, so you do not pick a Team.
-
-AI tagging uses the system `/usr/bin/python3`. No `pip install`.
 
 ### Use
 

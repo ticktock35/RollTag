@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		01000000000000000000000B /* sidecar in Resources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000A /* sidecar */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -23,7 +22,6 @@
 /* Begin PBXFileReference section */
 		010000000000000000000004 /* RollTag.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RollTag.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		010000000000000000000005 /* RollTagTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollTagTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		01000000000000000000000A /* sidecar */ = {isa = PBXFileReference; lastKnownFileType = folder; path = sidecar; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -68,7 +66,6 @@
 			children = (
 				010000000000000000000006 /* RollTag */,
 				010000000000000000000007 /* RollTagTests */,
-				01000000000000000000000A /* sidecar */,
 				010000000000000000000009 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -173,7 +170,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01000000000000000000000B /* sidecar in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

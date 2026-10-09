@@ -100,7 +100,7 @@ struct SidebarView: View {
                 Text(warehouse.preference.name)
                     .foregroundStyle(warehouse.isOnline ? .primary : .secondary)
                 if let progress = model.scanProgress, progress.warehouseID == warehouse.id {
-                    Text("\(progress.percentInt)% · \(progress.currentFile.isEmpty ? String(localized: "status.scanning") : progress.currentFile)")
+                    Text("\(progress.showsPercent ? "\(progress.percentInt)% · " : "")\(progress.currentFile.isEmpty ? String(localized: "status.scanning") : progress.currentFile)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

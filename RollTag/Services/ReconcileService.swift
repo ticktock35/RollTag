@@ -1,6 +1,29 @@
 import Foundation
 
 enum ReconcileService {
+    static let hashConcurrency = 4
+
+    static func isStableMatch(_ current: FootageSnapshot, file: DiskEntry) -> Bool {
+        current.size == file.size
+            && current.mtime == file.mtime
+            && current.status == .available
+            && current.contentHash != nil
+    }
+
+    static func pathsNeedingHash(existing: [FootageSnapshot], disk: [DiskEntry]) -> [String] {
+        var byPath: [String: FootageSnapshot] = [:]
+        byPath.reserveCapacity(existing.count)
+        for record in existing where byPath[record.relativePath] == nil {
+            byPath[record.relativePath] = record
+        }
+        return disk.compactMap { file in
+            if let current = byPath[file.relativePath], isStableMatch(current, file: file) {
+                return nil
+            }
+            return file.relativePath
+        }
+    }
+
     static func plan(
         existing: [FootageSnapshot],
         disk: [DiskEntry],
@@ -10,6 +33,16 @@ enum ReconcileService {
         var records = existing
         var hashedPaths: [String] = []
         var hashCache: [String: String] = [:]
+        var indexByID: [UUID: Int] = [:]
+        var indexByPath: [String: Int] = [:]
+        indexByID.reserveCapacity(records.count)
+        indexByPath.reserveCapacity(records.count)
+        for (index, record) in records.enumerated() {
+            indexByID[record.id] = index
+            if indexByPath[record.relativePath] == nil {
+                indexByPath[record.relativePath] = index
+            }
+        }
 
         func hash(_ relativePath: String) -> String {
             if let cached = hashCache[relativePath] { return cached }
@@ -20,11 +53,19 @@ enum ReconcileService {
         }
 
         func replace(_ snapshot: FootageSnapshot) {
-            if let index = records.firstIndex(where: { $0.id == snapshot.id }) {
+            if let index = indexByID[snapshot.id] {
+                let oldPath = records[index].relativePath
                 records[index] = snapshot
-            } else {
-                records.append(snapshot)
+                if oldPath != snapshot.relativePath, indexByPath[oldPath] == index {
+                    indexByPath.removeValue(forKey: oldPath)
+                }
+                indexByPath[snapshot.relativePath] = index
+                return
             }
+            records.append(snapshot)
+            let index = records.count - 1
+            indexByID[snapshot.id] = index
+            indexByPath[snapshot.relativePath] = index
         }
 
         let diskByPath = Dictionary(uniqueKeysWithValues: disk.map { ($0.relativePath, $0) })
@@ -42,11 +83,12 @@ enum ReconcileService {
         }
 
         for file in disk {
-            guard var current = records.first(where: { $0.relativePath == file.relativePath }) else { continue }
+            guard let index = indexByPath[file.relativePath] else { continue }
+            var current = records[index]
             claimedDisk.insert(file.relativePath)
 
             let filename = file.filename
-            if current.size == file.size, current.mtime == file.mtime, current.status == .available, current.contentHash != nil {
+            if isStableMatch(current, file: file) {
                 tick(file.relativePath)
                 continue
             }
@@ -133,7 +175,7 @@ enum ReconcileService {
                 capturedAt: nil,
                 needsReanalysis: true
             )
-            records.append(added)
+            replace(added)
             claimedDisk.insert(file.relativePath)
             tick(file.relativePath)
         }
@@ -159,32 +201,62 @@ enum ReconcileService {
         fileManager: FileManager = .default,
         onProgress: ((String, Int) -> Void)? = nil
     ) -> [DiskEntry] {
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
         guard let enumerator = fileManager.enumerator(
             at: root,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
+            includingPropertiesForKeys: keys,
             options: [.skipsHiddenFiles]
         ) else {
             return []
         }
 
+        let rootPath = root.standardizedFileURL.path
         var entries: [DiskEntry] = []
+        var lastProgressAt: TimeInterval = 0
+        var lastReportedCount = -1
+
+        func report(_ path: String, force: Bool = false) {
+            guard onProgress != nil else { return }
+            let now = Date().timeIntervalSince1970
+            if !force, entries.count == lastReportedCount, now - lastProgressAt < 0.12 {
+                return
+            }
+            if !force, now - lastProgressAt < 0.12, entries.count - lastReportedCount < 25 {
+                return
+            }
+            lastProgressAt = now
+            lastReportedCount = entries.count
+            onProgress?(path, entries.count)
+        }
+
         for case let url as URL in enumerator {
-            let relative = url.path.replacingOccurrences(of: root.path + "/", with: "")
-            if relative.hasPrefix(MediaConstants.rolltagDirectory) {
+            let relative = relativePath(for: url, rootPath: rootPath)
+            if relative == MediaConstants.rolltagDirectory || relative.hasPrefix(MediaConstants.rolltagDirectory + "/") {
                 enumerator.skipDescendants()
                 continue
             }
-            onProgress?(relative, entries.count)
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
+            if values.isDirectory == true { continue }
+            guard values.isRegularFile == true else { continue }
             let ext = url.pathExtension.lowercased()
             guard MediaConstants.supportedExtensions.contains(ext) else { continue }
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]),
-                  values.isRegularFile == true
-            else { continue }
             let size = Int64(values.fileSize ?? 0)
             let mtime = Int64(values.contentModificationDate?.timeIntervalSince1970 ?? 0)
             entries.append(DiskEntry(relativePath: relative, size: size, mtime: mtime))
-            onProgress?(relative, entries.count)
+            report(relative)
+        }
+        if let last = entries.last {
+            report(last.relativePath, force: true)
+        } else {
+            onProgress?("", 0)
         }
         return entries
+    }
+
+    static func relativePath(for url: URL, rootPath: String) -> String {
+        let path = url.path
+        guard path.hasPrefix(rootPath) else { return url.lastPathComponent }
+        let rest = path.dropFirst(rootPath.count)
+        return rest.first == "/" ? String(rest.dropFirst()) : String(rest)
     }
 }

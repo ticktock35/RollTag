@@ -305,9 +305,11 @@ private struct ScanToolbarItem: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("\(progress.percentInt)%")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                if progress.showsPercent {
+                    Text("\(progress.percentInt)%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
         } else if model.warehouses.contains(where: \.isReconciling) || model.isBusy {
             ProgressView()

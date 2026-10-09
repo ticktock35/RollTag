@@ -25,23 +25,25 @@ struct ScanProgress: Equatable {
     }
 
     var overallFraction: Double {
-        let phaseShare: Double
-        switch phase {
-        case .scanning:
-            return min(0.08, Double(completed) * 0.0004)
-        case .identifying:
-            phaseShare = 0.08 + 0.42 * (phaseFraction ?? 0)
-        case .analyzing:
-            phaseShare = 0.50 + 0.48 * (phaseFraction ?? 0)
-        case .tagging:
-            return phaseFraction ?? 0
-        case .finishing:
-            phaseShare = 0.99
-        }
-        return min(1, phaseShare)
+        displayFraction ?? 0
     }
 
+    var displayFraction: Double? {
+        if phase == .scanning, total == 0 { return nil }
+        guard let phaseFraction else { return nil }
+        if phase == .scanning {
+            return min(phaseFraction, 0.99)
+        }
+        return phaseFraction
+    }
+
+    var isScanningPastEstimate: Bool {
+        phase == .scanning && total > 0 && completed >= total
+    }
+
+    var showsPercent: Bool { displayFraction != nil }
+
     var percentInt: Int {
-        Int((overallFraction * 100).rounded())
+        Int(((displayFraction ?? 0) * 100).rounded())
     }
 }

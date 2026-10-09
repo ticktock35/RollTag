@@ -10,9 +10,11 @@ struct ScanProgressBanner: View {
                 Text(phaseTitle)
                     .font(.headline)
                 Spacer()
-                Text("\(progress.percentInt)%")
-                    .font(.headline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                if progress.showsPercent {
+                    Text("\(progress.percentInt)%")
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
 
             HStack {
@@ -58,7 +60,7 @@ struct ScanProgressBanner: View {
                 }
             }
 
-            ProgressView(value: progress.phaseFraction == nil && progress.phase == .scanning ? nil : progress.overallFraction)
+            ProgressView(value: progress.displayFraction)
                 .progressViewStyle(.linear)
 
             if model.showsAIStopButton {
@@ -85,7 +87,10 @@ struct ScanProgressBanner: View {
 
     private var phaseTitle: String {
         switch progress.phase {
-        case .scanning: String(localized: "progress.scanning")
+        case .scanning:
+            progress.isScanningPastEstimate
+                ? String(localized: "progress.scanning.confirming")
+                : String(localized: "progress.scanning")
         case .identifying: String(localized: "progress.identifying")
         case .analyzing: String(localized: "progress.analyzing")
         case .tagging: String(localized: "progress.tagging")
@@ -96,6 +101,9 @@ struct ScanProgressBanner: View {
     private var countText: String {
         if progress.phase == .scanning, progress.total == 0 {
             return String(format: String(localized: "progress.found"), locale: .current, progress.completed)
+        }
+        if progress.isScanningPastEstimate {
+            return String(format: String(localized: "progress.scanning.stillLooking"), locale: .current, progress.completed)
         }
         return String(format: String(localized: "progress.count"), locale: .current, progress.completed, max(progress.total, 0))
     }

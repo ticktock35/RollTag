@@ -558,7 +558,7 @@ final class AITaggingTests: XCTestCase {
                 NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled, userInfo: nil)
             )
         )
-        XCTAssertFalse(AITaggingStop.isCancellation(SidecarError.unavailable))
+        XCTAssertFalse(AITaggingStop.isCancellation(AITagError.requestFailed("request_failed")))
     }
 
     func testFrameFractionsStayInsideClip() {

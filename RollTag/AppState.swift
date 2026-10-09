@@ -97,7 +97,7 @@ final class AppModel {
     var localeID: String { TagCatalogLoader.localeID() }
 
     private let store: PreferenceStore
-    private let sidecar = SidecarClient()
+    private let aiTags = AITagClient()
     private let placeLookup = PlaceNameLookup()
     private let volumeMonitor = VolumeMonitor()
     private var databases: [UUID: WarehouseDatabase] = [:]
@@ -346,7 +346,6 @@ final class AppModel {
     }
 
     func start() {
-        sidecar.start()
         do {
             preference = try store.load()
         } catch {
@@ -354,10 +353,12 @@ final class AppModel {
             statusMessage = error.localizedDescription
         }
         refreshOnlineState()
+        reloadFootage()
         volumeMonitor.start { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
                 self.refreshOnlineState()
+                self.reloadFootage()
                 if Date() < self.suppressVolumeReconcileUntil { return }
                 await self.reconcileOnlineWarehouses()
             }
@@ -370,7 +371,7 @@ final class AppModel {
 
     func stop() {
         volumeMonitor.stop()
-        sidecar.stop()
+        aiTags.cancelInFlightSuggest()
         removePlaybackKeys()
         playback.unload()
         trimSession = nil
@@ -623,10 +624,6 @@ final class AppModel {
             return
         }
 
-        if !sidecar.isRunning {
-            sidecar.start()
-        }
-
         isBusy = true
         aiStopRequested = false
         defer {
@@ -859,7 +856,7 @@ final class AppModel {
     func stopAITagging() {
         guard showsAIStopButton else { return }
         aiStopRequested = true
-        sidecar.cancelInFlightSuggest()
+        aiTags.cancelInFlightSuggest()
     }
 
     private var shouldStopAITagging: Bool {
@@ -994,11 +991,11 @@ final class AppModel {
         examples: [AITaggingExample],
         onRoute: ((AIProvider) -> Void)? = nil
     ) async throws -> ([String: Any], AIProvider) {
-        var lastError: Error = SidecarError.unavailable
+        var lastError: Error = AITagError.requestFailed("request_failed")
         for route in routes {
             onRoute?(route.provider)
             do {
-                let payload = try await sidecar.suggestTags(
+                let payload = try await aiTags.suggestTags(
                     provider: route.provider,
                     apiKey: route.apiKey,
                     model: route.model,
@@ -1623,35 +1620,29 @@ final class AppModel {
         guard let item = preference.warehouses.first(where: { $0.id == warehouseID }) else { return }
         guard store.isOnline(item) else { return }
         setReconciling(warehouseID, true)
-        ThumbnailService.deferGeneration = true
-        publishProgress(
-            ScanProgress(
-                warehouseName: item.name,
-                warehouseID: item.id,
-                phase: .scanning,
-                currentFile: item.path,
-                completed: 0,
-                total: 0
-            ),
-            force: true
-        )
+        reloadFootage()
         do {
             let db = try openDatabase(for: item)
-            let existing = try db.allFootage().map { $0.snapshot() }
+            let existing = try await loadSnapshotsOffMain(db)
             let root = item.url
             let warehouseName = item.name
-
-            let disk = await scanDiskOffMain(root: root, warehouseID: warehouseID, warehouseName: warehouseName)
             publishProgress(
                 ScanProgress(
                     warehouseName: warehouseName,
-                    warehouseID: warehouseID,
-                    phase: .identifying,
+                    warehouseID: item.id,
+                    phase: .scanning,
                     currentFile: "",
                     completed: 0,
-                    total: disk.count
+                    total: existing.count
                 ),
                 force: true
+            )
+
+            let disk = await scanDiskOffMain(
+                root: root,
+                warehouseID: warehouseID,
+                warehouseName: warehouseName,
+                estimatedTotal: existing.count
             )
 
             let outcome = await planOffMain(
@@ -1674,13 +1665,13 @@ final class AppModel {
                 force: true
             )
             let applied = outcome.omitting(ids: discardedFootageIDs)
-            try db.apply(outcome: applied)
+            try await applyOutcomeOffMain(db, applied)
+            reloadFootage()
             try await analyzeIfNeeded(db: db, outcome: applied, root: root, warehouseName: warehouseName, warehouseID: warehouseID)
         } catch {
             statusMessage = error.localizedDescription
         }
         setReconciling(warehouseID, false)
-        ThumbnailService.deferGeneration = false
         thumbRefreshToken += 1
         await Task.yield()
         reloadFootage()
@@ -1688,23 +1679,57 @@ final class AppModel {
         statusMessage = ""
     }
 
-    private func scanDiskOffMain(root: URL, warehouseID: UUID, warehouseName: String) async -> [DiskEntry] {
-        await Task.detached(priority: .userInitiated) {
-            ReconcileService.scanDisk(root: root) { path, found in
-                Task { @MainActor in
-                    self.publishProgress(
-                        ScanProgress(
-                            warehouseName: warehouseName,
-                            warehouseID: warehouseID,
-                            phase: .scanning,
-                            currentFile: path,
-                            completed: found,
-                            total: 0
+    private func scanDiskOffMain(
+        root: URL,
+        warehouseID: UUID,
+        warehouseName: String,
+        estimatedTotal: Int
+    ) async -> [DiskEntry] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let entries = ReconcileService.scanDisk(root: root) { path, found in
+                    let total = max(estimatedTotal, found)
+                    DispatchQueue.main.async {
+                        self?.publishProgress(
+                            ScanProgress(
+                                warehouseName: warehouseName,
+                                warehouseID: warehouseID,
+                                phase: .scanning,
+                                currentFile: path,
+                                completed: found,
+                                total: total
+                            )
                         )
-                    )
+                    }
+                }
+                continuation.resume(returning: entries)
+            }
+        }
+    }
+
+    private func loadSnapshotsOffMain(_ db: WarehouseDatabase) async throws -> [FootageSnapshot] {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    continuation.resume(returning: try db.allFootage().map { $0.snapshot() })
+                } catch {
+                    continuation.resume(throwing: error)
                 }
             }
-        }.value
+        }
+    }
+
+    private func applyOutcomeOffMain(_ db: WarehouseDatabase, _ outcome: ReconcileOutcome) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try db.apply(outcome: outcome)
+                    continuation.resume(returning: ())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     private func planOffMain(
@@ -1714,26 +1739,77 @@ final class AppModel {
         warehouseID: UUID,
         warehouseName: String
     ) async -> ReconcileOutcome {
-        await Task.detached(priority: .userInitiated) {
+        let needHash = ReconcileService.pathsNeedingHash(existing: existing, disk: disk)
+        var cache: [String: String] = [:]
+        if !needHash.isEmpty {
+            publishProgress(
+                ScanProgress(
+                    warehouseName: warehouseName,
+                    warehouseID: warehouseID,
+                    phase: .identifying,
+                    currentFile: needHash[0],
+                    completed: 0,
+                    total: needHash.count
+                ),
+                force: true
+            )
+            cache = await hashDiskPaths(
+                needHash,
+                root: root,
+                warehouseID: warehouseID,
+                warehouseName: warehouseName
+            )
+        }
+        return await Task.detached(priority: .userInitiated) {
             let hasher = FileHasher()
             return ReconcileService.plan(existing: existing, disk: disk, hashOf: { relative in
+                if let cached = cache[relative] { return cached }
                 let url = root.appendingPathComponent(relative)
                 return (try? hasher.hashFile(at: url)) ?? ""
-            }, onProgress: { path, done, total in
-                Task { @MainActor in
-                    self.publishProgress(
-                        ScanProgress(
-                            warehouseName: warehouseName,
-                            warehouseID: warehouseID,
-                            phase: .identifying,
-                            currentFile: path,
-                            completed: done,
-                            total: total
-                        )
-                    )
-                }
             })
         }.value
+    }
+
+    private func hashDiskPaths(
+        _ paths: [String],
+        root: URL,
+        warehouseID: UUID,
+        warehouseName: String
+    ) async -> [String: String] {
+        var result: [String: String] = [:]
+        result.reserveCapacity(paths.count)
+        await withTaskGroup(of: (String, String).self) { group in
+            var submitted = 0
+            var finished = 0
+            func submitMore() {
+                while submitted < paths.count, submitted - finished < ReconcileService.hashConcurrency {
+                    let path = paths[submitted]
+                    submitted += 1
+                    let url = root.appendingPathComponent(path)
+                    group.addTask {
+                        let hash = (try? FileHasher().hashFile(at: url)) ?? ""
+                        return (path, hash)
+                    }
+                }
+            }
+            submitMore()
+            for await (path, hash) in group {
+                finished += 1
+                result[path] = hash
+                publishProgress(
+                    ScanProgress(
+                        warehouseName: warehouseName,
+                        warehouseID: warehouseID,
+                        phase: .identifying,
+                        currentFile: path,
+                        completed: finished,
+                        total: paths.count
+                    )
+                )
+                submitMore()
+            }
+        }
+        return result
     }
 
     private func analyzeIfNeeded(

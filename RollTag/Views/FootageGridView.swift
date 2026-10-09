@@ -134,6 +134,9 @@ struct FootageGridView: View {
         if !model.workFolders.isEmpty {
             return String(localized: "empty.noFootage.scoped.detail")
         }
+        if model.warehouses.contains(where: \.isReconciling) {
+            return String(localized: "empty.reconciling.detail")
+        }
         return String(localized: "empty.noFootage.detail")
     }
 }

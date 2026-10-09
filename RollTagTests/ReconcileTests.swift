@@ -105,6 +105,20 @@ final class ReconcileTests: XCTestCase {
         XCTAssertTrue(seen.contains("b.mov"))
     }
 
+    func testPathsNeedingHashSkipsStableAndListsNewOrChanged() {
+        let stable = snapshot(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", path: "keep.jpg", hash: "abc", size: 88, mtime: 9)
+        let changed = snapshot(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", path: "edit.jpg", hash: "old", size: 10, mtime: 1)
+        let disk = [
+            DiskEntry(relativePath: "keep.jpg", size: 88, mtime: 9),
+            DiskEntry(relativePath: "edit.jpg", size: 11, mtime: 2),
+            DiskEntry(relativePath: "fresh.jpg", size: 4, mtime: 3),
+        ]
+        XCTAssertEqual(
+            ReconcileService.pathsNeedingHash(existing: [stable, changed], disk: disk),
+            ["edit.jpg", "fresh.jpg"]
+        )
+    }
+
     func testMatchingPathSizeAndMtimeSkipsHash() {
         let existing = [snapshot(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", path: "stable.mov", hash: "abc", size: 88, mtime: 9)]
         let disk = [DiskEntry(relativePath: "stable.mov", size: 88, mtime: 9)]
@@ -152,6 +166,12 @@ final class ReconcileTests: XCTestCase {
         XCTAssertEqual(MediaKind.of(filename: "clip.MP4"), .video)
         XCTAssertFalse(MediaKind.of(filename: "photo.jpg").canHoverPlay)
         XCTAssertTrue(MediaKind.of(filename: "a.mov").canTrim)
+    }
+
+    func testRelativePathStripsRootPrefix() {
+        let root = URL(fileURLWithPath: "/Volumes/Media")
+        let url = URL(fileURLWithPath: "/Volumes/Media/export/clip.mp3")
+        XCTAssertEqual(ReconcileService.relativePath(for: url, rootPath: root.path), "export/clip.mp3")
     }
 
     private func snapshot(

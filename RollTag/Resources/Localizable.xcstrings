@@ -494,22 +494,6 @@
         }
       }
     },
-    "ai.sidecarUnavailable" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI sidecar is not running."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AI sidecar 沒有啟動。"
-          }
-        }
-      }
-    },
     "ai.skipped" : {
       "localizations" : {
         "en" : {
@@ -1270,6 +1254,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "把資料夾拖進視窗，或到設定裡新增路徑。"
+          }
+        }
+      }
+    },
+    "empty.reconciling.detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking this warehouse. Clips already in the library show up while the rest are matched."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在核對這顆倉庫。已經認得的片子會先出現，不必等掃完。"
           }
         }
       }
@@ -2036,13 +2036,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reading duration"
+            "value" : "Reading times and duration"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在讀長度"
+            "value" : "正在讀拍攝時間與長度"
           }
         }
       }
@@ -2090,7 +2090,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已找到 %lld 支影片"
+            "value" : "已找到 %lld 個檔案"
           }
         }
       }
@@ -2100,13 +2100,45 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Identifying footage"
+            "value" : "Matching files"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在核對身份"
+            "value" : "正在比對檔案"
+          }
+        }
+      }
+    },
+    "progress.scanning.confirming" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking for new files"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在確認有沒有新檔"
+          }
+        }
+      }
+    },
+    "progress.scanning.stillLooking" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Found %lld — still looking in remaining folders"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已找到 %lld 個，還在看其餘資料夾"
           }
         }
       }
@@ -2116,13 +2148,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scanning folder"
+            "value" : "Checking files"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在掃描目錄"
+            "value" : "正在檢查檔案"
           }
         }
       }
