@@ -1,10 +1,70 @@
 # RollTag
 
-本機 B-roll 倉庫。在自己的硬碟或資料夾裡打標、搜尋、預覽與切段。第一版是 macOS App。
+本機 B-roll 倉庫。檔還是在你的硬碟或資料夾裡，不上雲、不搬家。用來打標、搜尋、預覽，必要時切一小段。第一版是 macOS App。
 
 A local B-roll warehouse for macOS: tag, search, preview, and trim footage on your own disks.
 
 介面跟著系統語言：繁中 macOS 顯示繁中，英文 macOS 顯示英文。
+
+這不是剪輯軟體（沒有時間軸、調色、多軌），也不是相簿 App。剪片仍回你原本用的軟體；這裡負責讓「這堆碟裡到底有什麼」下次還找得到。
+
+---
+
+## 誰適合、怎麼用
+
+不必填 API key 就能加入倉庫、預覽、手打標、搜尋、切段、找重複。AI 打標是加分項，要自己到設定貼 key，匯入時**不會**自動跑。
+
+### 拍片、剪片的人（頻道、活動、後製）
+
+**常遇到：** 煙火、空鏡、路人、訪談 B-roll 散在好幾顆外接碟。每個剪輯專案都要重新找一遍，檔名又對不上內容。
+
+**可以這樣用：**
+
+1. 把裝素材的硬碟或資料夾拖進視窗，當成一個倉庫。拔掉會顯示離線，插回去標籤還在。
+2. 左側勾這次要處理的目錄（例如某一場活動），搜尋與打標只做這個範圍。
+3. 格線滑過可預覽；點選看原檔。空白鍵播放，P 全螢幕，`[` / `]` 換上一支／下一支。
+4. 同一組畫面一次選起來，右側點主題／情緒／鏡頭，或自己打客戶名、專案名。打中文會順便補英文，之後兩種語言都能搜。
+5. 大批未打標可批次請 AI 幫忙；人名、品牌仍建議自己打。不對的標點掉即可。
+6. 搜「夜景」「無人」「drone」把能用的撈出來，在 Finder 顯示後丟進剪輯軟體。
+7. 只要其中幾秒：右側「剪輯」拉出入點，存成新素材。
+8. 同一支片備份了兩份：左側「重複檔」留下一份，其餘丟進垃圾桶。
+
+換下一個剪輯專案時，不必再掃一次倉庫。這一版不做跟 DaVinci 等軟體的串接。
+
+### 拍照、旅遊、活動紀錄
+
+**常遇到：** 相機 RAW、JPEG、手機 HEIF 混在一起；同一張有三個複本；要用「星空」「海邊」找，Finder 只看得到檔名和日期。
+
+**可以這樣用：**
+
+1. 把那年的旅遊碟或「活動照片」資料夾拖進來。
+2. 用目錄先縮小範圍，再搜地名或自己打的標（例如城市、餐廳、誰在畫面裡）。
+3. 點選後播放區是原檔（不是糊糊的縮圖）；全螢幕可用雙指放大，Z 回到剛好放下。
+4. 批次 AI 可幫忙分主題與地點（有 GPS 的會先寫地名）；仍請抽查，尤其是人或情緒。
+5. 進「重複檔」清掉 RAW＋JPEG＋備份裡多出來的那份，硬碟會空出很多。
+
+### 硬碟裡堆了很多照片短片的一般人
+
+**常遇到：** 外接碟放了好幾年的手機備份，開啟資料夾要等很久，也不知道某次聚會的影片在哪。
+
+**可以這樣用：**
+
+1. 把那顆碟拖進 RollTag，等它在背景掃完（左側看得到進度）。不必一次打完所有標。
+2. 之後要找某次旅行或某個人：搜你記得的字，或從左側「已打標」的分類點進去。
+3. 慢慢幫常會再看的照片打幾個標就夠了；其餘可以先不管。
+4. 碟拔掉沒關係。下次插上，以前打過的標還在，可以繼續搜。
+
+找不到的檔會出現在左側「找不到」，不會默默消失。刪倉庫只是取消登記，**不會刪硬碟上的檔**。
+
+### 第一次建議這樣開始
+
+1. 拖一個資料夾或一顆碟進來。
+2. 在格子裡點幾支，確認預覽正常。
+3. 選幾支手打兩個標，再到上面搜尋欄試一次。
+4. 有需要再填 AI key；沒有 key 也不影響日常找檔。
+5. 細節按鍵與格式見下方「操作說明」。
+
+**這一版不適合：** 想在這裡剪完整支成片、要多人同時改同一套雲端片庫、或需要 Windows／Linux。那些以後再說，現在是單機 Mac。
 
 ---
 
@@ -160,6 +220,20 @@ open RollTag.xcodeproj
 ---
 
 ## English
+
+This is not an NLE and not a photo library. Files stay on your disks. Tag, search, preview, and trim here; edit the story in your usual cutting app.
+
+You do not need an API key to add a warehouse, preview, hand-tag, search, trim, or find duplicates. AI tagging is optional and never runs on import.
+
+**Editors and filmmakers:** drop a drive in as a warehouse. Scope a folder for one job, tag B-roll by theme / mood / shot, search in Chinese or English, trim a few seconds, and send keepers to your timeline. Unplug the drive and the tags stay with it; a new DaVinci project does not need a new index. This version does not connect to DaVinci.
+
+**Photographers and travel / event shooters:** mix RAW, JPEG, and phone HEIF in one warehouse. Search by place or people you tagged. Review originals (not tiny thumbs), pinch-zoom in fullscreen, and clear duplicate RAW+JPEG+backup copies.
+
+**Anyone with years of photos and clips on a disk:** drag the disk in, wait for the background scan, and tag only what you will look for again. Unplugging is fine; plug it back in and previous tags are still there. Removing a warehouse does not delete files.
+
+**A first session:** drop one folder → click a few clips → add two hand tags → search for them. Add an AI key later if you want.
+
+This version is a single-Mac tool. It does not finish a film, host a shared cloud library, or run on Windows / Linux.
 
 ### Install
 
