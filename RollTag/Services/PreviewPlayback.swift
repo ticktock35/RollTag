@@ -37,6 +37,10 @@ final class PreviewPlayback {
     var isIncompleteFile = false
     var zoomScale: CGFloat = 1
     var zoomOffset: CGSize = .zero
+    private(set) var isHoldSpeed = false
+
+    static let skipSeconds = 5.0
+    static let holdRate: Float = 2
 
     private var loadedURL: URL?
     private var presentGeneration = 0
@@ -45,6 +49,11 @@ final class PreviewPlayback {
     private var itemStatusObservation: NSKeyValueObservation?
     private var enteredSystemFullscreen = false
     private var resumeAfterScrub = false
+    private var awaitingSystemFullscreenEnter = false
+    private var hasPendingFullscreenResume = false
+    private var fullscreenResumePlaying = false
+    private var fullscreenResumeSeconds = 0.0
+    private var fullscreenResumeTask: Task<Void, Never>?
 
     init() {
         player = Self.makePlayer()
@@ -63,6 +72,16 @@ final class PreviewPlayback {
     }
 
     func present(_ next: PreviewMedia?) {
+        if let next, media?.id == next.id, media?.url == next.url, media?.kind == next.kind {
+            media = next
+            if let duration = next.duration, duration > 0 {
+                self.duration = duration
+            }
+            if canPlay, loadedURL != next.url {
+                ensureItemLoaded()
+            }
+            return
+        }
         media = next
         presentGeneration += 1
         detachPlayer()
@@ -89,6 +108,7 @@ final class PreviewPlayback {
         guard canPlay, !isPlaying else { return }
         ensureItemLoaded()
         player.play()
+        player.rate = isHoldSpeed ? Self.holdRate : 1
         isPlaying = true
     }
 
@@ -102,8 +122,33 @@ final class PreviewPlayback {
     }
 
     func pause() {
+        endHoldSpeed()
         player.pause()
+        player.rate = 0
         isPlaying = false
+    }
+
+    func skip(by seconds: Double) {
+        guard canPlay else { return }
+        ensureItemLoaded()
+        let next = clampedTime(currentSeconds + seconds)
+        currentSeconds = next
+        seek(to: next, precise: false)
+    }
+
+    func beginHoldSpeed() {
+        guard canPlay, isPlaying else { return }
+        ensureItemLoaded()
+        isHoldSpeed = true
+        player.rate = Self.holdRate
+    }
+
+    func endHoldSpeed() {
+        guard isHoldSpeed else { return }
+        isHoldSpeed = false
+        if isPlaying {
+            player.rate = 1
+        }
     }
 
     func beginScrubbing() {
@@ -144,15 +189,29 @@ final class PreviewPlayback {
     }
 
     func enterFullscreen() {
-        guard media != nil else { return }
+        guard media != nil, !isFullscreen else { return }
+        beginFullscreenTransition()
         isFullscreen = true
         if let window = NSApp.keyWindow, !window.styleMask.contains(.fullScreen) {
-            window.toggleFullScreen(nil)
+            awaitingSystemFullscreenEnter = true
             enteredSystemFullscreen = true
+            window.toggleFullScreen(nil)
+            fullscreenResumeTask?.cancel()
+            fullscreenResumeTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                guard !Task.isCancelled, self.awaitingSystemFullscreenEnter else { return }
+                self.awaitingSystemFullscreenEnter = false
+                self.finishFullscreenTransition()
+            }
+        } else {
+            finishFullscreenTransition()
         }
     }
 
     func exitFullscreen() {
+        awaitingSystemFullscreenEnter = false
+        fullscreenResumeTask?.cancel()
+        fullscreenResumeTask = nil
         isFullscreen = false
         if enteredSystemFullscreen, let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) {
             window.toggleFullScreen(nil)
@@ -160,9 +219,41 @@ final class PreviewPlayback {
         enteredSystemFullscreen = false
     }
 
+    func noteSystemEnteredFullscreen() {
+        guard awaitingSystemFullscreenEnter else { return }
+        awaitingSystemFullscreenEnter = false
+        fullscreenResumeTask?.cancel()
+        fullscreenResumeTask = nil
+        finishFullscreenTransition()
+    }
+
     func noteSystemExitedFullscreen() {
+        awaitingSystemFullscreenEnter = false
+        fullscreenResumeTask?.cancel()
+        fullscreenResumeTask = nil
         isFullscreen = false
         enteredSystemFullscreen = false
+    }
+
+    func beginFullscreenTransition() {
+        fullscreenResumePlaying = isPlaying && canPlay
+        fullscreenResumeSeconds = snapshotCurrentTime()
+        currentSeconds = fullscreenResumeSeconds
+        hasPendingFullscreenResume = true
+        pause()
+    }
+
+    func finishFullscreenTransition() {
+        guard hasPendingFullscreenResume else { return }
+        hasPendingFullscreenResume = false
+        let at = fullscreenResumeSeconds
+        let shouldPlay = fullscreenResumePlaying
+        fullscreenResumePlaying = false
+        currentSeconds = at
+        seek(to: at, precise: true)
+        if shouldPlay {
+            play()
+        }
     }
 
     func unload() {
@@ -230,8 +321,8 @@ final class PreviewPlayback {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
+                self?.pause()
                 self?.player.seek(to: .zero)
-                self?.isPlaying = false
                 self?.currentSeconds = 0
             }
         }
@@ -240,6 +331,11 @@ final class PreviewPlayback {
     }
 
     private func detachPlayer() {
+        awaitingSystemFullscreenEnter = false
+        hasPendingFullscreenResume = false
+        fullscreenResumePlaying = false
+        fullscreenResumeTask?.cancel()
+        fullscreenResumeTask = nil
         pause()
         isScrubbing = false
         resumeAfterScrub = false
@@ -318,6 +414,14 @@ final class PreviewPlayback {
             let slop = CMTime(seconds: 0.12, preferredTimescale: 600)
             player.seek(to: time, toleranceBefore: slop, toleranceAfter: slop)
         }
+    }
+
+    private func snapshotCurrentTime() -> Double {
+        let t = player.currentTime().seconds
+        if t.isFinite, t > 0.05 {
+            return clampedTime(t)
+        }
+        return currentSeconds
     }
 
     private func clampedTime(_ seconds: Double) -> Double {

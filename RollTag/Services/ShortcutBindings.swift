@@ -310,7 +310,7 @@ struct ShortcutPreference: Codable, Equatable {
     }
 
     var playbackHint: String {
-        String(
+        let keys = String(
             format: String(localized: "player.shortcuts"),
             locale: .current,
             displayLabel(for: .playPause),
@@ -320,6 +320,7 @@ struct ShortcutPreference: Codable, Equatable {
             displayLabel(for: .fullscreen),
             displayLabel(for: .clearSelection)
         )
+        return keys + " · " + String(localized: "player.skipHoldHint")
     }
 
     var duplicatesHint: String {

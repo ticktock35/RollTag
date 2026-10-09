@@ -75,6 +75,12 @@ final class ShortcutBindingTests: XCTestCase {
         XCTAssertEqual(loaded.shortcuts.binding(for: .playPause).keyCode, ShortcutKeys.space)
     }
 
+    func testPlaybackHintMentionsSkipAndHold() {
+        let hint = ShortcutPreference.empty.playbackHint
+        XCTAssertTrue(hint.contains("5"))
+        XCTAssertTrue(hint.contains("2"))
+    }
+
     func testWASDAliasesMoveTheLibraryGrid() {
         let shortcuts = ShortcutPreference.empty
         XCTAssertEqual(shortcuts.libraryGridDirection(keyCode: ShortcutKeys.w, modifiers: []), .up)

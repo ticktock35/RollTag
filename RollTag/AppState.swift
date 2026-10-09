@@ -104,6 +104,7 @@ final class AppModel {
     private var lastProgressPublish: TimeInterval = 0
     private var keyMonitor: Any?
     private var fullscreenObserver: NSObjectProtocol?
+    private var fullscreenEnterObserver: NSObjectProtocol?
     private var discardedFootageIDs: Set<UUID> = []
     private var reconcileRunning = false
     private var suppressVolumeReconcileUntil = Date.distantPast
@@ -2029,6 +2030,15 @@ final class AppModel {
                 self?.playback.noteSystemExitedFullscreen()
             }
         }
+        fullscreenEnterObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didEnterFullScreenNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.playback.noteSystemEnteredFullscreen()
+            }
+        }
     }
 
     private func removePlaybackKeys() {
@@ -2040,6 +2050,10 @@ final class AppModel {
             NotificationCenter.default.removeObserver(fullscreenObserver)
             self.fullscreenObserver = nil
         }
+        if let fullscreenEnterObserver {
+            NotificationCenter.default.removeObserver(fullscreenEnterObserver)
+            self.fullscreenEnterObserver = nil
+        }
     }
 
     private func handlePlaybackKey(_ event: NSEvent) -> NSEvent? {
@@ -2048,6 +2062,16 @@ final class AppModel {
         if Self.isTrimKeyWindow { return event }
         if Self.isEditingText { return event }
         let shortcuts = preference.shortcuts
+        if playback.isPlaying, playback.canPlay {
+            if shortcuts.matches(event, .gridLeft) {
+                playback.skip(by: -PreviewPlayback.skipSeconds)
+                return nil
+            }
+            if shortcuts.matches(event, .gridRight) {
+                playback.skip(by: PreviewPlayback.skipSeconds)
+                return nil
+            }
+        }
         if handleLibraryArrowKey(event) {
             return nil
         }

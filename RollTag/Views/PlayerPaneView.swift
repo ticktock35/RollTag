@@ -54,7 +54,7 @@ struct PlayerPaneView: View {
             case .video:
                 ZStack {
                     PlayerOriginalStillView(url: media.url)
-                    if model.playback.showsDecodedVideoFrame {
+                    if model.playback.showsDecodedVideoFrame, !model.playback.isFullscreen || fillsScreen {
                         SharedPlayerLayer(player: model.playback.player)
                     }
                     if let message = previewMessage {
@@ -393,6 +393,8 @@ private struct MediaZoomCatcher: NSViewRepresentable {
 private final class MediaZoomCatcherView: NSView {
     var coordinator: MediaZoomCatcher.Coordinator?
     private var lastDrag: NSPoint?
+    private var holdOrigin: NSPoint?
+    private var panning = false
 
     override var acceptsFirstResponder: Bool { false }
 
@@ -420,19 +422,33 @@ private final class MediaZoomCatcherView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        lastDrag = convert(event.locationInWindow, from: nil)
+        let point = convert(event.locationInWindow, from: nil)
+        lastDrag = point
+        holdOrigin = point
+        panning = false
+        coordinator?.playback.beginHoldSpeed()
     }
 
     override func mouseDragged(with event: NSEvent) {
         let now = convert(event.locationInWindow, from: nil)
-        if let last = lastDrag {
+        if !panning, let origin = holdOrigin {
+            let moved = hypot(now.x - origin.x, now.y - origin.y)
+            if moved > 4, (coordinator?.playback.zoomScale ?? 1) > 1 {
+                panning = true
+                coordinator?.playback.endHoldSpeed()
+            }
+        }
+        if panning, let last = lastDrag {
             coordinator?.pan(by: CGSize(width: now.x - last.x, height: now.y - last.y))
         }
         lastDrag = now
     }
 
     override func mouseUp(with event: NSEvent) {
+        coordinator?.playback.endHoldSpeed()
         lastDrag = nil
+        holdOrigin = nil
+        panning = false
     }
 }
 

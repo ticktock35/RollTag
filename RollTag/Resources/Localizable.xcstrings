@@ -1967,6 +1967,22 @@
         }
       }
     },
+    "player.skipHoldHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "← → skip 5s · hold 2×"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "← → 跳 5 秒 · 按住 2 倍速"
+          }
+        }
+      }
+    },
     "player.timeline" : {
       "localizations" : {
         "en" : {

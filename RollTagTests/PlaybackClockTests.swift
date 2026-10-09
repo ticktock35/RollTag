@@ -95,6 +95,110 @@ final class PlaybackClockTests: XCTestCase {
         XCTAssertEqual(playback.zoomOffset, .zero)
     }
 
+    @MainActor
+    func testSkipMovesFiveSecondsAndClamps() {
+        let playback = PreviewPlayback()
+        playback.present(
+            PreviewMedia(
+                id: UUID(),
+                url: URL(fileURLWithPath: "/tmp/clip.mov"),
+                kind: .video,
+                filename: "clip.mov",
+                width: 1920,
+                height: 1080,
+                duration: 12,
+                fileSize: 5_000_000
+            )
+        )
+        playback.skip(by: PreviewPlayback.skipSeconds)
+        XCTAssertEqual(playback.currentSeconds, 5, accuracy: 0.01)
+        playback.skip(by: PreviewPlayback.skipSeconds)
+        XCTAssertEqual(playback.currentSeconds, 10, accuracy: 0.01)
+        playback.skip(by: PreviewPlayback.skipSeconds)
+        XCTAssertEqual(playback.currentSeconds, 12, accuracy: 0.01)
+        playback.skip(by: -PreviewPlayback.skipSeconds)
+        XCTAssertEqual(playback.currentSeconds, 7, accuracy: 0.01)
+        playback.skip(by: -20)
+        XCTAssertEqual(playback.currentSeconds, 0, accuracy: 0.01)
+    }
+
+    @MainActor
+    func testPresentSameClipKeepsCurrentTime() {
+        let playback = PreviewPlayback()
+        let media = PreviewMedia(
+            id: UUID(),
+            url: URL(fileURLWithPath: "/tmp/clip.mov"),
+            kind: .video,
+            filename: "clip.mov",
+            width: 1920,
+            height: 1080,
+            duration: 120,
+            fileSize: 5_000_000
+        )
+        playback.present(media)
+        playback.skip(by: 75)
+        XCTAssertEqual(playback.currentSeconds, 75, accuracy: 0.01)
+        playback.present(media)
+        XCTAssertEqual(playback.currentSeconds, 75, accuracy: 0.01)
+        XCTAssertTrue(playback.isItemLoaded)
+    }
+
+    @MainActor
+    func testFullscreenTransitionPausesThenResumesFromSameTime() {
+        let playback = PreviewPlayback()
+        playback.present(
+            PreviewMedia(
+                id: UUID(),
+                url: URL(fileURLWithPath: "/tmp/clip.mov"),
+                kind: .video,
+                filename: "clip.mov",
+                width: 1920,
+                height: 1080,
+                duration: 120,
+                fileSize: 5_000_000
+            )
+        )
+        playback.skip(by: 75)
+        playback.play()
+        playback.beginFullscreenTransition()
+        XCTAssertFalse(playback.isPlaying)
+        XCTAssertEqual(playback.currentSeconds, 75, accuracy: 0.01)
+        playback.finishFullscreenTransition()
+        XCTAssertEqual(playback.currentSeconds, 75, accuracy: 0.01)
+        XCTAssertTrue(playback.isPlaying)
+    }
+
+    @MainActor
+    func testHoldSpeedOnlyWhilePlaying() {
+        let playback = PreviewPlayback()
+        playback.present(
+            PreviewMedia(
+                id: UUID(),
+                url: URL(fileURLWithPath: "/tmp/clip.mov"),
+                kind: .video,
+                filename: "clip.mov",
+                width: 1920,
+                height: 1080,
+                duration: 12,
+                fileSize: 5_000_000
+            )
+        )
+        playback.beginHoldSpeed()
+        XCTAssertFalse(playback.isHoldSpeed)
+        XCTAssertEqual(playback.player.rate, 0)
+        playback.play()
+        playback.beginHoldSpeed()
+        XCTAssertTrue(playback.isHoldSpeed)
+        XCTAssertEqual(playback.player.rate, PreviewPlayback.holdRate)
+        playback.endHoldSpeed()
+        XCTAssertFalse(playback.isHoldSpeed)
+        XCTAssertEqual(playback.player.rate, 1)
+        playback.beginHoldSpeed()
+        playback.pause()
+        XCTAssertFalse(playback.isHoldSpeed)
+        XCTAssertEqual(playback.player.rate, 0)
+    }
+
     func testTwoFingerPanDefaultFollowsFingersAndInvertFlipsBothAxes() {
         let follow = MediaPan.twoFingerDelta(x: 4, y: -3, invert: false)
         XCTAssertEqual(follow.width, -4)
