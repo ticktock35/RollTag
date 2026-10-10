@@ -81,6 +81,35 @@ final class FootageFilterTests: XCTestCase {
         XCTAssertFalse(FootageFilter.include(footage: clip(relativePath: "malaysia/a.mov"), isOnline: false, selection: folder, isDuplicate: false))
     }
 
+    func testGPXSelectionShowsAssignedFolderFilesInTrackSpan() {
+        let warehouse = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        var inSpan = clip(relativePath: "japan/a.jpg")
+        inSpan.capturedAt = t0.addingTimeInterval(30)
+        var outside = clip(id: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", relativePath: "japan/b.jpg")
+        outside.capturedAt = t0.addingTimeInterval(400)
+        var otherFolder = clip(id: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD", relativePath: "korea/c.jpg")
+        otherFolder.capturedAt = t0.addingTimeInterval(30)
+        let gpx = WarehouseGPXState(
+            tracks: [
+                ImportedGPXTrack(
+                    filename: "walk.gpx",
+                    track: GPXTrack(points: [
+                        GPXPoint(time: t0, latitude: 1, longitude: 2, altitude: nil),
+                        GPXPoint(time: t0.addingTimeInterval(120), latitude: 3, longitude: 4, altitude: nil),
+                    ])
+                )
+            ],
+            assignments: ["japan": "walk.gpx"],
+            offsets: [:]
+        )
+        let selection = SidebarSelection.gpx(warehouse, "walk.gpx")
+        XCTAssertTrue(FootageFilter.include(footage: inSpan, isOnline: true, selection: selection, isDuplicate: false, gpx: gpx))
+        XCTAssertFalse(FootageFilter.include(footage: outside, isOnline: true, selection: selection, isDuplicate: false, gpx: gpx))
+        XCTAssertFalse(FootageFilter.include(footage: otherFolder, isOnline: true, selection: selection, isDuplicate: false, gpx: gpx))
+        XCTAssertFalse(FootageFilter.include(footage: inSpan, isOnline: true, selection: selection, isDuplicate: false, gpx: .empty))
+    }
+
     func testWorkFoldersKeepUntaggedAndDuplicatesInsideThoseDirectories() {
         let warehouse = UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!
         let johor = clip(relativePath: "malaysia/johor/a.mov")

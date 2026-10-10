@@ -11,15 +11,6 @@ struct SidebarView: View {
                 }
             }
 
-            if !model.populatedTagCategories.isEmpty {
-                Section(String(localized: "sidebar.categories")) {
-                    ForEach(model.populatedTagCategories) { category in
-                        Label(category.title, systemImage: "folder")
-                            .tag(SidebarSelection.tagCategory(category.id))
-                    }
-                }
-            }
-
             Section(String(localized: "sidebar.warehouses")) {
                 ForEach(model.warehouses) { warehouse in
                     OutlineGroup(
@@ -36,6 +27,9 @@ struct SidebarView: View {
                         if node.isWarehouseRoot {
                             warehouseRow(warehouse)
                                 .tag(SidebarSelection.warehouse(warehouse.id))
+                                .contextMenu {
+                                    gpxFolderMenu(warehouse: warehouse, folder: "")
+                                }
                         } else {
                             let ref = FolderRef(warehouseID: warehouse.id, relativePath: node.relativePath)
                             HStack(spacing: 6) {
@@ -53,9 +47,34 @@ struct SidebarView: View {
                             }
                             .tag(SidebarSelection.warehouseFolder(warehouse.id, node.relativePath))
                             .help(node.relativePath)
+                            .contextMenu {
+                                gpxFolderMenu(warehouse: warehouse, folder: node.relativePath)
+                            }
                         }
                     }
                     .opacity(warehouse.isOnline ? 1 : 0.7)
+                }
+            }
+
+            if !model.populatedTagCategories.isEmpty {
+                Section(String(localized: "sidebar.categories")) {
+                    ForEach(model.populatedTagCategories) { category in
+                        Label(category.title, systemImage: "folder")
+                            .tag(SidebarSelection.tagCategory(category.id))
+                    }
+                }
+            }
+
+            if model.hasImportedGPX {
+                Section(String(localized: "sidebar.gpx")) {
+                    ForEach(model.warehouses.filter { !$0.gpx.tracks.isEmpty }) { warehouse in
+                        ForEach(warehouse.gpx.tracks) { track in
+                            Label(gpxRowTitle(warehouse: warehouse, track: track), systemImage: "point.topleft.down.to.point.bottomright.curved")
+                                .tag(SidebarSelection.gpx(warehouse.id, track.filename))
+                                .badge(model.gpxMatchCount(warehouse: warehouse, filename: track.filename))
+                                .help(warehouse.preference.name)
+                        }
+                    }
                 }
             }
         }
@@ -89,6 +108,64 @@ struct SidebarView: View {
         } else {
             row
         }
+    }
+
+    @ViewBuilder
+    private func gpxFolderMenu(warehouse: WarehouseRuntime, folder: String) -> some View {
+        if warehouse.isOnline {
+            if warehouse.gpx.tracks.isEmpty {
+                Button(String(localized: "gpx.import.menu")) {
+                    model.chooseGPXFile(for: warehouse.id)
+                }
+            } else {
+                Menu(String(localized: "gpx.apply")) {
+                    ForEach(warehouse.gpx.tracks) { track in
+                        Button {
+                            model.applyGPX(track.filename, toFolder: folder, warehouseID: warehouse.id)
+                        } label: {
+                            if model.effectiveGPXFilename(warehouseID: warehouse.id, folder: folder) == track.filename {
+                                Label(track.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(track.displayName)
+                            }
+                        }
+                    }
+                    if model.hasDirectGPXAssignment(warehouseID: warehouse.id, folder: folder) {
+                        Divider()
+                        Button(String(localized: "gpx.clear")) {
+                            model.clearGPXAssignment(folder: folder, warehouseID: warehouse.id)
+                        }
+                    }
+                }
+                Menu(String(localized: "gpx.offset")) {
+                    let current = model.folderGPXOffset(warehouseID: warehouse.id, folder: folder)
+                    ForEach(GPXOffsetStore.presets, id: \.self) { minutes in
+                        Button {
+                            model.setFolderGPXOffset(minutes, folder: folder, warehouseID: warehouse.id)
+                        } label: {
+                            if minutes == current {
+                                Label(offsetLabel(minutes), systemImage: "checkmark")
+                            } else {
+                                Text(offsetLabel(minutes))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func gpxRowTitle(warehouse: WarehouseRuntime, track: ImportedGPXTrack) -> String {
+        let named = model.warehouses.filter { !$0.gpx.tracks.isEmpty }
+        if named.count > 1 {
+            return "\(warehouse.preference.name) / \(track.displayName)"
+        }
+        return track.displayName
+    }
+
+    private func offsetLabel(_ minutes: Int) -> String {
+        if minutes == 0 { return "0" }
+        return minutes > 0 ? "+\(minutes)" : "\(minutes)"
     }
 
     private func warehouseRow(_ warehouse: WarehouseRuntime) -> some View {

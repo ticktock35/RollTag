@@ -6,19 +6,22 @@ enum FootageFilter {
         isOnline: Bool,
         selection: SidebarSelection,
         isDuplicate: Bool,
-        folderScopes: Set<FolderRef> = []
+        folderScopes: Set<FolderRef> = [],
+        gpx: WarehouseGPXState = .empty
     ) -> Bool {
         guard matchesSelection(
             footage: footage,
             isOnline: isOnline,
             selection: selection,
             isDuplicate: isDuplicate,
-            folderScopes: folderScopes
+            folderScopes: folderScopes,
+            gpx: gpx
         ) else { return false }
         return matchesScopes(footage: footage, scopes: resolvedScopes(selection: selection, folderScopes: folderScopes))
     }
 
     static func resolvedScopes(selection: SidebarSelection, folderScopes: Set<FolderRef>) -> Set<FolderRef> {
+        if case .gpx = selection { return [] }
         if !folderScopes.isEmpty { return folderScopes }
         if case .warehouseFolder(let id, let path) = selection {
             return [FolderRef(warehouseID: id, relativePath: path)]
@@ -50,7 +53,8 @@ enum FootageFilter {
         isOnline: Bool,
         selection: SidebarSelection,
         isDuplicate: Bool,
-        folderScopes: Set<FolderRef>
+        folderScopes: Set<FolderRef>,
+        gpx: WarehouseGPXState
     ) -> Bool {
         switch selection {
         case .collection(.all):
@@ -71,6 +75,16 @@ enum FootageFilter {
                 return footage.warehouseID == id
             }
             return true
+        case .gpx(let id, let filename):
+            guard isOnline, footage.status == .available, footage.warehouseID == id else { return false }
+            guard let imported = gpx.track(named: filename) else { return false }
+            return GPXMatcher.belongs(
+                footage: footage,
+                filename: filename,
+                track: imported.track,
+                assignments: gpx.assignments,
+                offsets: gpx.offsets
+            )
         case .tagCategory(let category):
             return isOnline
                 && footage.status == .available
@@ -112,7 +126,8 @@ enum FootageFilter {
                     isOnline: warehouse.isOnline,
                     selection: selection,
                     isDuplicate: false,
-                    folderScopes: folderScopes
+                    folderScopes: folderScopes,
+                    gpx: warehouse.gpx
                 ) else { return nil }
                 return footage.id
             }

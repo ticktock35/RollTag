@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 struct WarehouseRuntime: Identifiable, Hashable {
     var preference: WarehousePreference
@@ -8,6 +9,7 @@ struct WarehouseRuntime: Identifiable, Hashable {
     var isReconciling: Bool
     var footage: [Footage]
     var groups: [DuplicateGroup]
+    var gpx: WarehouseGPXState
     var footageByID: [UUID: Footage]
     var folderNodes: [WarehouseFolderNode]
 
@@ -18,13 +20,15 @@ struct WarehouseRuntime: Identifiable, Hashable {
         isOnline: Bool,
         isReconciling: Bool,
         footage: [Footage],
-        groups: [DuplicateGroup]
+        groups: [DuplicateGroup],
+        gpx: WarehouseGPXState = .empty
     ) {
         self.preference = preference
         self.isOnline = isOnline
         self.isReconciling = isReconciling
         self.footage = footage
         self.groups = groups
+        self.gpx = gpx
         self.footageByID = Dictionary(uniqueKeysWithValues: footage.map { ($0.id, $0) })
         self.folderNodes = WarehouseFolderTree.nodes(warehouseID: preference.id, from: footage)
     }
@@ -75,6 +79,7 @@ final class AppModel {
     var isBusy = false
     var showDuplicates = false
     var showShortcuts = false
+    var showHelp = false
     var showSettings = false
     var scanProgress: ScanProgress?
     var focusedFootageID: UUID?
@@ -339,7 +344,7 @@ final class AppModel {
             if !workFolders.contains(ref) {
                 workFolders = [ref]
             }
-        case .warehouse:
+        case .warehouse, .gpx:
             workFolders = []
         default:
             break
@@ -388,7 +393,8 @@ final class AppModel {
                 isOnline: online,
                 isReconciling: existing?.isReconciling ?? false,
                 footage: online ? (existing?.footage ?? []) : (existing?.footage ?? []),
-                groups: existing?.groups ?? []
+                groups: existing?.groups ?? [],
+                gpx: existing?.gpx ?? .empty
             )
         }
     }
@@ -531,6 +537,185 @@ final class AppModel {
         panel.prompt = String(localized: "warehouse.add")
         if panel.runModal() == .OK, let url = panel.url {
             addWarehouse(url: url)
+        }
+    }
+
+    var canImportGPX: Bool {
+        warehouses.contains(where: \.isOnline)
+    }
+
+    func chooseGPXFile(for warehouseID: UUID? = nil) {
+        guard let warehouse = gpxTargetWarehouse(id: warehouseID) else {
+            statusMessage = String(localized: "gpx.import.needWarehouse")
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [UTType(filenameExtension: "gpx") ?? .xml]
+        panel.prompt = String(localized: "gpx.import.choose")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importGPX(url: url, warehouse: warehouse)
+    }
+
+    func applyGPX(_ filename: String, toFolder path: String, warehouseID: UUID) {
+        guard let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline else { return }
+        guard let imported = warehouse.gpx.track(named: filename) else { return }
+        let folder = WarehouseFolderTree.normalize(path)
+        var assignments = warehouse.gpx.assignments
+        assignments[folder] = filename
+        do {
+            try GPXAssignmentStore.save(assignments, root: warehouse.preference.url)
+            let db = try openDatabase(for: warehouse.preference)
+            var matching = 0
+            var wrote = 0
+            for footage in warehouse.footage {
+                guard footage.status == .available else { continue }
+                guard footage.mediaKind == .image || footage.mediaKind == .video else { continue }
+                guard WarehouseFolderTree.contains(directoryPath: footage.directoryPath, folder: folder) else {
+                    continue
+                }
+                guard GPXMatcher.assignedTrack(directoryPath: footage.directoryPath, assignments: assignments) == filename else {
+                    continue
+                }
+                guard let capturedAt = footage.capturedAt else { continue }
+                let minutes = warehouse.gpx.offsets[GPXMatcher.folder(of: footage.relativePath)] ?? 0
+                let adjusted = capturedAt.addingTimeInterval(TimeInterval(minutes * 60))
+                guard let point = imported.track.location(at: adjusted) else { continue }
+                matching += 1
+                var capture = footage.captureMetadata
+                guard GPXMatcher.shouldWriteGPS(capture) else { continue }
+                capture.latitude = point.latitude
+                capture.longitude = point.longitude
+                capture.altitude = point.altitude
+                capture.gpsSource = .gpx
+                try db.updateCaptureMetadata(id: footage.id, capture: capture)
+                wrote += 1
+            }
+            reloadFootage()
+            sidebarSelection = .gpx(warehouseID, filename)
+            statusMessage = String(
+                format: String(localized: "gpx.applied"),
+                locale: .current,
+                imported.displayName,
+                matching,
+                wrote
+            )
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func clearGPXAssignment(folder path: String, warehouseID: UUID) {
+        guard let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline else { return }
+        let folder = WarehouseFolderTree.normalize(path)
+        var assignments = warehouse.gpx.assignments
+        guard assignments.removeValue(forKey: folder) != nil else { return }
+        do {
+            try GPXAssignmentStore.save(assignments, root: warehouse.preference.url)
+            reloadFootage()
+            statusMessage = String(localized: "gpx.cleared")
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func setFolderGPXOffset(_ minutes: Int, folder path: String, warehouseID: UUID) {
+        guard let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline else { return }
+        let folder = WarehouseFolderTree.normalize(path)
+        var offsets = warehouse.gpx.offsets
+        offsets[folder] = minutes
+        do {
+            try GPXOffsetStore.save(offsets, root: warehouse.preference.url)
+            reloadFootage()
+            statusMessage = String(
+                format: String(localized: "gpx.offsetSet"),
+                locale: .current,
+                minutes
+            )
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func effectiveGPXFilename(warehouseID: UUID, folder: String) -> String? {
+        warehouses.first(where: { $0.id == warehouseID }).flatMap {
+            GPXMatcher.assignedTrack(directoryPath: folder, assignments: $0.gpx.assignments)
+        }
+    }
+
+    func hasDirectGPXAssignment(warehouseID: UUID, folder: String) -> Bool {
+        warehouses.first(where: { $0.id == warehouseID })?.gpx.assignments[WarehouseFolderTree.normalize(folder)] != nil
+    }
+
+    func folderGPXOffset(warehouseID: UUID, folder: String) -> Int {
+        warehouses.first(where: { $0.id == warehouseID })?.gpx.offsets[WarehouseFolderTree.normalize(folder)] ?? 0
+    }
+
+    func gpxMatchCount(warehouse: WarehouseRuntime, filename: String) -> Int {
+        guard warehouse.isOnline, let imported = warehouse.gpx.track(named: filename) else { return 0 }
+        return warehouse.footage.filter {
+            GPXMatcher.belongs(
+                footage: $0,
+                filename: filename,
+                track: imported.track,
+                assignments: warehouse.gpx.assignments,
+                offsets: warehouse.gpx.offsets
+            )
+        }.count
+    }
+
+    func gpxDisplayName(warehouseID: UUID, filename: String) -> String {
+        warehouses.first(where: { $0.id == warehouseID })?.gpx.track(named: filename)?.displayName
+            ?? (filename as NSString).deletingPathExtension
+    }
+
+    var hasImportedGPX: Bool {
+        warehouses.contains { !$0.gpx.tracks.isEmpty }
+    }
+
+    private func gpxTargetWarehouse(id: UUID? = nil) -> WarehouseRuntime? {
+        if let id, let warehouse = warehouses.first(where: { $0.id == id }), warehouse.isOnline {
+            return warehouse
+        }
+        switch sidebarSelection {
+        case .gpx(let warehouseID, _), .warehouse(let warehouseID), .warehouseFolder(let warehouseID, _):
+            if let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline {
+                return warehouse
+            }
+        default:
+            break
+        }
+        if let focused = focusedFootage,
+           let warehouse = warehouses.first(where: { $0.id == focused.warehouseID }),
+           warehouse.isOnline {
+            return warehouse
+        }
+        let scopedIDs = Set(workFolders.map(\.warehouseID))
+        let scoped = warehouses.filter { $0.isOnline && scopedIDs.contains($0.id) }
+        if scoped.count == 1 { return scoped[0] }
+        let online = warehouses.filter(\.isOnline)
+        if online.count == 1 { return online[0] }
+        return online.first
+    }
+
+    private func importGPX(url: URL, warehouse: WarehouseRuntime) {
+        do {
+            let data = try Data(contentsOf: url)
+            _ = try GPXDocument.parse(data: data)
+            let copied = try GPXOffsetStore.copyTrack(from: url, root: warehouse.preference.url)
+            reloadFootage()
+            sidebarSelection = .gpx(warehouse.id, copied.lastPathComponent)
+            statusMessage = String(
+                format: String(localized: "gpx.imported"),
+                locale: .current,
+                (copied.lastPathComponent as NSString).deletingPathExtension
+            )
+        } catch GPXParseError.empty {
+            statusMessage = String(localized: "gpx.import.empty")
+        } catch {
+            statusMessage = error.localizedDescription
         }
     }
 
@@ -1144,7 +1329,8 @@ final class AppModel {
             isOnline: current.isOnline,
             isReconciling: current.isReconciling,
             footage: footage,
-            groups: groups
+            groups: groups,
+            gpx: current.gpx
         )
         rebuildVisibleResults()
     }
@@ -1239,7 +1425,8 @@ final class AppModel {
             capturedAtSource: footage.capturedAtSource,
             latitude: footage.latitude,
             longitude: footage.longitude,
-            altitude: footage.altitude
+            altitude: footage.altitude,
+            gpsSource: footage.gpsSource
         )
         let db = try openDatabase(for: warehouse.preference)
         if existing == nil {
@@ -1271,7 +1458,8 @@ final class AppModel {
             capturedAtSource: footage.capturedAtSource,
             latitude: footage.latitude,
             longitude: footage.longitude,
-            altitude: footage.altitude
+            altitude: footage.altitude,
+            gpsSource: footage.gpsSource
         )
         upsertFootage(created)
         return created
@@ -1296,7 +1484,8 @@ final class AppModel {
             isOnline: current.isOnline,
             isReconciling: current.isReconciling,
             footage: list,
-            groups: current.groups
+            groups: current.groups,
+            gpx: current.gpx
         )
         rebuildVisibleResults()
     }
@@ -1893,8 +2082,10 @@ final class AppModel {
         warehouseName: String,
         warehouseID: UUID
     ) async throws {
-        let pending = outcome.records.filter {
-            $0.status == .available && $0.capturedAt == nil && ($0.capturedAtLocal == nil || $0.capturedAtLocal?.isEmpty == true)
+        let pending = outcome.records.filter { record in
+            guard record.status == .available else { return false }
+            let missingTime = record.capturedAt == nil && (record.capturedAtLocal == nil || record.capturedAtLocal?.isEmpty == true)
+            return record.needsReanalysis || missingTime
         }
         guard !pending.isEmpty else { return }
         let skipImplausible = preference.ai.skipImplausibleCaptureDates
@@ -1907,9 +2098,13 @@ final class AppModel {
                     let record = pending[index]
                     submitted += 1
                     let source = root.appendingPathComponent(record.relativePath)
+                    let stored = record.captureMetadata
+                    let replaceTime = record.needsReanalysis || (
+                        stored.capturedAt == nil && (stored.capturedAtLocal == nil || stored.capturedAtLocal?.isEmpty == true)
+                    )
                     group.addTask {
-                        let capture = await MediaMetadata.read(url: source, skipImplausibleHeader: skipImplausible)
-                        return (index, record.id, record.relativePath, capture)
+                        let live = await MediaMetadata.read(url: source, skipImplausibleHeader: skipImplausible)
+                        return (index, record.id, record.relativePath, stored.merging(live: live, replaceTime: replaceTime))
                     }
                 }
             }
@@ -1952,7 +2147,8 @@ final class AppModel {
                     isOnline: true,
                     isReconciling: existing?.isReconciling ?? false,
                     footage: (try? db.allFootage()) ?? [],
-                    groups: (try? db.duplicateGroups()) ?? []
+                    groups: (try? db.duplicateGroups()) ?? [],
+                    gpx: GPXLibrary.load(root: item.url)
                 )
             }
             return WarehouseRuntime(
@@ -1960,7 +2156,8 @@ final class AppModel {
                 isOnline: false,
                 isReconciling: false,
                 footage: existing?.footage ?? [],
-                groups: existing?.groups ?? []
+                groups: existing?.groups ?? [],
+                gpx: existing?.gpx ?? .empty
             )
         }
         rebuildVisibleResults()
@@ -1992,7 +2189,8 @@ final class AppModel {
                     isOnline: context.isOnline,
                     selection: sidebarSelection,
                     isDuplicate: duplicateIDs.contains(footage.id),
-                    folderScopes: workFolders
+                    folderScopes: workFolders,
+                    gpx: warehouse.gpx
                 ) else { return nil }
                 return (footage, context)
             }
@@ -2234,7 +2432,7 @@ final class AppModel {
         guard let window = NSApp.keyWindow else { return false }
         if isTrimKeyWindow || isSettingsKeyWindow { return false }
         let id = window.identifier?.rawValue ?? ""
-        return id != "duplicates" && id != "shortcuts"
+        return id != "duplicates" && id != "shortcuts" && id != "help"
     }
 
     static func isFocusInSidebar(_ window: NSWindow? = NSApp.keyWindow) -> Bool {

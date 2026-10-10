@@ -72,7 +72,8 @@ final class WarehouseDatabase {
                 capturedAtSource: capture.capturedAtSource,
                 latitude: capture.latitude,
                 longitude: capture.longitude,
-                altitude: capture.altitude
+                altitude: capture.altitude,
+                gpsSource: capture.gpsSource
             )
         }
     }
@@ -415,6 +416,9 @@ final class WarehouseDatabase {
         if let altitude = capture.altitude {
             object["altitude"] = altitude
         }
+        if let gpsSource = capture.gpsSource {
+            object["gpsSource"] = gpsSource.rawValue
+        }
         guard !object.isEmpty,
               let data = try? JSONSerialization.data(withJSONObject: object)
         else { return nil }
@@ -436,6 +440,11 @@ final class WarehouseDatabase {
         snapshot.latitude = doubleValue(object["latitude"])
         snapshot.longitude = doubleValue(object["longitude"])
         snapshot.altitude = doubleValue(object["altitude"])
+        if let rawGPS = object["gpsSource"] as? String {
+            snapshot.gpsSource = GPSSource(rawValue: rawGPS)
+        } else if snapshot.hasGPS {
+            snapshot.gpsSource = .header
+        }
         return snapshot
     }
 
@@ -560,7 +569,8 @@ extension Footage {
             capturedAtSource: capturedAtSource,
             latitude: latitude,
             longitude: longitude,
-            altitude: altitude
+            altitude: altitude,
+            gpsSource: gpsSource
         )
     }
 }

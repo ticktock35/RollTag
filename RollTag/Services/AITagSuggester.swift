@@ -73,6 +73,7 @@ enum AITagSuggester {
             next.latitude = live.latitude
             next.longitude = live.longitude
             next.altitude = live.altitude
+            next.gpsSource = live.gpsSource
         }
         return next
     }

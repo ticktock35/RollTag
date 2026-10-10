@@ -33,6 +33,7 @@ struct FootageSnapshot: Equatable, Sendable {
     var latitude: Double? = nil
     var longitude: Double? = nil
     var altitude: Double? = nil
+    var gpsSource: GPSSource? = nil
 
     var directoryPath: String {
         let dir = (relativePath as NSString).deletingLastPathComponent
@@ -47,7 +48,8 @@ struct FootageSnapshot: Equatable, Sendable {
             capturedAt: capturedAt,
             capturedAtLocal: capturedAtLocal,
             capturedAtHasTimeZone: capturedAtHasTimeZone,
-            capturedAtSource: capturedAtSource
+            capturedAtSource: capturedAtSource,
+            gpsSource: gpsSource
         )
     }
 }
@@ -120,6 +122,9 @@ enum MediaConstants {
     static let rolltagDirectory = ".rolltag"
     static let databaseName = "warehouse.sqlite"
     static let thumbsDirectory = "thumbs"
+    static let gpxDirectory = "gpx"
+    static let gpxOffsetsName = "gpx-offsets.json"
+    static let gpxAssignmentsName = "gpx-assignments.json"
     static let trimmedDirectory = "trimmed"
     static let minimumPlayableVideoBytes: Int64 = 8 * 1024
 }

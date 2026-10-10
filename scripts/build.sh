@@ -28,6 +28,9 @@ Options:
   --install  Copy to /Applications (or ~/Applications) and open it.
              Finder lists it there. macOS Apps / Gemini grids often hide unsigned local builds.
   -h         Show this help
+
+A Release build also writes build/RollTag.zip (app + first-launch note)
+for GitHub Releases.
 EOF
 }
 
@@ -98,6 +101,18 @@ dest="$root/build/RollTag.app"
 rm -rf "$dest"
 ditto "$product" "$dest"
 
+zip=""
+if [[ "$configuration" == "Release" ]]; then
+  dist="$root/build/dist/RollTag"
+  rm -rf "$root/build/dist"
+  mkdir -p "$dist"
+  ditto "$dest" "$dist/RollTag.app"
+  cp "$root/scripts/first-launch.txt" "$dist/第一次打開.txt"
+  zip="$root/build/RollTag.zip"
+  rm -f "$zip"
+  ditto -c -k --keepParent "$dist" "$zip"
+fi
+
 if [[ "$run_tests" -eq 1 ]]; then
   echo "Running tests…"
   xcodebuild \
@@ -129,6 +144,10 @@ fi
 
 echo
 echo "App: $dest"
+if [[ -n "$zip" ]]; then
+  echo "Zip for GitHub Releases: $zip"
+  echo "Paste scripts/github-release-notes.md into the Release description so people see Gatekeeper steps before they download."
+fi
 if [[ -n "$install_dest" ]]; then
   echo "Installed: $install_dest"
   echo "Finder → Applications has it. macOS Apps / Gemini icon grids often hide unsigned local builds."

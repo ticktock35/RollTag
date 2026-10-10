@@ -110,7 +110,14 @@ struct InspectorView: View {
                 }
                 if footage.captureMetadata.hasGPS, let latitude = footage.latitude, let longitude = footage.longitude {
                     LabeledContent(String(localized: "inspector.gps")) {
-                        Text(gpsText(latitude: latitude, longitude: longitude, altitude: footage.altitude))
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(gpsText(latitude: latitude, longitude: longitude, altitude: footage.altitude))
+                            if footage.captureMetadata.resolvedGPSSource == .gpx {
+                                Text(String(localized: "inspector.gpsSource.gpx"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
                 if let width = footage.width, let height = footage.height, width > 0, height > 0 {

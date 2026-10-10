@@ -8,6 +8,11 @@ enum CaptureTimeSource: String, Codable, Equatable, Sendable {
     case fileDate
 }
 
+enum GPSSource: String, Codable, Equatable, Sendable {
+    case header
+    case gpx
+}
+
 struct MediaMetadataSnapshot: Equatable, Sendable {
     var latitude: Double?
     var longitude: Double?
@@ -16,8 +21,31 @@ struct MediaMetadataSnapshot: Equatable, Sendable {
     var capturedAtLocal: String?
     var capturedAtHasTimeZone: Bool = false
     var capturedAtSource: CaptureTimeSource?
+    var gpsSource: GPSSource?
 
     var hasGPS: Bool { latitude != nil && longitude != nil }
+
+    var resolvedGPSSource: GPSSource? {
+        guard hasGPS else { return nil }
+        return gpsSource ?? .header
+    }
+
+    func merging(live: MediaMetadataSnapshot, replaceTime: Bool) -> MediaMetadataSnapshot {
+        var next = self
+        if replaceTime {
+            next.capturedAt = live.capturedAt
+            next.capturedAtLocal = live.capturedAtLocal
+            next.capturedAtHasTimeZone = live.capturedAtHasTimeZone
+            next.capturedAtSource = live.capturedAtSource
+        }
+        if live.hasGPS {
+            next.latitude = live.latitude
+            next.longitude = live.longitude
+            next.altitude = live.altitude
+            next.gpsSource = live.gpsSource ?? .header
+        }
+        return next
+    }
 
     func capturedAtForAI() -> String? {
         if !capturedAtHasTimeZone, let capturedAtLocal, !capturedAtLocal.isEmpty {
@@ -51,7 +79,8 @@ enum MediaMetadata {
         var snapshot = MediaMetadataSnapshot(
             latitude: header.latitude,
             longitude: header.longitude,
-            altitude: header.altitude
+            altitude: header.altitude,
+            gpsSource: header.latitude != nil && header.longitude != nil ? .header : nil
         )
 
         if let headerTime = header.time, !skipImplausibleHeader || isPlausible(headerTime) {

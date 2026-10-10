@@ -21,6 +21,16 @@ struct ContentView: View {
             .navigationSplitViewStyle(.prominentDetail)
             .navigationTitle(title)
             .toolbar(model.playback.isFullscreen ? .hidden : .automatic)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        model.showHelp = true
+                    } label: {
+                        Label(String(localized: "help.title"), systemImage: "book")
+                    }
+                    .help(String(localized: "help.open"))
+                }
+            }
 
             FullscreenOverlay(model: model)
         }
@@ -35,6 +45,12 @@ struct ContentView: View {
             if shouldOpen {
                 openWindow(id: "shortcuts")
                 model.showShortcuts = false
+            }
+        }
+        .onChange(of: model.showHelp) { _, shouldOpen in
+            if shouldOpen {
+                openWindow(id: "help")
+                model.showHelp = false
             }
         }
         .onChange(of: model.trimSession) { _, session in
@@ -213,6 +229,8 @@ struct ContentView: View {
                 model.warehouses.first(where: { $0.id == id })?.preference.name ?? String(localized: "app.name")
             case .warehouseFolder(let id, let path):
                 folderTitle(warehouseID: id, path: path)
+            case .gpx(let id, let filename):
+                model.gpxDisplayName(warehouseID: id, filename: filename)
             case .tagCategory(let id):
                 model.populatedTagCategories.first(where: { $0.id == id })?.title
                     ?? model.catalog.categories.first(where: { $0.id == id })?.localizedName(locale: TagCatalogLoader.localeID(from: locale))

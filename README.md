@@ -43,6 +43,20 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 4. 批次 AI 可幫忙分主題與地點（有 GPS 的會先寫地名）；仍請抽查，尤其是人或情緒。
 5. 進「重複檔」清掉 RAW＋JPEG＋備份裡多出來的那份，硬碟會空出很多。
 
+### 同一張照片、同一支影片存了很多份
+
+**常遇到：** 相機同時存 RAW 和 JPEG；手機備份又整包拷到外接碟；同一個資料夾被複製過一次。Finder 看檔名幾乎一樣，不知道哪份才該留。
+
+**可以這樣用：**
+
+1. 把這些資料夾或硬碟拖進 RollTag，等背景掃完。
+2. 點左側「重複檔」，或按 **⌘⇧D**。上半並排比較目錄與畫面，下半一組一組處理。
+3. **A** 留最左、**D** 留最右、**S** 這一組全留下。看清楚後按 **Enter**，沒留下的進垃圾桶。不確定時可按 **P** 全螢幕看選中的那一支。
+4. 只想清某次旅行：先勾那個資料夾，重複檔就只列有檔落在裡面的組。
+5. 不想處理的組可以先跳過，徽章數字是還沒處理完的組數。
+
+刪的是進垃圾桶的複本，原檔位置不變。刪倉庫不會刪硬碟上的檔。
+
 ### 硬碟裡堆了很多照片短片的一般人
 
 **常遇到：** 外接碟放了好幾年的手機備份。Finder 開資料夾很慢，Preview 一次只能看一個檔，也不知道某次聚會的影片在哪。
@@ -74,9 +88,11 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 
 ### 用現成的 App
 
-1. 到 [GitHub Releases](https://github.com/ticktock35/RollTag/releases) 下載最新的 `.app` 壓縮檔，解壓後**拖進「應用程式」（Applications）**。放在下載區或專案資料夾時，Finder 的應用程式清單不會列出它。macOS 26 的 Apps／Gemini 圖示格子常略過未公證的本機簽章 App，請用格子搜尋、Finder → 應用程式，或拖到 Dock。
-2. 第一次開啟若被系統擋下：在 Finder 對 App **按右鍵 → 打開**，再按打開。這是因為目前用本機簽章，不是 App Store。
-3. 關閉最後一個視窗或按 ⌘Q 就會結束。
+1. 到 [GitHub Releases](https://github.com/ticktock35/RollTag/releases) 看該筆說明（第一次打開的步驟寫在下載按鈕上面），再下載 `RollTag.zip`。
+2. 解開後同一層有 `RollTag.app` 與「第一次打開.txt」。把 App **拖進「應用程式」（Applications）**。留在下載區時，Finder 的應用程式清單不會列出它。
+3. 第一次開啟若被系統擋下：在 Finder 對 App **按右鍵 → 打開**，再按打開。這是因為目前用本機簽章，不是 App Store，也還沒公證。
+4. macOS 26 的 Apps／Gemini 圖示格子常略過未公證的本機簽章 App，請用格子搜尋、Finder → 應用程式，或拖到 Dock。
+5. 關閉最後一個視窗或按 ⌘Q 就會結束。
 
 ### 從原始碼建置
 
@@ -101,11 +117,11 @@ cd RollTag
 ./scripts/build.sh --install
 ```
 
-建好的 App 會在 `build/RollTag.app`，`--install` 再複製到「應用程式」並打開。本機簽章，不必選 Team。macOS 26 的 Apps 格子不一定會列出它。
+建好的 App 會在 `build/RollTag.app`，Release 建置還會打出 `build/RollTag.zip`（App 加上「第一次打開.txt」）方便上傳 GitHub Releases。`--install` 再複製到「應用程式」並打開。本機簽章，不必選 Team。macOS 26 的 Apps 格子不一定會列出它。
 
 | 指令 | 做什麼 |
 |---|---|
-| `./scripts/build.sh` | Release 建置，輸出 `build/RollTag.app` |
+| `./scripts/build.sh` | Release 建置，輸出 `build/RollTag.app` 與可上傳的 `build/RollTag.zip` |
 | `./scripts/build.sh --debug` | Debug 建置 |
 | `./scripts/build.sh --test` | 建置後跑單元測試 |
 | `./scripts/build.sh --run` | 建完就打開 App（仍在專案 `build/`） |
@@ -149,8 +165,9 @@ open RollTag.xcodeproj
 
 - 左側是智慧列表（全部、已打標、未打標、找不到、重複檔）與已用過的分類。
 - 倉庫可展開看目錄。點一層或勾幾個資料夾，搜尋、打標與重複檔只先做那些範圍；點倉庫名或「看整倉」回到整庫。
-- 右半最上緣有加框的搜尋欄與排序。只搜現在插著、讀得到的倉庫。
+- 右半最上緣有加框的搜尋欄與排序。只搜現在插著、讀得到的倉庫。視窗最右上打開的書可開使用說明（加入倉庫、看圖／看影片、重複檔、快捷鍵、搜標、AI／批次打標、GPX）。
 - 點一支：左上看原檔（影片載入播放器、照片依螢幕大小從原檔解），右側看路徑、拍攝時間、GPS（有才顯示）與標籤。格線仍用縮圖。
+- 倉庫選單可匯入 GPX，軌跡會出現在左側 GPX。在倉庫資料夾按右鍵套用哪一條後，落在軌跡時段內的照片／影片會列在該 GPX 底下；缺 GPS 的把座標寫進倉庫（不改原檔）。各資料夾可設相機鐘差。
 - 滑過格子可預覽影片／音訊。
 
 常用快捷鍵（可在設定 → 快捷鍵改；⌘/ 看全部）：
@@ -203,7 +220,7 @@ open RollTag.xcodeproj
   不要分享這個檔，也不要放進公開 git。
 - GPS 反查地名快取：`~/rolltag/geocode-cache.json`
 - 每個倉庫的標籤與縮圖：`<倉庫>/.rolltag/`  
-  切段可存倉庫內或倉庫外；只有存進倉庫才寫這一支的資料。
+  匯入的 GPX 副本、各資料夾鐘差與哪個資料夾套用哪條軌跡也在這裡。切段可存倉庫內或倉庫外；只有存進倉庫才寫這一支的資料。
   跟著硬碟走。
 
 更細的規則以 [SPEC.md](SPEC.md) 為準。
@@ -228,6 +245,8 @@ You do not need an API key to add a warehouse, preview, hand-tag, search, trim, 
 
 **Photographers and travel / event shooters:** mix RAW, JPEG, and phone HEIF in one warehouse. Search by place or people you tagged. Review originals (not tiny thumbs), pinch-zoom in fullscreen, and clear duplicate RAW+JPEG+backup copies.
 
+**People sitting on duplicate photos and videos:** the same shot often exists as RAW + JPEG, a phone backup, and a copied folder. Drop those disks in, open **Duplicates** (or ⌘⇧D), compare side by side, then **A** keep left, **D** keep right, **S** keep all, **Enter** send the rest to Trash. Pin a trip folder first if you only want groups that touch that folder. The sidebar number is unfinished groups, not files.
+
 **Anyone with years of photos and clips on a disk:** drag the disk in, wait for the background scan, and tag only what you will look for again. Unplugging is fine; plug it back in and previous tags are still there. Removing a warehouse does not delete files.
 
 **A first session:** drop one folder → click a few clips → add two hand tags → search for them. Add an AI key later if you want.
@@ -238,7 +257,7 @@ This version is a single-Mac tool. It does not finish a film, host a shared clou
 
 Requires **macOS 14+**.
 
-**Ready-made app:** download the latest `.app` zip from [Releases](https://github.com/ticktock35/RollTag/releases), unzip, and drag it into **Applications**. A copy left in Downloads or the repo will not show up in Finder’s Applications list. On macOS 26 the Apps / Gemini icon grids often hide unsigned local builds — use the grid search field, Finder → Applications, or the Dock. If Gatekeeper blocks the first launch, right-click the app in Finder → **Open**.
+**Ready-made app:** the [Release](https://github.com/ticktock35/RollTag/releases) page itself has first-launch steps above the download button. Download `RollTag.zip`, unzip it (you will see `RollTag.app` and `第一次打開.txt`), and drag the app into **Applications**. A copy left in Downloads will not show up in Finder’s Applications list. If Gatekeeper blocks the first launch, right-click the app in Finder → **Open**. On macOS 26 the Apps / Gemini icon grids often hide unsigned local builds — use the grid search field, Finder → Applications, or the Dock.
 
 **From source** (no Apple Developer account):
 
@@ -263,7 +282,7 @@ That copies the app into Applications and opens it. Finder lists it there. On ma
 ### Use
 
 1. Drop a footage folder or drive on the window, or press **⌘O**. Removing a warehouse only unregisters it; files on disk stay. Unplugged drives go offline until you plug them back in. Rescan with ⌘R.
-2. Browse the sidebar lists and folders. Search and sort sit in a boxed field at the top of the right pane. Click a clip to see its stored thumb. Space or Play loads video/audio. Drag the bar between the player and the file info pane to resize them. P toggles fullscreen; ⌘/ lists shortcuts.
+2. Browse the sidebar lists and folders. Search and sort sit in a boxed field at the top of the right pane. The open-book icon at the far top-right opens the user guide (warehouse, photos / video, duplicates, shortcuts, search, AI / batch tagging, GPX). Click a clip to see its stored thumb. Space or Play loads video/audio. Drag the bar between the player and the file info pane to resize them. P toggles fullscreen; ⌘/ lists shortcuts.
 3. **Hand tags:** select one clip or a similar group, click a preset on the right, or type your own word and press Return. Click a tag to remove it.
 4. **AI tags:** paste a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key in Settings → AI. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag** (keeps tags immediately). Sidebar **Untagged** only sends files with no tags yet; to replace bad AI tags, select those clips in the grid and batch again. A batch of more than 10 files shows **Stop**. While it runs, the banner shows which provider is sending and whether the last clip succeeded or failed; the provider name opens that platform’s usage page. Files with GPS get a place name first and those locality parts are always written as tags (even if the model fails); nearby shots within about 1 km reuse that result. Folder names are hints only and are not written as tags. On-device Vision counts human bodies (toy faces and dog bodies do not count); empty scenes do not get portrait or name tags. Running AI again replaces the previous AI tags and keeps hand / path tags. Existing custom labels such as people’s names are not auto-applied by AI — add those by hand. **AI tags can be wrong — review them.** Later files in a large batch may fail on quota; the status line clears after about 10 seconds. Wait and retry what is still untagged.
 5. **Duplicates:** sidebar or ⌘⇧D. A / D keep one side, S keeps all, Enter sends the rest to Trash. **Trim** on a single video uses an iPhone-style in/out strip; pick a folder and filename, then the new clip is indexed in the background.

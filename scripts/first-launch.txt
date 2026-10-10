@@ -1,0 +1,35 @@
+第一次打開 RollTag
+====================
+
+這個 App 是本機簽章，不是 App Store 下載，目前也還沒有 Apple 公證。
+第一次從網路上打開時，macOS 常會說「無法驗證開發者」、已損壞，或直接擋下。
+
+請這樣開：
+
+1. 把 RollTag 拖進「應用程式」（Applications）。
+   留在「下載項目」裡時，Finder 的應用程式清單不會列出它。
+2. 在 Finder 對 RollTag 按右鍵（或 Control + 點一下）→「打開」。
+3. 再按一次「打開」。
+
+請不要只按兩下。用右鍵打開過一次之後，之後就可以正常開。
+
+macOS 26 的 Apps／Gemini 圖示格子常不列出未公證的本機簽章 App。
+請用格子上方搜尋、打開 Finder → 應用程式，或把 App 拖到 Dock。
+
+
+First launch
+============
+
+This build is signed locally. It is not from the App Store and is not notarized.
+macOS Gatekeeper often blocks the first open after a download
+(“cannot verify the developer”, “damaged”, or it simply won’t launch).
+
+1. Drag RollTag into Applications.
+   A copy left in Downloads will not appear in Finder’s Applications list.
+2. In Finder, right-click (or Control-click) RollTag → Open.
+3. Click Open again.
+
+Do not only double-click. After one right-click Open, later launches are normal.
+
+On macOS 26 the Apps / Gemini icon grids often hide unsigned local builds.
+Use the grid search field, Finder → Applications, or drag the app to the Dock.

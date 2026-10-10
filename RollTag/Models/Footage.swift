@@ -140,6 +140,7 @@ struct Footage: Identifiable, Hashable {
     var latitude: Double? = nil
     var longitude: Double? = nil
     var altitude: Double? = nil
+    var gpsSource: GPSSource? = nil
 
     var directoryPath: String {
         let dir = (relativePath as NSString).deletingLastPathComponent
@@ -167,7 +168,8 @@ struct Footage: Identifiable, Hashable {
                 capturedAt: capturedAt,
                 capturedAtLocal: capturedAtLocal,
                 capturedAtHasTimeZone: capturedAtHasTimeZone,
-                capturedAtSource: capturedAtSource
+                capturedAtSource: capturedAtSource,
+                gpsSource: gpsSource
             )
         }
         set {
@@ -178,6 +180,7 @@ struct Footage: Identifiable, Hashable {
             capturedAtLocal = newValue.capturedAtLocal
             capturedAtHasTimeZone = newValue.capturedAtHasTimeZone
             capturedAtSource = newValue.capturedAtSource
+            gpsSource = newValue.gpsSource
         }
     }
 

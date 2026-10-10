@@ -39,6 +39,10 @@ struct RollTagApp: App {
                     model.chooseWarehouseFolder()
                 }
                 .keyboardShortcut("o", modifiers: [.command])
+                Button(String(localized: "gpx.import.menu")) {
+                    model.chooseGPXFile()
+                }
+                .disabled(!model.canImportGPX)
                 Button(String(localized: "duplicates.title")) {
                     model.showDuplicates = true
                 }
@@ -89,6 +93,9 @@ struct RollTagApp: App {
                 }
             }
             CommandGroup(after: .help) {
+                Button(String(localized: "help.title")) {
+                    model.showHelp = true
+                }
                 Button(String(localized: "shortcuts.title")) {
                     model.showShortcuts = true
                 }
@@ -110,6 +117,11 @@ struct RollTagApp: App {
             ShortcutsView(model: model)
         }
         .defaultSize(width: 540, height: 640)
+
+        Window(String(localized: "help.title"), id: "help") {
+            HelpView(model: model)
+        }
+        .defaultSize(width: 760, height: 640)
 
         Window(String(localized: "trim.title"), id: "trim") {
             if let session = model.trimSession,

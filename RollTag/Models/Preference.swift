@@ -272,6 +272,8 @@ enum SidebarSelection: Hashable {
     case warehouse(UUID)
     /// Relative folder inside a warehouse. Search and the grid stay inside this folder and its descendants.
     case warehouseFolder(UUID, String)
+    /// Imported GPX filename inside a warehouse. Grid shows files whose folder is assigned to this track and whose time falls in the span.
+    case gpx(UUID, String)
     case tagCategory(String)
 }
 
