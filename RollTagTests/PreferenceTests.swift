@@ -50,6 +50,7 @@ final class PreferenceTests: XCTestCase {
         try store.save(file)
         let loaded = try store.load()
         XCTAssertEqual(loaded.ai.selectedProvider, .gemini)
+        XCTAssertTrue(loaded.ai.useJoyTag)
         XCTAssertEqual(loaded.ai.settings(for: .gemini).apiKey, "gem-test")
         XCTAssertTrue(loaded.ai.hasKey(for: .gemini))
         XCTAssertFalse(loaded.ai.hasKey(for: .openai))

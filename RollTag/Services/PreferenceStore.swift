@@ -56,7 +56,21 @@ struct PreferenceStore {
 
     func updateAI(selectedProvider: AIProvider?, in file: PreferenceFile) -> PreferenceFile {
         var next = file
-        next.ai.selectedProvider = selectedProvider
+        if selectedProvider == .joytag {
+            next.ai.useJoyTag = true
+            next.ai.selectedProvider = nil
+        } else {
+            next.ai.selectedProvider = selectedProvider
+        }
+        return next
+    }
+
+    func updateUseJoyTag(_ on: Bool, in file: PreferenceFile) -> PreferenceFile {
+        var next = file
+        next.ai.useJoyTag = on
+        if next.ai.selectedProvider == .joytag {
+            next.ai.selectedProvider = nil
+        }
         return next
     }
 

@@ -5,6 +5,7 @@ import XCTest
 final class AITaggingTests: XCTestCase {
     func testGeminiThenOpenAIWhenAuto() {
         var ai = AIPreference.empty
+        ai.useJoyTag = false
         ai = withKeys(ai, gemini: "g", openai: "o")
         XCTAssertEqual(ai.taggingRoute()?.provider, .gemini)
         XCTAssertEqual(ai.resolvedModel(for: .gemini), "gemini-3.5-flash-lite")
@@ -14,6 +15,7 @@ final class AITaggingTests: XCTestCase {
 
     func testFallsBackToOpenAIWithoutGeminiKey() {
         var ai = AIPreference.empty
+        ai.useJoyTag = false
         ai.providers[.openai] = AIProviderSettings(apiKey: "o", model: "")
         XCTAssertEqual(ai.taggingRoute()?.provider, .openai)
         XCTAssertEqual(ai.taggingRoute()?.model, "gpt-4.1-mini")
@@ -21,6 +23,7 @@ final class AITaggingTests: XCTestCase {
 
     func testSelectedOpenAIGoesFirstButGeminiStaysFallback() {
         var ai = AIPreference.empty
+        ai.useJoyTag = false
         ai.selectedProvider = .openai
         ai = withKeys(ai, gemini: "g", openai: "o")
         XCTAssertEqual(ai.taggingRoutes().map(\.provider), [.openai, .gemini])
@@ -53,9 +56,35 @@ final class AITaggingTests: XCTestCase {
 
     func testUnwiredSelectionStillUsesFrameProviders() {
         var ai = AIPreference.empty
+        ai.useJoyTag = false
         ai.selectedProvider = .twelvelabs
         ai = withKeys(ai, gemini: "g", openai: "")
         XCTAssertEqual(ai.taggingRoute()?.provider, .gemini)
+    }
+
+    func testJoyTagToggleIsFirstPriorityThenCloud() {
+        var ai = AIPreference.empty
+        XCTAssertTrue(ai.useJoyTag)
+        ai = withKeys(ai, gemini: "g", openai: "o")
+        XCTAssertEqual(ai.taggingRoutes().map(\.provider), [.joytag, .gemini, .openai])
+        XCTAssertEqual(ai.taggingRoute()?.model, "joytag")
+        XCTAssertTrue(AIProvider.joytag.supportsFrameTagging)
+        XCTAssertFalse(AIProvider.joytag.needsAPIKey)
+        ai.useJoyTag = false
+        XCTAssertEqual(ai.taggingRoutes().map(\.provider), [.gemini, .openai])
+    }
+
+    func testLegacyJoyTagProviderSelectionBecomesToggle() throws {
+        var stored = AIPreference.empty
+        stored.useJoyTag = false
+        stored.providers[.gemini] = AIProviderSettings(apiKey: "g", model: "")
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(stored)) as! [String: Any]
+        object["selectedProvider"] = "joytag"
+        object.removeValue(forKey: "useJoyTag")
+        let ai = try JSONDecoder().decode(AIPreference.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertTrue(ai.useJoyTag)
+        XCTAssertNil(ai.selectedProvider)
+        XCTAssertEqual(ai.taggingRoutes().map(\.provider), [.joytag, .gemini])
     }
 
     func testContextSendsKnownFileFactsAndOmitsMissingGPS() {

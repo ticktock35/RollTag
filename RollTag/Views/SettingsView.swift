@@ -151,6 +151,11 @@ struct SettingsView: View {
                 Text(String(localized: "settings.ai.detail"))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                joyTagSection
+
+                Divider()
+
                 HStack(spacing: 16) {
                     Link(String(localized: "settings.ai.keys.gemini"), destination: URL(string: "https://aistudio.google.com/api-keys")!)
                     Link(String(localized: "settings.ai.keys.openai"), destination: URL(string: "https://platform.openai.com/api-keys")!)
@@ -192,7 +197,7 @@ struct SettingsView: View {
                     set: { model.selectAIProvider($0) }
                 )) {
                     Text(String(localized: "settings.ai.none")).tag(Optional<AIProvider>.none)
-                    ForEach(AIProvider.allCases) { provider in
+                    ForEach(AIProvider.keyedProviders) { provider in
                         Text(String(localized: String.LocalizationValue(provider.localizationKey))).tag(Optional(provider))
                     }
                 }
@@ -200,7 +205,7 @@ struct SettingsView: View {
 
                 Divider()
 
-                ForEach(AIProvider.allCases) { provider in
+                ForEach(AIProvider.keyedProviders) { provider in
                     providerRow(provider)
                 }
 
@@ -355,6 +360,68 @@ struct SettingsView: View {
                 Text(String(localized: "settings.ai.notWired"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var joyTagSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(
+                get: { model.preference.ai.useJoyTag },
+                set: { model.updateUseJoyTag($0) }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "settings.ai.joytag.toggle"))
+                        .font(.headline)
+                    Text(String(localized: "ai.capability.joytag"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            Text(String(localized: "settings.ai.joytag.privacy"))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let url = AIProvider.joytag.infoURL {
+                Link(String(localized: "settings.ai.joytag.site"), destination: url)
+                    .font(.caption)
+            }
+            Text(String(localized: "settings.ai.joytag.warn"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(String(localized: "settings.ai.joytag.size"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                if model.joyTagDownloading {
+                    ProgressView(value: model.joyTagDownloadFraction)
+                        .frame(maxWidth: 180)
+                    Text("\(Int((model.joyTagDownloadFraction * 100).rounded()))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else if model.joyTagInstalled {
+                    Text(String(localized: "settings.ai.joytag.ready"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button(String(localized: "settings.ai.joytag.delete")) {
+                        model.removeJoyTagModel()
+                    }
+                    .disabled(model.isBusy)
+                } else {
+                    Button(String(localized: "settings.ai.joytag.download")) {
+                        model.downloadJoyTagModel()
+                    }
+                    .disabled(model.isBusy)
+                }
+            }
+            if !model.joyTagStatusMessage.isEmpty {
+                Text(model.joyTagStatusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
         .padding(.vertical, 4)

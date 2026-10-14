@@ -25,7 +25,7 @@ final class AITagClient {
         context: [String: Any] = [:],
         examples: [AITaggingExample] = []
     ) async throws -> [String: Any] {
-        guard !apiKey.isEmpty else { throw AITagError.missingAPIKey }
+        guard provider == .joytag || !apiKey.isEmpty else { throw AITagError.missingAPIKey }
         guard !frames.isEmpty else { throw AITagError.missingFrames }
         let encoded = frames.map { $0.base64EncodedString() }
         let prompt = AITagSuggest.buildPrompt(
@@ -36,6 +36,10 @@ final class AITagClient {
         suggestGeneration += 1
         let token = suggestGeneration
         let task = Task { () -> [String: Any] in
+            if provider == .joytag {
+                try await JoyTagInstaller.shared.ensureInstalled { _ in }
+                return try JoyTagEngine.shared.suggest(frames: frames)
+            }
             let text: String
             switch provider {
             case .gemini:
@@ -52,6 +56,8 @@ final class AITagClient {
                     prompt: prompt,
                     frames: encoded
                 )
+            case .joytag:
+                throw AITagError.unsupportedProvider
             default:
                 throw AITagError.unsupportedProvider
             }

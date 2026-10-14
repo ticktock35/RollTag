@@ -12,7 +12,7 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 
 ## 誰適合、怎麼用
 
-不必填 API key 就能加入倉庫、當看圖／看片瀏覽、手打標、搜尋、切段、找重複。AI 打標是加分項，要自己到設定貼 key，匯入時**不會**自動跑。
+不必填 API key 就能加入倉庫、當看圖／看片瀏覽、手打標、搜尋、切段、找重複。AI 打標預設先用本機 JoyTag（畫面不送出），也可再貼 Gemini／OpenAI key。匯入時**不會**自動跑。
 
 ### 拍片、剪片的人（頻道、活動、後製）
 
@@ -193,12 +193,13 @@ open RollTag.xcodeproj
 
 **AI 給的標可能錯**（地點、情緒、關鍵字都可能不對；人數先由這台 Mac 的 Vision 判斷，仍請看過）。不對的點掉。匯入**不會**自動打標。
 
-先到設定 → AI（⌘,）填一把 key（有兩把更好）：
+先到設定 → AI（⌘,）選一種方式：
 
 - **Gemini：** 用 Google 帳號到 [Google AI Studio API keys](https://aistudio.google.com/api-keys) 建立，貼到設定。說明：[Using Gemini API keys](https://ai.google.dev/gemini-api/docs/api-key)
 - **OpenAI：** 到 [OpenAI API keys](https://platform.openai.com/api-keys) 建立 secret key，貼到設定。帳號可能要先開計費
+- **JoyTag（預設打開、最先打）：** 不必 key。**畫面留在這台 Mac**，不送到 Google 或 OpenAI。模型約 370 MB，存在 `~/rolltag/joytag/`；第一次打標或按下載才抓。標來自 Danbooru 詞表，可能錯或不宜，請看過。失敗才改送已填的 Gemini／OpenAI。設定裡可關掉。
 
-用量由各平台計費。Key 只存在這台 Mac 的 `~/rolltag/config.json`，不要分享那個檔。
+雲端用量由各平台計費。Key 只存在這台 Mac 的 `~/rolltag/config.json`，不要分享那個檔。
 
 然後任選一種方式：
 
@@ -216,7 +217,8 @@ open RollTag.xcodeproj
 
 ### 資料放哪
 
-- 程式設定（倉庫名單、API key、快捷鍵等）：`~/rolltag/config.json`  
+- 程式設定（倉庫名單、API key、快捷鍵等）：`~/rolltag/config.json`
+- JoyTag 本機模型：`~/rolltag/joytag/`  
   不要分享這個檔，也不要放進公開 git。
 - GPS 反查地名快取：`~/rolltag/geocode-cache.json`
 - 每個倉庫的標籤與縮圖：`<倉庫>/.rolltag/`  
@@ -284,7 +286,7 @@ That copies the app into Applications and opens it. Finder lists it there. On ma
 1. Drop a footage folder or drive on the window, or press **⌘O**. Removing a warehouse only unregisters it; files on disk stay. Unplugged drives go offline until you plug them back in. Rescan with ⌘R.
 2. Browse the sidebar lists and folders. Search and sort sit in a boxed field at the top of the right pane. The open-book icon at the far top-right opens the user guide (warehouse, photos / video, duplicates, shortcuts, search, AI / batch tagging, GPX). Click a clip to see its stored thumb. Space or Play loads video/audio. Drag the bar between the player and the file info pane to resize them. P toggles fullscreen; ⌘/ lists shortcuts.
 3. **Hand tags:** select one clip or a similar group, click a preset on the right, or type your own word and press Return. Click a tag to remove it.
-4. **AI tags:** paste a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key in Settings → AI. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag** (keeps tags immediately). Sidebar **Untagged** only sends files with no tags yet; to replace bad AI tags, select those clips in the grid and batch again. A batch of more than 10 files shows **Stop**. While it runs, the banner shows which provider is sending and whether the last clip succeeded or failed; the provider name opens that platform’s usage page. Files with GPS get a place name first and those locality parts are always written as tags (even if the model fails); nearby shots within about 1 km reuse that result. Folder names are hints only and are not written as tags. On-device Vision counts human bodies (toy faces and dog bodies do not count); empty scenes do not get portrait or name tags. Running AI again replaces the previous AI tags and keeps hand / path tags. Existing custom labels such as people’s names are not auto-applied by AI — add those by hand. **AI tags can be wrong — review them.** Later files in a large batch may fail on quota; the status line clears after about 10 seconds. Wait and retry what is still untagged.
+4. **AI tags:** **JoyTag** is on by default and runs first (private, on this Mac; about 370 MB under `~/rolltag/joytag/`). Optionally paste a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key as fallback. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag** (keeps tags immediately). Sidebar **Untagged** only sends files with no tags yet; to replace bad AI tags, select those clips in the grid and batch again. A batch of more than 10 files shows **Stop**. While it runs, the banner shows which provider is sending and whether the last clip succeeded or failed; the provider name opens that platform’s usage page. Files with GPS get a place name first and those locality parts are always written as tags (even if the model fails); nearby shots within about 1 km reuse that result. Folder names are hints only and are not written as tags. On-device Vision counts human bodies (toy faces and dog bodies do not count); empty scenes do not get portrait or name tags. Running AI again replaces the previous AI tags and keeps hand / path tags. Existing custom labels such as people’s names are not auto-applied by AI — add those by hand. **AI tags can be wrong — review them.** Later files in a large batch may fail on quota; the status line clears after about 10 seconds. Wait and retry what is still untagged.
 5. **Duplicates:** sidebar or ⌘⇧D. A / D keep one side, S keeps all, Enter sends the rest to Trash. **Trim** on a single video uses an iPhone-style in/out strip; pick a folder and filename, then the new clip is indexed in the background.
 
-Settings: `~/rolltag/config.json` (do not share). Place-name cache: `~/rolltag/geocode-cache.json`. Tags and thumbs: `<warehouse>/.rolltag/`. Full contract: [SPEC.md](SPEC.md).
+Settings: `~/rolltag/config.json` (do not share). Place-name cache: `~/rolltag/geocode-cache.json`. JoyTag model: `~/rolltag/joytag/`. Tags and thumbs: `<warehouse>/.rolltag/`. Full contract: [SPEC.md](SPEC.md).

@@ -92,7 +92,7 @@ The search field at the top of the right pane only looks in **online, readable**
 
 **AI tags can be wrong** (place, mood, and keywords). People-count comes from on-device Vision; still review it. Import never runs AI by itself.
 
-1. Settings → AI (⌘,) — paste a Gemini or OpenAI key. Keys live only in `~/rolltag/config.json` on this Mac. Do not share that file.
+1. Settings → AI (⌘,) — **JoyTag** is the switch at the top (on by default, tried first). **Advantage: private** — frames stay on this Mac and are not sent to Google or OpenAI. About 370 MB in `~/rolltag/joytag/`. Optionally paste a Gemini or OpenAI key as fallback. Keys live only in `~/rolltag/config.json` on this Mac. Do not share that file.
 2. Select a **video or photo** (already tagged clips can be sent again). Audio, tiny, or unreadable files are skipped.
 3. Click **AI Tag** on the right or press **⌥⌘T**. Then **Done** / Return to keep, or **Cancel** / Esc to drop this pass.
 

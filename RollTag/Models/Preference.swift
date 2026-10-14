@@ -77,6 +77,7 @@ struct PreferenceFile: Codable, Equatable {
 enum AIProvider: String, CaseIterable, Identifiable, Codable, Hashable {
     case gemini
     case openai
+    case joytag
     case twelvelabs
     case dashscope
     case anthropic
@@ -97,9 +98,24 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable, Hashable {
         }
     }
 
+    var infoURL: URL? {
+        switch self {
+        case .joytag:
+            URL(string: "https://github.com/fpgaminer/joytag")
+        default:
+            nil
+        }
+    }
+
     static let taggingPriority: [AIProvider] = [.gemini, .openai]
 
-    var supportsFrameTagging: Bool { Self.taggingPriority.contains(self) }
+    static var keyedProviders: [AIProvider] { allCases.filter(\.needsAPIKey) }
+
+    var needsAPIKey: Bool { self != .joytag }
+
+    var supportsFrameTagging: Bool {
+        self == .joytag || Self.taggingPriority.contains(self)
+    }
 
     var selectableModels: [String] {
         switch self {
@@ -113,6 +129,8 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable, Hashable {
             ["qwen-vl-max", "qwen-vl-plus"]
         case .anthropic:
             ["claude-sonnet-4-5", "claude-sonnet-4", "claude-opus-4"]
+        case .joytag:
+            ["joytag"]
         }
     }
 
@@ -164,43 +182,57 @@ struct AIPreference: Codable, Equatable {
     var providers: [AIProvider: AIProviderSettings]
     var skipImplausibleCaptureDates: Bool
     var examples: [AITaggingExample]
+    var useJoyTag: Bool
 
     enum CodingKeys: String, CodingKey {
         case selectedProvider
         case providers
         case skipImplausibleCaptureDates
         case examples
+        case useJoyTag
     }
 
     static var empty: AIPreference {
-        AIPreference(selectedProvider: nil, providers: [:], skipImplausibleCaptureDates: true, examples: [])
+        AIPreference(selectedProvider: nil, providers: [:], skipImplausibleCaptureDates: true, examples: [], useJoyTag: true)
     }
 
     init(
         selectedProvider: AIProvider?,
         providers: [AIProvider: AIProviderSettings],
         skipImplausibleCaptureDates: Bool = true,
-        examples: [AITaggingExample] = []
+        examples: [AITaggingExample] = [],
+        useJoyTag: Bool = true
     ) {
-        self.selectedProvider = selectedProvider
+        self.selectedProvider = selectedProvider == .joytag ? nil : selectedProvider
         self.providers = providers
         self.skipImplausibleCaptureDates = skipImplausibleCaptureDates
         self.examples = examples
+        self.useJoyTag = useJoyTag || selectedProvider == .joytag
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        selectedProvider = try container.decodeIfPresent(AIProvider.self, forKey: .selectedProvider)
+        let storedProvider = try container.decodeIfPresent(AIProvider.self, forKey: .selectedProvider)
+        let storedJoyTag = try container.decodeIfPresent(Bool.self, forKey: .useJoyTag)
         providers = try container.decodeIfPresent([AIProvider: AIProviderSettings].self, forKey: .providers) ?? [:]
         skipImplausibleCaptureDates = try container.decodeIfPresent(Bool.self, forKey: .skipImplausibleCaptureDates) ?? true
         examples = try container.decodeIfPresent([AITaggingExample].self, forKey: .examples) ?? []
+        if storedProvider == .joytag {
+            selectedProvider = nil
+            useJoyTag = true
+        } else {
+            selectedProvider = storedProvider
+            useJoyTag = storedJoyTag ?? true
+        }
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(selectedProvider, forKey: .selectedProvider)
+        let stored = selectedProvider == .joytag ? nil : selectedProvider
+        try container.encodeIfPresent(stored, forKey: .selectedProvider)
         try container.encode(providers, forKey: .providers)
         try container.encode(skipImplausibleCaptureDates, forKey: .skipImplausibleCaptureDates)
+        try container.encode(useJoyTag, forKey: .useJoyTag)
         if !examples.isEmpty {
             try container.encode(examples, forKey: .examples)
         }
@@ -227,18 +259,23 @@ struct AIPreference: Codable, Equatable {
     }
 
     func taggingRoutes() -> [AITaggingRoute] {
+        var routes: [AITaggingRoute] = []
+        if useJoyTag {
+            routes.append(AITaggingRoute(provider: .joytag, apiKey: "", model: "joytag"))
+        }
         var order = AIProvider.taggingPriority
-        if let selected = selectedProvider, selected.supportsFrameTagging {
+        if let selected = selectedProvider, selected.supportsFrameTagging, selected.needsAPIKey {
             order = [selected] + order.filter { $0 != selected }
         }
-        return order.compactMap { provider in
-            guard hasKey(for: provider) else { return nil }
+        routes += order.compactMap { provider in
+            guard provider.needsAPIKey, hasKey(for: provider) else { return nil }
             return AITaggingRoute(
                 provider: provider,
                 apiKey: settings(for: provider).apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
                 model: resolvedModel(for: provider)
             )
         }
+        return routes
     }
 }
 

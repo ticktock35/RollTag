@@ -95,6 +95,10 @@ final class AppModel {
     private var aiStopRequested = false
     var capturingShortcut: ShortcutAction?
     var shortcutCaptureMessage = ""
+    var joyTagInstalled = false
+    var joyTagDownloading = false
+    var joyTagDownloadFraction: Double = 0
+    var joyTagStatusMessage = ""
     let playback = PreviewPlayback()
 
     let catalog: TagCatalog
@@ -359,6 +363,7 @@ final class AppModel {
             statusMessage = error.localizedDescription
         }
         refreshOnlineState()
+        refreshJoyTagStatus()
         reloadFootage()
         volumeMonitor.start { [weak self] in
             Task { @MainActor in
@@ -378,6 +383,8 @@ final class AppModel {
     func stop() {
         volumeMonitor.stop()
         aiTags.cancelInFlightSuggest()
+        Task { await JoyTagInstaller.shared.cancel() }
+        JoyTagEngine.shared.unload()
         removePlaybackKeys()
         playback.unload()
         trimSession = nil
@@ -429,6 +436,64 @@ final class AppModel {
     func selectAIProvider(_ provider: AIProvider?) {
         preference = store.updateAI(selectedProvider: provider, in: preference)
         persistPreference()
+    }
+
+    func updateUseJoyTag(_ on: Bool) {
+        preference = store.updateUseJoyTag(on, in: preference)
+        persistPreference()
+        if on, !JoyTagStore.isInstalled {
+            downloadJoyTagModel()
+        }
+    }
+
+    func refreshJoyTagStatus() {
+        joyTagInstalled = JoyTagStore.isInstalled
+        if joyTagInstalled {
+            joyTagStatusMessage = ""
+        }
+    }
+
+    func downloadJoyTagModel() {
+        Task { try? await ensureJoyTagModel() }
+    }
+
+    func removeJoyTagModel() {
+        guard !isBusy, !joyTagDownloading else { return }
+        JoyTagEngine.shared.unload()
+        try? JoyTagStore.remove()
+        joyTagDownloadFraction = 0
+        joyTagStatusMessage = ""
+        refreshJoyTagStatus()
+    }
+
+    private func ensureJoyTagModel() async throws {
+        if JoyTagStore.isInstalled {
+            refreshJoyTagStatus()
+            return
+        }
+        joyTagDownloading = true
+        joyTagDownloadFraction = 0
+        joyTagStatusMessage = ""
+        defer { joyTagDownloading = false }
+        do {
+            try await JoyTagInstaller.shared.ensureInstalled { [weak self] fraction in
+                Task { @MainActor in
+                    self?.joyTagDownloadFraction = fraction
+                    if var progress = self?.scanProgress, progress.phase == .tagging {
+                        progress.currentFile = String(localized: "ai.downloadingModel")
+                        progress.completed = Int((fraction * 100).rounded())
+                        progress.total = 100
+                        self?.scanProgress = progress
+                    }
+                }
+            }
+            refreshJoyTagStatus()
+        } catch {
+            if AITaggingStop.isCancellation(error) { throw error }
+            joyTagStatusMessage = String(localized: "ai.joytag.downloadFailed")
+            refreshJoyTagStatus()
+            throw error
+        }
     }
 
     func updateAIKey(provider: AIProvider, apiKey: String, model: String? = nil) {
@@ -817,6 +882,31 @@ final class AppModel {
             aiStopRequested = false
             if scanProgress?.phase == .tagging {
                 scanProgress = nil
+            }
+        }
+
+        if routes.contains(where: { $0.provider == .joytag }), !JoyTagStore.isInstalled {
+            publishProgress(
+                ScanProgress(
+                    warehouseName: String(localized: "ai.provider.joytag"),
+                    warehouseID: nil,
+                    phase: .tagging,
+                    currentFile: String(localized: "ai.downloadingModel"),
+                    completed: 0,
+                    total: 100,
+                    currentProvider: AITaggingProgressCopy.providerTitle(.joytag),
+                    currentProviderID: AIProvider.joytag.rawValue
+                ),
+                force: true
+            )
+            do {
+                try await ensureJoyTagModel()
+            } catch {
+                if AITaggingStop.isCancellation(error) { return }
+                if !routes.contains(where: { $0.provider != .joytag }) {
+                    showTemporaryStatus(String(localized: "ai.joytag.downloadFailed"))
+                    return
+                }
             }
         }
 
