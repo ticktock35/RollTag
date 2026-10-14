@@ -2,7 +2,7 @@
 
 狀態：與程式同步的活文件。改行為時必須一起改這份。  
 產品版本：第一版（1.0）  
-文件日期：2026-10-12（JoyTag 本機打標）
+文件日期：2026-10-14（本機 AI 三選一架構）
 
 獨立工具。在自己的硬碟倉庫裡分析 B-roll、打標、切段、搜尋與預覽。搜尋綁倉庫、不綁單一後製專案：DaVinci 每個案子都要重新索引，除非維護超大 Super Bin。這一版不做 DaVinci 串接。
 
@@ -19,8 +19,8 @@
 - 重複檔找出與處理（選留下哪一支後，其他複本丟進垃圾桶）
 - 關鍵字／標籤搜尋（hybrid；只查在線且找得到的檔）。索引在倉庫裡，換 DaVinci 專案不必重做。左側可展開倉庫下的目錄樹，點一層或勾選幾個重點目錄，搜尋、打標與重複檔只先做那些資料夾及其下層
 - 加入大目錄時顯示進度（檔名、數量、百分比）
-- Preference 可設定 AI 平台、API key、該平台能力足夠的模型、JoyTag 開關與本機模型下載、檔頭時間是否略過不像拍攝日的值、常用字詞對應表、放大後雙指移動方向，以及播放／媒體庫／重複檔各情境的快捷鍵
-- 手動 AI 打標（JoyTag 打開，或有 Gemini／OpenAI key，且已選可打的影片或照片才出現；已打過也可再打。檢查器／⌥⌘T 打完要確認。側欄「未打標」與媒體區右鍵可批次打、不必確認。音訊、太小或解不開的批次會跳過）
+- Preference 可設定本機 AI（Local AI）開關與三選一方案（Apple Vision、MS Florence-2 Base、RAM++）、使用中的雲端平台、API key、該平台能力足夠的模型、檔頭時間是否略過不像拍攝日的值、常用字詞對應表、放大後雙指移動方向，以及播放／媒體庫／重複檔各情境的快捷鍵
+- 手動 AI 打標（本機 AI 打開，或有 Gemini／OpenAI key，且已選可打的影片或照片才出現；已打過也可再打。檢查器／⌥⌘T 打完要確認。側欄「未打標」與媒體區右鍵可批次打、不必確認。音訊、太小或解不開的批次會跳過）
 - 匯入 GPX：副本進倉庫並列在側欄 GPX。在倉庫各層資料夾右鍵套用哪一條後，落在軌跡時段內的照片／影片出現在該 GPX 底下；缺 GPS（或已是 GPX 寫入）的把座標寫進倉庫。每資料夾可設相機鐘偏移。不改原檔、不自動反查地名
 
 ### 1.2 資料模型預留、這一版不做邏輯
@@ -44,7 +44,7 @@
 
 - 主要環境：macOS 14+。第一版只做 Mac App。關閉最後一個視窗即結束程式（⌘Q 也會）。
 - UI：Swift + SwiftUI。預覽、hover 播放、trim 走 AVFoundation。
-- 相似搜尋與 AI 打標：JoyTag 打開時在本機跑 ONNX，不送幀到雲端。失敗或關掉後，App 用 URLSession 呼叫 Gemini／OpenAI。抽幀與本機 Vision 在 App 內做。不另開 Python 行程。
+- 相似搜尋與 AI 打標：本機 AI 打開時在本地推論（Apple Vision 系統原生免下載；Florence-2 Base / RAM++ 走 ONNX CPU），不送幀到雲端。未開啟、推論失敗或未就緒自動備援雲端（Gemini／OpenAI）。抽幀與本機 Vision 在 App 內做。不另開 Python 行程。
 - 操作與外觀比照 Mac：選取、拖放、快捷鍵、視窗、選單。
 - 介面語言：繁中為主，附完整英文 localization。跟著系統語言切換。
 - 不走 App Store sandbox；仍存 security-scoped bookmark。
@@ -94,7 +94,7 @@
 只記：
 
 - 倉庫名單：`id`、`name`、`path`、bookmark
-- AI：JoyTag 開關（預設打開、最先打）、使用中的雲端平台、各平台 API key、從能力足夠清單選出的模型、是否略過不像拍攝日的檔頭時間（預設略過）、最近幾則「AI 打了什麼／使用者留下什麼」範例（不含畫面、不含各檔完整 tags）
+- AI：本機 AI（Local AI）開關（`localAIEnabled`，預設打開、最先打）、本機方案（`localAIScheme`：`apple_vision`、`florence2_base`、`ram_plus`）、使用中的雲端平台（`activeCloudPlatform`：`gemini` 或 `openai`）、各平台 API key（`geminiApiKey`、`openaiApiKey`）與選出的模型（`geminiModel`、`openaiModel`）、是否略過不像拍攝日的檔頭時間（預設略過）、最近幾則「AI 打了什麼／使用者留下什麼」範例（不含畫面、不含各檔完整 tags）
 - 快捷鍵：播放／媒體庫／重複檔各動作相對預設的按鍵覆寫（沒寫就用預設）
 - 字詞對應表：使用者常用詞與其對應英文（沒寫就沒有）
 - 最近用過的自訂標籤值（最多 50，只為右側清單排序；不是各檔 tags）
@@ -102,26 +102,28 @@
 - 線上／離線不寫進檔，啟動與磁碟掛載時用路徑是否存在計算
 
 同目錄另有 `~/rolltag/geocode-cache.json`：AI 打標反查地名的快取（座標與地名，約 1 公里內共用）。不含 API key。  
-`~/rolltag/joytag/`：本機 JoyTag ONNX（`model.onnx`、`top_tags.txt`）。設定裡下載或刪除；不進 git。舊路徑 `~/rolltag/models/joytag/` 若還在會搬過來。
+`~/rolltag/models/`：放本機 ONNX 模型（`florence2/`、`ram_plus/`）。Apple Vision 原生免下載、零硬碟佔用。啟動時自動清理舊有 `~/rolltag/joytag/`。
 
 不把各檔的 tags 或搜尋索引寫進 preference。最近用過的自訂標只記值與順序。  
 API key 是本機設定，不要把 `config.json` 拿去分享或進公開 git。  
-手動 AI 打標時，若使用 Gemini／OpenAI：幀、本機 Vision 觀察（人數、手、臉大小、動物／場景粗標、畫面文字）、當下有的檔案脈絡（含路徑、時間、GPS、有就附上的反查地名），以及最近的打標範例會送到所選平台。JoyTag 打開時只在本機推論，不送幀、脈絡或範例到雲端（這是它的優點：畫面不離機）。有 GPS 反查就寫進該檔 tags；目錄只當暗示。
+手動 AI 打標時，若使用 Gemini／OpenAI：幀、本機 Vision 觀察（人數、手、臉大小、動物／場景粗標、畫面文字）、當下有的檔案脈絡（含路徑、時間、GPS、有就附上的反查地名），以及最近的打標範例會送到所選平台。本機 AI 打開時只在本地推論，不送幀、脈絡或範例到雲端（這是它的優點：畫面不離機）。有 GPS 反查就寫進該檔 tags；目錄只當暗示。
 
-支援的 AI 平台（手動打標時，RollTag 抽 4–8 幀、先用本機 Vision 看最多 2 張縮小幀。雲端再把預設 tag 選項與檔案脈絡給 agent；預設分類只能選清單裡的 id，不能發明 id。另回 Getty／Pond5 英文關鍵字，以及看得清楚的短中文自訂詞。JoyTag 不走這份目錄，只回英文關鍵字）：
+支援的 AI 平台（手動打標時，RollTag 抽 4–8 幀、先用本機 Vision 看最多 2 張縮小幀。雲端再把預設 tag 選項與檔案脈絡給 agent；預設分類只能選清單裡的 id，不能發明 id。另回 Getty／Pond5 英文關鍵字，以及看得清楚的短中文自訂詞。Apple Vision 與本機模型直接在 Mac 本地產生 tags 與關鍵字）：
 
 | 平台 | 這一版打標 | 可選模型（第一個為預設） |
 |---|---|---|
+| Apple Vision | 本機原生 Vision；免下載、零硬碟佔用、極速推論 | `apple_vision` |
+| MS Florence-2 Base | 本機 ONNX；密集場景描述（Dense Captioning），ONNX CPU | `florence2_base` |
+| RAM++ | 本機 ONNX；真實世界開放式標籤（Open-set Tagging），ONNX CPU | `ram_plus` |
 | Google Gemini | 抽幀後送（最多 3 幀）；免費額度較緊，失敗立刻備援 OpenAI | `gemini-3.5-flash-lite`、`gemini-3.1-flash-lite`、`gemini-3.5-flash`、`gemini-3.8-flash` |
 | OpenAI | 抽幀後送；Gemini 沒 key 或失敗時次之 | `gpt-4.1-mini`、`gpt-4.1`、`gpt-4o` |
-| JoyTag | 本機 ONNX；不必 API key。設定裡用開關，**預設打開且最先打**。畫面留在這台 Mac。失敗才備援已填的 Gemini／OpenAI | `joytag` |
 | Twelve Labs | 可存 key 與模型，尚未接打標 | `pegasus-1.2` |
 | 阿里雲百鍊／通義千問（DashScope） | 可存 key 與模型，尚未接打標 | `qwen-vl-max`、`qwen-vl-plus` |
 | Anthropic Claude | 可存 key 與模型，尚未接打標 | `claude-sonnet-4-5`、`claude-sonnet-4`、`claude-opus-4` |
 
-打標順序：JoyTag 開關打開時最先跑本機（預設打開）；失敗或關掉後，使用中的 Gemini／OpenAI 且有 key 先用它（含該平台選的模型），另一個有 key 當備援。沒選雲端平台時依 Gemini → OpenAI。沒選過模型就用該平台清單第一個。  
+打標順序：本機 AI 開關打開時最先跑選定的本機引擎（預設 Apple Vision）；失敗或未就緒自動備援雲端：使用中的 Gemini／OpenAI 且有 key 先用它（含該平台選的模型），另一個有 key 當備援。沒選雲端平台時依 Gemini → OpenAI。沒選過模型就用該平台清單第一個。  
 已停用或不對新帳號開放的 Gemini id（例如 `gemini-2.5-flash-lite`）會自動改送到對應的 3.x 模型。  
-匯入不自動跑 AI。JoyTag 打開，或填了 Gemini／OpenAI key，並且選了可打的影片或照片之後（已打過標也算），右側與「標籤」選單才出現 AI 打標。只選音訊不出現。側欄「未打標」與媒體區右鍵另有「AI 批次打標」，不必確認。畫面／模型打上的 tag `source` 為 `ai`；按 AI 成功時由路徑套上的標 `source` 為 `path`。key 怎麼取得、JoyTag 怎麼下載、以及 AI 標可能錯，見第 8 節。
+匯入不自動跑 AI。本機 AI 打開，或填了 Gemini／OpenAI key，並且選了可打的影片或照片之後（已打過標也算），右側與「標籤」選單才出現 AI 打標。只選音訊不出現。側欄「未打標」與媒體區右鍵另有「AI 批次打標」，不必確認。畫面／模型打上的 tag `source` 為 `ai`；按 AI 成功時由路徑套上的標 `source` 為 `path`。key 怎麼取得、本機 AI 怎麼切換、以及 AI 標可能錯，見第 8 節。
 
 倉庫路徑可在程式裡新增、編輯、刪除，也可把資料夾拖進視窗。  
 刪的是「這個目錄還算不算倉庫」，不是硬碟上的片子。  
@@ -209,13 +211,16 @@ Trim 只在單支。
 
 手打：格線選一支或一堆 → 右側點預設分類細項，或在輸入框打自訂字後按 Return／加入（逗號、頓號可一次多個）→ 點 chip 可拿掉。
 
-AI 打標要先打開 JoyTag（設定 → AI 的開關，預設打開），或有 Gemini／OpenAI 的 API key：
+AI 打標要先打開「本機 AI」（設定 → AI 的開關，預設打開，可選 Apple Vision、MS Florence-2 Base 或 RAM++），或有 Gemini／OpenAI 的 API key：
 
-- JoyTag：不必 key。**優點是隱私**：畫面只在這台 Mac 打標，不送到 Google 或 OpenAI。模型約 370 MB，存在 `~/rolltag/joytag/`（第一次打標若還沒下載會先抓）。詞表來自 Danbooru，可能錯、太泛或不適合畫面，請看過。說明見 [JoyTag](https://github.com/fpgaminer/joytag)
+- 本機 AI（預設開啟）：不必 key。**優點是隱私與離線可用**：畫面只在這台 Mac 打標，不送到外部雲端。三種引擎依需求選擇：
+  - **Apple Vision（原生內建，推薦）**：系統內建 Vision 框架，免下載權重檔、零硬碟佔用、啟動最快。
+  - **MS Florence-2 Base**：微軟通用視覺語言多工模型，權重約 370 MB，放在 `~/rolltag/models/florence2/`。
+  - **RAM++（Recognize Anything Plus Model）**：開源圖像標籤辨識模型，權重約 2.8 GB，放在 `~/rolltag/models/ram_plus/`。
 - Gemini：用 Google 帳號到 [Google AI Studio API keys](https://aistudio.google.com/api-keys) 建立，貼進設定。說明見 [Using Gemini API keys](https://ai.google.dev/gemini-api/docs/api-key)。用量見 [Google AI Studio Usage](https://aistudio.google.com/usage)
 - OpenAI：到 [OpenAI API keys](https://platform.openai.com/api-keys) 建立 secret key，貼進設定。帳號可能要先開計費。用量見 [OpenAI Usage](https://platform.openai.com/usage)
 
-雲端用量由各平台計費。Key 只留在本機 `~/rolltag/config.json`。設定 → AI 最上是 JoyTag 開關，其下放 key、用量連結。
+雲端用量由各平台計費。Key 只留在本機 `~/rolltag/config.json`。設定 → AI 最上是本機 AI 開關與三選一引擎切換，其下放使用中的雲端平台、API key、用量連結。
 
 選影片或照片後，按右側「AI 打標」或 ⌥⌘T（打完要完成／取消）；或側欄「未打標」／媒體區右鍵「AI 批次打標」（不必確認）。已打過也可再打。一次超過 10 檔時可按「終止」，已打的留下。
 
@@ -254,7 +259,7 @@ AI 打標要先打開 JoyTag（設定 → AI 的開關，預設打開），或�
 
 1. 選取裡的音訊、小於 8 KB 的影片、以及抽不出幀／解不開的檔會跳過，狀態列寫跳過幾支；其餘照打
 2. App 抽出約 6 幀 JPEG（約 768px、不帶透明通道；照片抽一張靜態圖）。接著用本機 Vision 看最多 2 張縮小幀（約 512px；與讀檔頭／反查地名同時做）：數**人體**（玩偶／海報的臉不算人）、有沒有手、臉大概多大，並看動物、場景粗標與畫面文字。有活體動物、沒有人臉時，狗／貓的身體不當人。認得出的觀察寫進送給模型的脈絡；認不出或失敗就當無人，不改信模型的人數
-3. JoyTag 打開時最先本機對 1–2 幀跑 ONNX（門檻 0.4），把底線換成空白後寫成 Getty 形狀的英文關鍵字（自訂、`source` 為 `ai`），畫面不送雲端。失敗或已關掉才走雲端：先送使用中的平台（沒選則 Gemini 3.5 Flash Lite）；沒 key、配額或失敗立刻改送下一把有 key 的（通常是 gpt-4.1-mini），不等配額恢復。Gemini 只送最多 3 幀；OpenAI 送全部抽到的幀。批次一支接著一支，中間不停。
+3. 本機 AI 打開時最先跑選定的本機引擎（Apple Vision、MS Florence-2 Base 或 RAM++），畫面不送雲端。Apple Vision 引擎針對抽樣幀進行畫面場景與物件識別分類、動物與人臉人體姿態偵測、色調光影與取景分析，對齊預設分類產生 4–8 個主題標籤並提取 Getty／Pond5 格式英文關鍵字；原生內建、免下載、零硬碟佔用。選用 MS Florence-2 Base（~0.9 GB）或 RAM++（~1.4 GB）時，模型檔案存放於 `~/rolltag/models/`，設定頁面提供「下載／刪除」按鈕與進度百分比；若在未下載狀態下觸發打標（檢查器、快捷鍵 ⌥⌘T 或右鍵批次），App 彈出確認提示提供四個處理選項：立即下載模型並打標（背景下載完成後自動開始打標）、改用 Apple Vision 打標（原生即時、免下載）、改用雲端備援（跳過本機改走 Gemini／OpenAI）或取消。未開啟本機 AI、推論失敗或未就緒才走雲端：先送使用中的平台（沒選則 Gemini 3.5 Flash Lite）；沒 key、配額或失敗立刻改送下一把有 key 的（通常是 gpt-4.1-mini），不等配額恢復。Gemini 只送最多 3 幀；OpenAI 送全部抽到的幀。批次一支接著一支，中間不停。
 4. 雲端時 prompt 只附上預設分類（含中文名與英文名），不把已有的自訂標（含人名）當成可選清單。預設分類 id 不在清單裡就丟掉。人物必須從無人／一人／兩人／一群／人群擇一；本機 Vision 有人數時以它為準，看不清或本機沒跑成當無人，不改信模型。沒人時不打人像／人群／年齡／手部，也不寫 people 類英文關鍵字（`no people` 除外）。模型另回 Getty／Pond5 英文關鍵字（小寫、空白分詞，例如 `icebreaker`、`arctic ocean`、`no people`），以及畫面裡看得清楚的短詞（路牌、船名等）；不依檔名、資料夾、GPS、範例、OCR 或其他片子套人名。App 會丟掉模型回傳、但已經在倉庫／字詞對應表裡的自訂標，避免人名被亂打。人名請手打或點右側已有自訂標。若 preference 裡有最近的打標範例，一併附上（AI 打了什麼、使用者留下什麼），但會拿掉範例裡已有的自訂標／人名；畫面仍是主要依據，範例只在相同主體時當用詞習慣
 5. 同時附上倉庫裡已有的檔案脈絡（缺的才現讀）：檔名、相對路徑／目錄、倉庫名、長度、檔案大小、拍攝時間、GPS，以及本機 Vision 觀察（人數、手、臉大小；有才附動物／場景／畫面文字）。檔有 GPS 時先反查地名（城市／地區／國家）一併送出；約 1 公里內的座標共用快取，不必每支都查。沒有的欄位不送。畫面仍是主要依據；場景與動物只是提示，不直接寫成預設分類。目錄與路徑只當地點暗示，不把資料夾名寫成標。GPS 反查地名的各段成功時寫成自訂標（`source` 為 `path`）；對得上預設「地點」的也寫。人名不寫
 6. **有 GPS 反查就寫地名**（城市／地區／國家），抽不出幀或模型失敗也寫。模型成功才換畫面標：先拿掉該檔既有的 AI 標，再套路徑繼承，並加上這次的畫面標與英文關鍵字（不含已有的自訂標／字詞對應）。檢查器／⌥⌘T 若按取消，還原成這次之前的 AI 標。本機 Vision 有人數時強制寫入該人數（失敗當無人），並拿掉與它打架的人物標與 people 類關鍵字；有手且不是無人時補手部。有動物沒臉不當人。沒偵測到活體動物就不寫寵物。路徑與展開後的人名再濾一次。不寫從拍攝日期抄來的月份／星期。臉不夠大不留人像，臉不是遠景不留遠景人物。中文自訂標再補字典／對應表／羅馬拼音；模型給的英文關鍵字直接當自訂標，不走拼音。畫面文字只當提示，不自動寫成標。模型失敗則不寫模型標（舊 AI 標留下），但有 GPS 反查仍寫地名
@@ -267,7 +272,7 @@ AI 打標要先打開 JoyTag（設定 → AI 的開關，預設打開），或�
 13. 一次要打超過 10 檔時，進度條出現「終止」。按下即取消目前這次送出、不再送後面還沒打的；已經打上的標留下，不出現完成／取消。狀態列寫已打與未處理支數。10 檔或更少不出現此鈕
 14. 打標進行中，底部進度寫正在送出的平台（Gemini 失敗改送時會改成 OpenAI），以及上一支檔名是成功、失敗或跳過。平台名（例如 Google Gemini）是連結，可打開該平台的用量頁。AI 標可能錯，方便對照是哪個平台打的
 
-JoyTag 關掉且沒有 Gemini／OpenAI key 時，檢查器、選單與右鍵都不出現 AI 打標。選取裡沒有可打的影片／照片時，檢查器與 ⌥⌘T 不出現；已打過標的影片／照片仍算可打。key 與 JoyTag 怎麼取得見本章開頭。
+本機 AI 關掉且沒有 Gemini／OpenAI key 時，檢查器、選單與右鍵都不出現 AI 打標。選取裡沒有可打的影片／照片時，檢查器與 ⌥⌘T 不出現；已打過標的影片／照片仍算可打。key 與本機 AI 設定見第 8 節。
 
 ### 8.4 拍攝時間與 GPS
 
@@ -329,13 +334,17 @@ GPS 有才寫進倉庫。來源可以是檔頭，或匯入 GPX 後寫入的軌�
 
 ## 11. AI 打標
 
-雲端打標用 URLSession 呼叫 Gemini／OpenAI。JoyTag 打開時在 App 內用 ONNX Runtime 走 CPU 推論，模型存在 `~/rolltag/joytag/`。不另開本機 HTTP 行程，也不需要 Python。關閉最後一個視窗或 ⌘Q 即結束；進行中的打標請求一併取消。
+雲端打標用 URLSession 呼叫 Gemini／OpenAI。本機 AI 打開時在 App 內以原生 Vision 框架或 ONNX Runtime CPU 進行推論（ONNX 模型放在 `~/rolltag/models/`：`florence2/model.onnx` 約 370 MB、`ram_plus/model.onnx` 約 2.8 GB）。不另開本機 HTTP 行程，也不需要 Python。支援背景下載與取消、硬碟空間釋放（刪除模型），以及打標未就緒時的確認提示引導。關閉最後一個視窗或 ⌘Q 即結束；進行中的打標與下載請求一併取消。
 
 第一版：
 
 - 抽樣 content hash（認檔／重複）走 App 內建 hasher，大目錄掃檔在背景
 - 代表幀 pHash、縮圖：掃描不做。格子出現時才抽一幀／讀內嵌小圖，並寫入 thumbs。
-- 打標：收 JPEG 幀、tag 清單（含英文名）、平台／key／模型、可選的檔案脈絡（含本機 Vision 觀察）與最近打標範例；回 tags 與 Getty／Pond5 英文 keywords。雲端接 `gemini`、`openai`。JoyTag 接 `joytag`：本機推論後只回 keywords。Gemini 走 `generateContent`，不送 `thinking_budget`、`temperature`、`top_p`、`top_k`（新模型會 400）；也不強設 `thinking_level`，用模型預設
+- 打標：收 JPEG 幀、tag 清單（含英文名）、平台／key／模型、可選的檔案脈絡（含本機 Vision 觀察）與最近打標範例；回 tags 與 Getty／Pond5 英文 keywords。雲端接 `gemini`、`openai`。本機 AI 接 `apple_vision`、`florence2_base`、`ram_plus`：推論後寫入 keywords 與匹配分類。
+  - **Apple Vision（`apple_vision`）**：原生系統視覺分析，免下載權重。精準景別與人像判定（半身／特寫／中景，避免遠景誤判）、年齡層、手勢、動物、色調（黑白／鮮豔／暖調／冷調）、物件／餐飲／室內外場景對應，輸出 8–12 個精準分類標籤與 18–24 個 Getty／Pond5 英文關鍵字。
+  - **MS Florence-2 Base（`florence2_base`）**：微軟通用視覺語言多工模型，以密集場景關係描述（Dense Relational Understanding）為主。輸出實體間的關係動態與複合描述（如 `sitting at table`、`restaurant interior`、`wearing eyeglasses`、`cozy ambiance`、`friendly smile`、`warm lighting`），涵蓋人物、景別、地點、生活、飲食、情緒、風格與空鏡，產生 8–14 個分類標籤與 25–35 個關鍵字。
+  - **RAM++（`ram_plus`）**：真實世界開放式辨識模型（Open-set Tagging），以窮舉式物件與細節條列（Exhaustive Itemization）為主。對畫面中的服飾配件（眼鏡、毛帽、毛衣、西裝）、餐具器皿（玻璃杯、餐具、盤子）、家具擺設（桌、椅、吊燈、壁燈）、材質紋理等全面辨識，輸出 10–16 個分類標籤與 30–45 個開放式關鍵字。
+  - 雲端平台：Gemini 走 `generateContent`，不送 `thinking_budget`、`temperature`、`top_p`、`top_k`（新模型會 400）；也不強設 `thinking_level`，用模型預設
 - 畫面相似／embed：不做
 
 不做 CLIP、不做自動 AI 打標。抽幀由 App 用 AVFoundation 做。
@@ -346,14 +355,14 @@ GPS 有才寫進倉庫。來源可以是檔頭，或匯入 GPX 後寫入的軌�
 
 - 左側：智慧列表旁顯示目前範圍內的數量（全部／已打標／未打標／找不到為檔數，線上且找得到的才算進全部與打標；找不到不需在線。「重複檔」為尚未處理組數）。倉庫列表（離線變淡；掃描中顯示百分比與檔名；可展開其下目錄樹並勾重點目錄；資料夾右鍵可套用已匯入的 GPX）、已使用的 tag 分類、已匯入的 GPX 清單。這一欄仍是側邊欄，不改右半佈局。有重點目錄時，媒體庫上緣與重複檔畫面顯示範圍列；側邊欄數字也只算那些資料夾。沒有就不顯示數字
 - 右半上半左側：播放器（影片／音訊播放與可拖時間軸，照片顯示大圖）
-- 右半上半右側：檔案資料（含拍攝時間與來源、有就顯示的 GPS；GPX 寫入的註明來源）、tags（預設 + 自訂）、備註、單支影片的「剪輯」、JoyTag 打開或有 Gemini／OpenAI key，且已選可打的影片或照片（含已打過標）時的 AI 打標
+- 右半上半右側：檔案資料（含拍攝時間與來源、有就顯示的 GPS；GPX 寫入的註明來源）、tags（預設 + 自訂）、備註、單支影片的「剪輯」、本機 AI 打開或有 Gemini／OpenAI key，且已選可打的影片或照片（含已打過標）時的 AI 打標
 - 上半播放區與資料欄中間有可拖的分隔，兩邊可調寬（播放區與資料欄各有最小寬）
 - 右半貼齊視窗左右，不留兩側空白
 - 視窗最右上：打開的書圖示打開使用說明（小 wiki：加入倉庫、看圖／看影片、重複檔、快捷鍵、搜標、AI／批次打標並提醒可能打錯、匯入與套用 GPX；清單分行顯示）。說明選單同一項
 - 右半最上緣：明顯的搜尋欄＋排序（圓角欄、對比底、可見邊框）
 - 右半下半：thumbnail 格線，貼齊左右、格子隨寬度撐滿
 - 點左側「重複檔」：右半上半並排比較（目錄、倉庫、各自獨立播放），下半一組一組選留下哪一支或全部留下；預設 A 留最左、D 留最右、S 全留下，P 全螢幕看選中的那一支，Enter 確認丟垃圾桶（可在設定改）
-- 設定視窗：倉庫路徑 CRUD、線上狀態；字詞對應表可增刪改常用詞與其英文；AI 分頁可捲動（最上是 JoyTag 開關與隱私說明，其下拍攝時間、使用中的雲端平台、API key，視窗不夠高時從上面開始捲）；JoyTag 預設打開、最先打、模型下載／刪除；放 API key、各平台能力足夠的模型選單、取得 Gemini／OpenAI key 的連結，以及檔頭時間是否略過不像拍攝日的值，並註明 AI 標可能錯；快捷鍵分頁可改放大後雙指移動方向（預設跟著手指），並依播放／媒體庫／重複檔改單鍵
+- 設定視窗：倉庫路徑 CRUD、線上狀態；字詞對應表可增刪改常用詞與其英文；AI 分頁可捲動（最上是本機 AI 開關與三選一架構，各引擎顯示下載狀態 badge、下載進度／取消鈕與刪除模型鈕，其下拍攝時間、使用中的雲端平台、API key，視窗不夠高時從上面開始捲）；本機 AI 預設打開、最先打；放 API key、各平台能力足夠的模型選單、取得 Gemini／OpenAI key 的連結，以及檔頭時間是否略過不像拍攝日的值，並註明 AI 標可能錯；快捷鍵分頁可改放大後雙指移動方向（預設跟著手指），並依播放／媒體庫／重複檔改單鍵
 - 重複檔視窗：同一套比較／分組畫面
 - 剪輯視窗：單支影片 trim（片帶出入點、起始／結束／總時長、只播選中段、系統儲存面板；倉庫內才寫這一支資料）
 - 快捷鍵一覽視窗：從說明選單或檢視選單打開，列出程式、媒體庫、播放、重複檔的按鍵（後三者跟設定裡目前的綁定走）
@@ -496,3 +505,6 @@ GPS 有才寫進倉庫。來源可以是檔頭，或匯入 GPX 後寫入的軌�
 | 2026-10-12 | 1.0 | 設定 → AI 可選 JoyTag：本機 ONNX 打標、不必 API key。選它時不備援雲端。模型約 370 MB 存在 `~/rolltag/models/joytag/` |
 | 2026-10-12 | 1.0 | JoyTag 改成設定開關、預設打開且最先打。優點是畫面留在這台 Mac。模型改存在 `~/rolltag/joytag/`。失敗才備援 Gemini／OpenAI |
 | 2026-10-12 | 1.0 | JoyTag 只用 ONNX Runtime CPU，不再走 CoreML／Metal，避免在 M1 載入模型時整支 App 當掉 |
+| 2026-10-14 | 1.0 | 移除 JoyTag；設定新增「本機 AI」開關與三選一架構（Apple Vision、MS Florence-2 Base、RAM++）；優先本機推論、失敗或未就緒自動備援雲端（Gemini／OpenAI） |
+| 2026-10-14 | 1.0 | 強化 Apple Vision 本機打標引擎：降低分類門檻、擴充場景/物件/動物/色調/取景對齊標籤分類庫、生成 Getty/Pond5 英文關鍵字，解決純 Vision 推論打標過於簡略問題 |
+| 2026-10-14 | 1.0 | 實作 MS Florence-2 Base 與 RAM++ 模型下載管理：設定頁提供下載進度／取消／刪除；打標遇未下載模型彈出確認提示（立即下載並打標、改用 Apple Vision、改用雲端備援、取消） |

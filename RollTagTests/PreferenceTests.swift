@@ -45,13 +45,17 @@ final class PreferenceTests: XCTestCase {
         try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
         let store = PreferenceStore(homeDirectory: home)
         var file = PreferenceFile.empty
-        file = store.updateAI(selectedProvider: .gemini, in: file)
-        file = store.updateAIKey(provider: .gemini, apiKey: "gem-test", model: "gemini-2.5-flash", in: file)
+        file = store.updateActiveCloudPlatform(.gemini, in: file)
+        file = store.updateLocalAIEnabled(true, in: file)
+        file = store.updateLocalAIScheme(.florence2Base, in: file)
+        file = store.updateAIKey(provider: .gemini, apiKey: "gem-test", model: "gemini-3.5-flash", in: file)
         try store.save(file)
         let loaded = try store.load()
-        XCTAssertEqual(loaded.ai.selectedProvider, .gemini)
-        XCTAssertTrue(loaded.ai.useJoyTag)
-        XCTAssertEqual(loaded.ai.settings(for: .gemini).apiKey, "gem-test")
+        XCTAssertEqual(loaded.ai.activeCloudPlatform, .gemini)
+        XCTAssertTrue(loaded.ai.localAIEnabled)
+        XCTAssertEqual(loaded.ai.localAIScheme, .florence2Base)
+        XCTAssertEqual(loaded.ai.geminiApiKey, "gem-test")
+        XCTAssertEqual(loaded.ai.geminiModel, "gemini-3.5-flash")
         XCTAssertTrue(loaded.ai.hasKey(for: .gemini))
         XCTAssertFalse(loaded.ai.hasKey(for: .openai))
 
@@ -61,6 +65,38 @@ final class PreferenceTests: XCTestCase {
         try Data(legacy.utf8).write(to: store.configURL)
         let migrated = try store.load()
         XCTAssertEqual(migrated.ai, .empty)
+    }
+
+    func testFlatAndNestedConfigSchemaRoundTrip() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
+        let store = PreferenceStore(homeDirectory: home)
+
+        let flatJSON = """
+        {
+            "version": 1,
+            "warehouses": [],
+            "localAIEnabled": false,
+            "localAIScheme": "ram_plus",
+            "activeCloudPlatform": "openai",
+            "openaiApiKey": "sk-test",
+            "openaiModel": "gpt-4.1"
+        }
+        """
+        try Data(flatJSON.utf8).write(to: store.configURL)
+        let loadedFlat = try store.load()
+        XCTAssertFalse(loadedFlat.ai.localAIEnabled)
+        XCTAssertEqual(loadedFlat.ai.localAIScheme, .ramPlus)
+        XCTAssertEqual(loadedFlat.ai.activeCloudPlatform, .openai)
+        XCTAssertEqual(loadedFlat.ai.openaiApiKey, "sk-test")
+        XCTAssertEqual(loadedFlat.ai.openaiModel, "gpt-4.1")
+
+        try store.save(loadedFlat)
+        let reloaded = try store.load()
+        XCTAssertFalse(reloaded.ai.localAIEnabled)
+        XCTAssertEqual(reloaded.ai.localAIScheme, .ramPlus)
+        XCTAssertEqual(reloaded.ai.activeCloudPlatform, .openai)
+        XCTAssertEqual(reloaded.ai.openaiApiKey, "sk-test")
     }
 
     func testGlossaryRoundTripAndLegacyConfigStaysEmpty() throws {

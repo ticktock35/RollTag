@@ -42,6 +42,13 @@ struct DuplicateKeepRequest: Equatable {
     var otherCount: Int
 }
 
+struct MissingLocalModelPrompt: Identifiable, Equatable {
+    var id: String { scheme.rawValue }
+    let scheme: LocalAIScheme
+    let targetIDs: [UUID]
+    let requireConfirmation: Bool
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -89,16 +96,15 @@ final class AppModel {
     var duplicatePendingDelete: DuplicateKeepRequest?
     var pendingMissingDeleteIDs: Set<UUID>?
     var pendingAIConfirmation = false
+    var localAIDownloadProgress: [LocalAIScheme: Double] = [:]
+    var localAIDownloadError: [LocalAIScheme: String] = [:]
+    var missingLocalModelPrompt: MissingLocalModelPrompt?
     private var pendingAINovelTags: [UUID: [TagAssignment]] = [:]
     private var pendingAIBeforeKeys: [UUID: Set<String>] = [:]
     private var pendingAIReplacedTags: [UUID: [TagAssignment]] = [:]
     private var aiStopRequested = false
     var capturingShortcut: ShortcutAction?
     var shortcutCaptureMessage = ""
-    var joyTagInstalled = false
-    var joyTagDownloading = false
-    var joyTagDownloadFraction: Double = 0
-    var joyTagStatusMessage = ""
     let playback = PreviewPlayback()
 
     let catalog: TagCatalog
@@ -363,7 +369,7 @@ final class AppModel {
             statusMessage = error.localizedDescription
         }
         refreshOnlineState()
-        refreshJoyTagStatus()
+        LocalAIStore.cleanupLegacyJoyTagIfNeeded()
         reloadFootage()
         volumeMonitor.start { [weak self] in
             Task { @MainActor in
@@ -383,8 +389,6 @@ final class AppModel {
     func stop() {
         volumeMonitor.stop()
         aiTags.cancelInFlightSuggest()
-        Task { await JoyTagInstaller.shared.cancel() }
-        JoyTagEngine.shared.unload()
         removePlaybackKeys()
         playback.unload()
         trimSession = nil
@@ -433,67 +437,122 @@ final class AppModel {
         }
     }
 
-    func selectAIProvider(_ provider: AIProvider?) {
-        preference = store.updateAI(selectedProvider: provider, in: preference)
+    func updateLocalAIEnabled(_ on: Bool) {
+        preference = store.updateLocalAIEnabled(on, in: preference)
         persistPreference()
     }
 
-    func updateUseJoyTag(_ on: Bool) {
-        preference = store.updateUseJoyTag(on, in: preference)
+    func updateLocalAIScheme(_ scheme: LocalAIScheme) {
+        preference = store.updateLocalAIScheme(scheme, in: preference)
         persistPreference()
-        if on, !JoyTagStore.isInstalled {
-            downloadJoyTagModel()
-        }
     }
 
-    func refreshJoyTagStatus() {
-        joyTagInstalled = JoyTagStore.isInstalled
-        if joyTagInstalled {
-            joyTagStatusMessage = ""
-        }
+    func isLocalAIModelDownloading(_ scheme: LocalAIScheme) -> Bool {
+        localAIDownloadProgress[scheme] != nil
     }
 
-    func downloadJoyTagModel() {
-        Task { try? await ensureJoyTagModel() }
-    }
-
-    func removeJoyTagModel() {
-        guard !isBusy, !joyTagDownloading else { return }
-        JoyTagEngine.shared.unload()
-        try? JoyTagStore.remove()
-        joyTagDownloadFraction = 0
-        joyTagStatusMessage = ""
-        refreshJoyTagStatus()
-    }
-
-    private func ensureJoyTagModel() async throws {
-        if JoyTagStore.isInstalled {
-            refreshJoyTagStatus()
-            return
-        }
-        joyTagDownloading = true
-        joyTagDownloadFraction = 0
-        joyTagStatusMessage = ""
-        defer { joyTagDownloading = false }
-        do {
-            try await JoyTagInstaller.shared.ensureInstalled { [weak self] fraction in
+    func downloadLocalAIModel(
+        _ scheme: LocalAIScheme,
+        onCompletion: (@MainActor () -> Void)? = nil
+    ) {
+        guard localAIDownloadProgress[scheme] == nil else { return }
+        localAIDownloadProgress[scheme] = 0.0
+        localAIDownloadError[scheme] = nil
+        Task {
+            do {
+                try await LocalAIInstaller.shared.ensureInstalled(scheme: scheme) { fraction in
+                    Task { @MainActor in
+                        self.localAIDownloadProgress[scheme] = fraction
+                    }
+                }
                 Task { @MainActor in
-                    self?.joyTagDownloadFraction = fraction
-                    if var progress = self?.scanProgress, progress.phase == .tagging {
-                        progress.currentFile = String(localized: "ai.downloadingModel")
-                        progress.completed = Int((fraction * 100).rounded())
-                        progress.total = 100
-                        self?.scanProgress = progress
+                    self.localAIDownloadProgress.removeValue(forKey: scheme)
+                    self.localAIDownloadError.removeValue(forKey: scheme)
+                    onCompletion?()
+                }
+            } catch {
+                Task { @MainActor in
+                    self.localAIDownloadProgress.removeValue(forKey: scheme)
+                    if !(error is CancellationError) {
+                        self.localAIDownloadError[scheme] = error.localizedDescription
+                        self.showTemporaryStatus(error.localizedDescription)
                     }
                 }
             }
-            refreshJoyTagStatus()
-        } catch {
-            if AITaggingStop.isCancellation(error) { throw error }
-            joyTagStatusMessage = String(localized: "ai.joytag.downloadFailed")
-            refreshJoyTagStatus()
-            throw error
         }
+    }
+
+    func cancelLocalAIDownload(_ scheme: LocalAIScheme) {
+        Task {
+            await LocalAIInstaller.shared.cancel(scheme: scheme)
+            await MainActor.run {
+                self.localAIDownloadProgress.removeValue(forKey: scheme)
+                self.localAIDownloadError.removeValue(forKey: scheme)
+            }
+        }
+    }
+
+    func deleteLocalAIModel(_ scheme: LocalAIScheme) {
+        do {
+            try LocalAIStore.deleteModel(scheme: scheme)
+            localAIDownloadProgress.removeValue(forKey: scheme)
+            localAIDownloadError.removeValue(forKey: scheme)
+            showTemporaryStatus(String(localized: "settings.ai.local.deleted"))
+        } catch {
+            showTemporaryStatus(error.localizedDescription)
+        }
+    }
+
+    func downloadAndTagWithMissingModel() {
+        guard let prompt = missingLocalModelPrompt else { return }
+        let targetScheme = prompt.scheme
+        let targetIDs = prompt.targetIDs
+        let reqConfirm = prompt.requireConfirmation
+        downloadLocalAIModel(targetScheme) { [weak self] in
+            guard let self else { return }
+            self.missingLocalModelPrompt = nil
+            Task { await self.tagWithAI(ids: targetIDs, requireConfirmation: reqConfirm) }
+        }
+    }
+
+    func useAppleVisionForMissingModel() {
+        guard let prompt = missingLocalModelPrompt else { return }
+        let targetIDs = prompt.targetIDs
+        let reqConfirm = prompt.requireConfirmation
+        missingLocalModelPrompt = nil
+        Task { await tagWithAI(ids: targetIDs, requireConfirmation: reqConfirm, overrideScheme: .appleVision) }
+    }
+
+    func useCloudFallbackForMissingModel() {
+        guard let prompt = missingLocalModelPrompt else { return }
+        let targetIDs = prompt.targetIDs
+        let reqConfirm = prompt.requireConfirmation
+        missingLocalModelPrompt = nil
+        if preference.ai.cloudTaggingRoutes().isEmpty {
+            showTemporaryStatus(String(localized: "ai.missingKey"))
+        } else {
+            Task { await tagWithAI(ids: targetIDs, requireConfirmation: reqConfirm, skipLocalAI: true) }
+        }
+    }
+
+    func cancelMissingModelPrompt() {
+        if let prompt = missingLocalModelPrompt {
+            cancelLocalAIDownload(prompt.scheme)
+        }
+        missingLocalModelPrompt = nil
+    }
+
+    func selectActiveCloudPlatform(_ provider: AIProvider?) {
+        preference = store.updateActiveCloudPlatform(provider, in: preference)
+        persistPreference()
+    }
+
+    func selectAIProvider(_ provider: AIProvider?) {
+        selectActiveCloudPlatform(provider)
+    }
+
+    func updateUseJoyTag(_ on: Bool) {
+        updateLocalAIEnabled(on)
     }
 
     func updateAIKey(provider: AIProvider, apiKey: String, model: String? = nil) {
@@ -867,9 +926,27 @@ final class AppModel {
         Task { await tagWithAI(ids: ids, requireConfirmation: false) }
     }
 
-    func tagWithAI(ids: [UUID], requireConfirmation: Bool = true) async {
+    func tagWithAI(
+        ids: [UUID],
+        requireConfirmation: Bool = true,
+        overrideScheme: LocalAIScheme? = nil,
+        skipLocalAI: Bool = false
+    ) async {
         guard !ids.isEmpty, !isBusy, !pendingAIConfirmation else { return }
-        let routes = preference.ai.taggingRoutes()
+
+        if !skipLocalAI && preference.ai.localAIEnabled {
+            let activeScheme = overrideScheme ?? preference.ai.localAIScheme
+            if activeScheme != .appleVision && !LocalAIStore.isInstalled(scheme: activeScheme) {
+                missingLocalModelPrompt = MissingLocalModelPrompt(
+                    scheme: activeScheme,
+                    targetIDs: ids,
+                    requireConfirmation: requireConfirmation
+                )
+                return
+            }
+        }
+
+        let routes = preference.ai.taggingRoutes(overrideLocalScheme: overrideScheme, skipLocalAI: skipLocalAI)
         guard !routes.isEmpty else {
             showTemporaryStatus(String(localized: "ai.missingKey"))
             return
@@ -882,31 +959,6 @@ final class AppModel {
             aiStopRequested = false
             if scanProgress?.phase == .tagging {
                 scanProgress = nil
-            }
-        }
-
-        if routes.contains(where: { $0.provider == .joytag }), !JoyTagStore.isInstalled {
-            publishProgress(
-                ScanProgress(
-                    warehouseName: String(localized: "ai.provider.joytag"),
-                    warehouseID: nil,
-                    phase: .tagging,
-                    currentFile: String(localized: "ai.downloadingModel"),
-                    completed: 0,
-                    total: 100,
-                    currentProvider: AITaggingProgressCopy.providerTitle(.joytag),
-                    currentProviderID: AIProvider.joytag.rawValue
-                ),
-                force: true
-            )
-            do {
-                try await ensureJoyTagModel()
-            } catch {
-                if AITaggingStop.isCancellation(error) { return }
-                if !routes.contains(where: { $0.provider != .joytag }) {
-                    showTemporaryStatus(String(localized: "ai.joytag.downloadFailed"))
-                    return
-                }
             }
         }
 
@@ -1278,7 +1330,8 @@ final class AppModel {
                     frames: frames,
                     catalog: catalog,
                     context: context,
-                    examples: examples
+                    examples: examples,
+                    tagCatalog: self.catalog
                 )
                 return (payload, route.provider)
             } catch {

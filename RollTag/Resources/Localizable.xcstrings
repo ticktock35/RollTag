@@ -135,18 +135,50 @@
         }
       }
     },
-    "ai.capability.joytag" : {
+    "ai.capability.apple_vision" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "On-device, no API key"
+            "value" : "Native system Vision, zero download"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本機打標，不必 API key"
+            "value" : "系統原生 Vision，免下載"
+          }
+        }
+      }
+    },
+    "ai.capability.florence2_base" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dense scene captioning on CPU"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密集場景描述，CPU 推論"
+          }
+        }
+      }
+    },
+    "ai.capability.ram_plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open-set tagging on CPU"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開放式標籤，CPU 推論"
           }
         }
       }
@@ -361,50 +393,18 @@
         }
       }
     },
-    "ai.downloadingModel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Downloading JoyTag…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在下載 JoyTag…"
-          }
-        }
-      }
-    },
-    "ai.joytag.downloadFailed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Could not download JoyTag. Check the network and try again in Settings."
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法下載 JoyTag。請檢查網路後，到設定再試一次。"
-          }
-        }
-      }
-    },
     "ai.missingKey" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Turn on JoyTag in Settings, or add a Gemini or OpenAI API key."
+            "value" : "Turn on Local AI in Settings, or add a Gemini or OpenAI API key."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先在設定打開 JoyTag，或填 Gemini／OpenAI 的 API key。"
+            "value" : "請先在設定打開本機 AI，或填 Gemini／OpenAI 的 API key。"
           }
         }
       }
@@ -476,18 +476,50 @@
         }
       }
     },
-    "ai.provider.joytag" : {
+    "ai.provider.apple_vision" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JoyTag"
+            "value" : "Apple Vision"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JoyTag"
+            "value" : "Apple Vision"
+          }
+        }
+      }
+    },
+    "ai.provider.florence2_base" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MS Florence-2 Base"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MS Florence-2 Base"
+          }
+        }
+      }
+    },
+    "ai.provider.ram_plus" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RAM++"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RAM++"
           }
         }
       }
@@ -2982,13 +3014,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JoyTag is on by default and runs first: frames stay on this Mac. Add a Gemini or OpenAI key as fallback. AI tagging appears once you select a video or photo. Import never runs automatically."
+            "value" : "Local AI is on by default and runs first: frames stay on this Mac. Add a Gemini or OpenAI key as fallback. AI tagging appears once you select a video or photo. Import never runs automatically."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "預設先用 JoyTag：畫面留在這台 Mac。可再填 Gemini 或 OpenAI key 當備援。選了影片或照片才會出現 AI 打標。匯入不會自動跑。"
+            "value" : "預設先用本機 AI：畫面留在這台 Mac。可再填 Gemini 或 OpenAI key 當備援。選了影片或照片才會出現 AI 打標。匯入不會自動跑。"
           }
         }
       }
@@ -3030,23 +3062,199 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI tags can be wrong (people, place, keywords). Review them and click off anything that does not match. Cloud providers bill usage; JoyTag runs on this Mac."
+            "value" : "AI tags can be wrong (people, place, keywords). Review them and click off anything that does not match. Cloud providers bill usage; Local AI runs on this Mac."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI 打的標可能錯誤（人數、地點、關鍵字都可能不對）。請自己看過，不對的點掉。雲端平台計費用量；JoyTag 在這台 Mac 上跑。"
+            "value" : "AI 打的標可能錯誤（人數、地點、關鍵字都可能不對）。請自己看過，不對的點掉。雲端平台計費用量；本機 AI 在這台 Mac 上跑。"
           }
         }
       }
     },
-    "settings.ai.joytag.delete" : {
+    "settings.ai.cloud.section" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remove model"
+            "value" : "Cloud AI (Remote / Fallback)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "雲端 AI (備援與遠端打標)"
+          }
+        }
+      }
+    },
+    "settings.ai.local.toggle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local AI Tagging"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 AI 打標 (Local AI)"
+          }
+        }
+      }
+    },
+    "settings.ai.local.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On-device & 100% private. Frames stay on this Mac and are never sent to cloud."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100% 本機執行與隱私保護：畫面留在這台 Mac，不送往雲端。"
+          }
+        }
+      }
+    },
+    "settings.ai.local.scheme.apple_vision.desc" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Native system framework, ultra fast, no download, 0 disk space."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統原生、極速、免下載、零硬碟佔用"
+          }
+        }
+      }
+    },
+    "settings.ai.local.scheme.florence2_base.desc" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dense scene captioning, ONNX CPU."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密集場景描述 (Dense Captioning)，ONNX CPU"
+          }
+        }
+      }
+    },
+    "settings.ai.local.scheme.ram_plus.desc" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open-set real-world image tagging, ONNX CPU."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "真實世界開放式標籤 (Open-set Tagging)，ONNX CPU"
+          }
+        }
+      }
+    },
+    "settings.ai.local.warn" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local AI runs first when enabled. If inference fails or models are not ready, RollTag automatically falls back to configured cloud platforms."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本機 AI 開啟時優先執行；推論失敗或模型未就緒時，自動備援至已填寫 Key 的雲端平台。"
+          }
+        }
+      }
+    },
+    "settings.ai.local.appleVision.ready" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Built-in · No Download · 0 Disk Space"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原生內建 · 免下載 · 零硬碟佔用"
+          }
+        }
+      }
+    },
+    "settings.ai.local.notDownloaded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not downloaded (%@)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未下載 (%@)"
+          }
+        }
+      }
+    },
+    "settings.ai.local.ready" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready (%@)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已就緒 (%@)"
+          }
+        }
+      }
+    },
+    "settings.ai.local.downloadButton" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Model (%@)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下載模型 (%@)"
+          }
+        }
+      }
+    },
+    "settings.ai.local.deleteButton" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Model"
           }
         },
         "zh-Hant" : {
@@ -3057,114 +3265,130 @@
         }
       }
     },
-    "settings.ai.joytag.download" : {
+    "settings.ai.local.cancelButton" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Download model"
+            "value" : "Cancel"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下載模型"
+            "value" : "取消"
           }
         }
       }
     },
-    "settings.ai.joytag.privacy" : {
+    "settings.ai.local.deleted" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Private: frames never leave this Mac. Google and OpenAI do not see your pictures. Tried first when this switch is on."
+            "value" : "Model deleted"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隱私：畫面留在這台 Mac，不會送到 Google 或 OpenAI。打開時優先用它打標。"
+            "value" : "模型已刪除"
           }
         }
       }
     },
-    "settings.ai.joytag.ready" : {
+    "ai.missingModel.title" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ready on this Mac"
+            "value" : "%@ Not Downloaded"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已在這台 Mac 就緒"
+            "value" : "%@ 尚未下載模型"
           }
         }
       }
     },
-    "settings.ai.joytag.site" : {
+    "ai.missingModel.message" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "About JoyTag"
+            "value" : "%@ requires model weights (%@) to run offline local tagging on your Mac. How would you like to proceed?"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "關於 JoyTag"
+            "value" : "%@ 需要下載模型檔案（%@）才能在本機離線執行視覺打標。請選擇處理方式："
           }
         }
       }
     },
-    "settings.ai.joytag.toggle" : {
+    "ai.missingModel.downloadAndTag" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JoyTag"
+            "value" : "Download & Tag (%@)"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "JoyTag"
+            "value" : "立即下載並打標 (%@)"
           }
         }
       }
     },
-    "settings.ai.joytag.size" : {
+    "ai.missingModel.useAppleVision" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "About 370 MB, saved in ~/rolltag/joytag/. First tag downloads it if needed."
+            "value" : "Use Apple Vision (No Download · Native)"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "約 370 MB，存在 ~/rolltag/joytag/。第一次打標若還沒下載會先抓。"
+            "value" : "改用 Apple Vision 打標 (免下載 · 系統原生)"
           }
         }
       }
     },
-    "settings.ai.joytag.warn" : {
+    "ai.missingModel.useCloud" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local tags from a Danbooru-trained model. They can be wrong, generic, or NSFW. Review them. Frames stay on this Mac."
+            "value" : "Use Cloud Fallback Instead"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本機用 Danbooru 訓練的模型打標。標可能錯、太泛或不適合畫面。請自己看過。幀不會送出這台 Mac。"
+            "value" : "改用雲端備援"
+          }
+        }
+      }
+    },
+    "ai.missingModel.downloadingNotice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading model... %d%% (will tag automatically once done)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模型下載中... %d%%（完成後自動打標）"
           }
         }
       }
@@ -3238,13 +3462,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Priority: JoyTag first (private, on this Mac), then Gemini 3.5 Flash Lite, then gpt-4.1-mini. Turn JoyTag off to skip the local model. Gemini rate limits are tighter; a cloud failure falls back to OpenAI immediately."
+            "value" : "Priority: Local AI first (private, on this Mac), then Gemini 3.5 Flash Lite, then gpt-4.1-mini. Cloud failures fall back immediately."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "優先 JoyTag（本機、畫面不送出），其次 Gemini 3.5 Flash Lite，再來 gpt-4.1-mini。關掉 JoyTag 就跳過本機模型。Gemini 配額較緊，雲端失敗立刻改送 OpenAI。"
+            "value" : "優先使用本機 AI（畫面不送出），其次 Gemini 3.5 Flash Lite，再來 gpt-4.1-mini。雲端失敗立刻改送備援平台。"
           }
         }
       }
@@ -3254,13 +3478,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keys are saved in ~/rolltag/config.json. Do not share that file. The JoyTag model is in ~/rolltag/joytag/."
+            "value" : "Keys are saved in ~/rolltag/config.json. Do not share that file."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Key 存在 ~/rolltag/config.json，不要分享那個檔。JoyTag 模型在 ~/rolltag/joytag/。"
+            "value" : "Key 存在 ~/rolltag/config.json，不要分享那個檔。"
           }
         }
       }

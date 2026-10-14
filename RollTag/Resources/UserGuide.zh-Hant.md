@@ -92,7 +92,7 @@ RollTag 是看自己硬碟上照片與影片、打標、搜尋的工具。檔案
 
 **AI 給的標可能錯**（地點、情緒、關鍵字都可能不對；人數由這台 Mac 的 Vision 判斷，仍請看過）。不對的點掉。匯入**不會**自動打標。
 
-1. 設定 → AI（⌘,）最上是 **JoyTag 開關**（預設打開、最先打）。**優點是隱私：畫面留在這台 Mac，不送到 Google 或 OpenAI。** 模型約 370 MB，在 `~/rolltag/joytag/`。可再填 Gemini 或 OpenAI key 當備援。Key 只存在這台 Mac 的 `~/rolltag/config.json`，不要分享。
+1. 設定 → AI（⌘,）最上是 **本機 AI 開關**（預設打開、最先打）。**優點是隱私：畫面留在這台 Mac，不送到 Google 或 OpenAI。** 提供三選一：Apple Vision（系統原生、免下載）、MS Florence-2 Base（~370 MB）或 RAM++（~2.8 GB）。後兩者可在設定頁面下載或刪除；打標時若尚未下載，亦會彈出確認提示（可選擇立即下載並打標、改用 Apple Vision 或走雲端備援）。可再填 Gemini 或 OpenAI key 當備援。Key 只存在這台 Mac 的 `~/rolltag/config.json`，不要分享。
 2. 選**影片或照片**（已打過的也可再送）。音訊、太小或解不開的會跳過。
 3. 按右側「AI 打標」或 **⌥⌘T**。回來後按「完成」或 Enter 保留；「取消」或 Esc 拿掉這次標。
 

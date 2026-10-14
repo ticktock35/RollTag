@@ -100,9 +100,9 @@ enum VisionFrameAnalyzer {
 
     static func faceID(maxFaceArea: Double, peopleCount: Int) -> String {
         guard peopleCount > 0 else { return "none" }
-        if maxFaceArea >= 0.12 { return "portrait" }
-        if maxFaceArea > 0, maxFaceArea < 0.03 { return "distant" }
-        if maxFaceArea >= 0.03 { return "visible" }
+        if maxFaceArea >= 0.025 { return "portrait" }
+        if maxFaceArea > 0, maxFaceArea < 0.015 { return "distant" }
+        if maxFaceArea >= 0.015 { return "visible" }
         return "distant"
     }
 
@@ -263,14 +263,14 @@ enum VisionFrameAnalyzer {
             textRequest.minimumTextHeight = 0.04
             try? handler.perform([animalRequest, sceneRequest, textRequest])
             scenes = sceneLabels(sceneRequest.results)
-            animals = animalLabels(animalRequest.results)
+            animals = animalLabels(animalRequest.results, classifications: sceneRequest.results)
             text = textLabels(textRequest.results)
         } else {
             try? handler.perform([animalRequest])
-            animals = animalLabels(animalRequest.results)
+            animals = animalLabels(animalRequest.results, classifications: nil)
         }
         let faceBoxes = faces.results ?? []
-        let bodyBoxes = (bodies.results ?? []).filter { $0.confidence >= 0.7 }
+        let bodyBoxes = (bodies.results ?? []).filter { $0.confidence >= 0.50 }
         let maxFaceArea = faceBoxes.map { $0.boundingBox.width * $0.boundingBox.height }.max() ?? 0
         return FrameFacts(
             peopleCount: bodyBoxes.count,
@@ -294,9 +294,10 @@ enum VisionFrameAnalyzer {
     }
 
     private static func sceneLabels(_ results: [VNClassificationObservation]?) -> [String] {
-        let skip: Set<String> = ["photograph", "photography", "image", "art", "screenshot"]
+        let skip: Set<String> = ["photograph", "photography", "image", "art", "screenshot", "material", "textile", "structure", "container", "surface", "object"]
         let labels = (results ?? [])
-            .filter { $0.confidence >= 0.4 }
+            .filter { $0.confidence >= 0.015 }
+            .sorted(by: { $0.confidence > $1.confidence })
             .compactMap { observation -> String? in
                 let label = observation.identifier
                     .replacingOccurrences(of: "_", with: " ")
@@ -305,14 +306,29 @@ enum VisionFrameAnalyzer {
                 guard !label.isEmpty, !skip.contains(label) else { return nil }
                 return label
             }
-        return Array(labels.prefix(5))
+        return Array(labels.prefix(12))
     }
 
-    private static func animalLabels(_ results: [VNRecognizedObjectObservation]?) -> [String] {
-        (results ?? []).compactMap { observation in
-            guard let label = observation.labels.first, label.confidence >= 0.4 else { return nil }
-            return label.identifier.replacingOccurrences(of: "_", with: " ").lowercased()
+    private static func animalLabels(
+        _ results: [VNRecognizedObjectObservation]?,
+        classifications: [VNClassificationObservation]? = nil
+    ) -> [String] {
+        var list: [String] = []
+        for observation in results ?? [] {
+            guard let label = observation.labels.first, label.confidence >= 0.25 else { continue }
+            list.append(label.identifier.replacingOccurrences(of: "_", with: " ").lowercased())
         }
+        let animalIdentifiers: Set<String> = [
+            "dog", "cat", "bird", "owl", "raptor", "husky", "puppy", "kitten", "horse", "cow", "sheep",
+            "goat", "pig", "canine", "feline", "wildlife", "deer", "bear", "lion", "tiger", "wolf", "fox"
+        ]
+        for c in classifications ?? [] where c.confidence >= 0.035 {
+            let id = c.identifier.lowercased()
+            if animalIdentifiers.contains(id) {
+                list.append(id.replacingOccurrences(of: "_", with: " "))
+            }
+        }
+        return list
     }
 
     private static func textLabels(_ results: [VNRecognizedTextObservation]?) -> [String] {

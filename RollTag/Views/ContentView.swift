@@ -88,6 +88,9 @@ struct ContentView: View {
                 )
             }
         }
+        .sheet(item: $model.missingLocalModelPrompt) { prompt in
+            MissingLocalModelSheet(model: model, prompt: prompt)
+        }
     }
 
     private var rightColumn: some View {
@@ -333,5 +336,109 @@ private struct ScanToolbarItem: View {
             ProgressView()
                 .controlSize(.small)
         }
+    }
+}
+
+private struct MissingLocalModelSheet: View {
+    @Bindable var model: AppModel
+    let prompt: MissingLocalModelPrompt
+
+    var body: some View {
+        VStack(spacing: 20) {
+            HStack(alignment: .top, spacing: 16) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(Color.accentColor)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(String(format: String(localized: "ai.missingModel.title"), prompt.scheme.title))
+                        .font(.headline)
+
+                    Text(
+                        String(
+                            format: String(localized: "ai.missingModel.message"),
+                            prompt.scheme.title,
+                            LocalAIStore.modelSizeString(for: prompt.scheme)
+                        )
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if model.isLocalAIModelDownloading(prompt.scheme) {
+                VStack(alignment: .leading, spacing: 10) {
+                    let progress = model.localAIDownloadProgress[prompt.scheme] ?? 0
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                    HStack {
+                        Text(String(format: String(localized: "ai.missingModel.downloadingNotice"), Int(progress * 100)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(String(localized: "settings.ai.local.cancelButton")) {
+                            model.cancelLocalAIDownload(prompt.scheme)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+                .padding(14)
+                .background(
+                    Color(nsColor: .controlBackgroundColor),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+            } else {
+                VStack(spacing: 10) {
+                    Button {
+                        model.downloadAndTagWithMissingModel()
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.down.circle")
+                            Text(String(format: String(localized: "ai.missingModel.downloadAndTag"), LocalAIStore.modelSizeString(for: prompt.scheme)))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+
+                    Button {
+                        model.useAppleVisionForMissingModel()
+                    } label: {
+                        HStack {
+                            Image(systemName: "sparkles")
+                            Text(String(localized: "ai.missingModel.useAppleVision"))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
+                    if !model.preference.ai.cloudTaggingRoutes().isEmpty {
+                        Button {
+                            model.useCloudFallbackForMissingModel()
+                        } label: {
+                            HStack {
+                                Image(systemName: "cloud")
+                                Text(String(localized: "ai.missingModel.useCloud"))
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                    }
+
+                    Button(String(localized: "duplicates.cancel")) {
+                        model.cancelMissingModelPrompt()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 480)
     }
 }

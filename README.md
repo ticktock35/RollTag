@@ -12,7 +12,7 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 
 ## 誰適合、怎麼用
 
-不必填 API key 就能加入倉庫、當看圖／看片瀏覽、手打標、搜尋、切段、找重複。AI 打標預設先用本機 JoyTag（畫面不送出），也可再貼 Gemini／OpenAI key。匯入時**不會**自動跑。
+不必填 API key 就能加入倉庫、當看圖／看片瀏覽、手打標、搜尋、切段、找重複。AI 打標預設先用本機 AI（畫面不送出），也可再貼 Gemini／OpenAI key。匯入時**不會**自動跑。
 
 ### 拍片、剪片的人（頻道、活動、後製）
 
@@ -197,7 +197,7 @@ open RollTag.xcodeproj
 
 - **Gemini：** 用 Google 帳號到 [Google AI Studio API keys](https://aistudio.google.com/api-keys) 建立，貼到設定。說明：[Using Gemini API keys](https://ai.google.dev/gemini-api/docs/api-key)
 - **OpenAI：** 到 [OpenAI API keys](https://platform.openai.com/api-keys) 建立 secret key，貼到設定。帳號可能要先開計費
-- **JoyTag（預設打開、最先打）：** 不必 key。**畫面留在這台 Mac**，不送到 Google 或 OpenAI。模型約 370 MB，存在 `~/rolltag/joytag/`；第一次打標或按下載才抓。標來自 Danbooru 詞表，可能錯或不宜，請看過。失敗才改送已填的 Gemini／OpenAI。設定裡可關掉。
+- **本機 AI（預設打開、最先打）：** 不必 key。**畫面留在這台 Mac**，不送到 Google 或 OpenAI。提供 Apple Vision（系統原生、免下載、零硬碟佔用）、MS Florence-2 Base（密集場景描述，約 370 MB）與 RAM++（開放式標籤，約 2.8 GB）三選一。後兩者支援在設定內下載／刪除，或於打標時彈出確認提示（立即下載並打標、改用 Apple Vision、改用雲端備援）。失敗或未就緒才改送已填的 Gemini／OpenAI。設定裡可關掉。
 
 雲端用量由各平台計費。Key 只存在這台 Mac 的 `~/rolltag/config.json`，不要分享那個檔。
 
@@ -218,7 +218,7 @@ open RollTag.xcodeproj
 ### 資料放哪
 
 - 程式設定（倉庫名單、API key、快捷鍵等）：`~/rolltag/config.json`
-- JoyTag 本機模型：`~/rolltag/joytag/`  
+- 本機 AI 模型檔案：`~/rolltag/models/florence2/`、`~/rolltag/models/ram_plus/`
   不要分享這個檔，也不要放進公開 git。
 - GPS 反查地名快取：`~/rolltag/geocode-cache.json`
 - 每個倉庫的標籤與縮圖：`<倉庫>/.rolltag/`  

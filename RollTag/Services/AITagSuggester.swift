@@ -2,7 +2,7 @@ import Foundation
 
 enum AITagSuggester {
     static func catalogPayload(catalog: TagCatalog, locale: String, customValues: [String]) -> [String: Any] {
-        var categories: [[String: Any]] = catalog.categories.map { category in
+        let categories: [[String: Any]] = catalog.categories.map { category in
             [
                 "id": category.id,
                 "name": category.localizedName(locale: locale),

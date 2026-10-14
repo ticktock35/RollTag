@@ -54,35 +54,43 @@ struct PreferenceStore {
         return next
     }
 
-    func updateAI(selectedProvider: AIProvider?, in file: PreferenceFile) -> PreferenceFile {
+    func updateLocalAIEnabled(_ on: Bool, in file: PreferenceFile) -> PreferenceFile {
         var next = file
-        if selectedProvider == .joytag {
-            next.ai.useJoyTag = true
-            next.ai.selectedProvider = nil
-        } else {
-            next.ai.selectedProvider = selectedProvider
-        }
+        next.ai.localAIEnabled = on
         return next
     }
 
-    func updateUseJoyTag(_ on: Bool, in file: PreferenceFile) -> PreferenceFile {
+    func updateLocalAIScheme(_ scheme: LocalAIScheme, in file: PreferenceFile) -> PreferenceFile {
         var next = file
-        next.ai.useJoyTag = on
-        if next.ai.selectedProvider == .joytag {
-            next.ai.selectedProvider = nil
-        }
+        next.ai.localAIScheme = scheme
         return next
+    }
+
+    func updateActiveCloudPlatform(_ platform: AIProvider?, in file: PreferenceFile) -> PreferenceFile {
+        var next = file
+        next.ai.activeCloudPlatform = platform?.isLocal == true ? nil : platform
+        return next
+    }
+
+    func updateAI(selectedProvider: AIProvider?, in file: PreferenceFile) -> PreferenceFile {
+        updateActiveCloudPlatform(selectedProvider, in: file)
+    }
+
+    func updateUseJoyTag(_ on: Bool, in file: PreferenceFile) -> PreferenceFile {
+        updateLocalAIEnabled(on, in: file)
     }
 
     func updateAIKey(provider: AIProvider, apiKey: String, model: String? = nil, in file: PreferenceFile) -> PreferenceFile {
         var next = file
-        var settings = next.ai.settings(for: provider)
-        settings.apiKey = apiKey
-        if let model { settings.model = model }
-        if settings.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, settings.model.isEmpty {
-            next.ai.providers[provider] = nil
-        } else {
-            next.ai.providers[provider] = settings
+        switch provider {
+        case .gemini:
+            next.ai.geminiApiKey = apiKey
+            if let model, !model.isEmpty { next.ai.geminiModel = model }
+        case .openai:
+            next.ai.openaiApiKey = apiKey
+            if let model, !model.isEmpty { next.ai.openaiModel = model }
+        default:
+            break
         }
         return next
     }

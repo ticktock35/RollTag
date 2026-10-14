@@ -152,66 +152,71 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                joyTagSection
+                localAISection
 
                 Divider()
 
-                HStack(spacing: 16) {
-                    Link(String(localized: "settings.ai.keys.gemini"), destination: URL(string: "https://aistudio.google.com/api-keys")!)
-                    Link(String(localized: "settings.ai.keys.openai"), destination: URL(string: "https://platform.openai.com/api-keys")!)
-                }
-                .font(.callout)
-                HStack(spacing: 16) {
-                    if let url = AIProvider.gemini.usageURL {
-                        Link(String(localized: "settings.ai.usage.gemini"), destination: url)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(String(localized: "settings.ai.cloud.section"))
+                        .font(.headline)
+
+                    HStack(spacing: 16) {
+                        Link(String(localized: "settings.ai.keys.gemini"), destination: URL(string: "https://aistudio.google.com/api-keys")!)
+                        Link(String(localized: "settings.ai.keys.openai"), destination: URL(string: "https://platform.openai.com/api-keys")!)
                     }
-                    if let url = AIProvider.openai.usageURL {
-                        Link(String(localized: "settings.ai.usage.openai"), destination: url)
-                    }
-                }
-                .font(.callout)
-                Text(String(localized: "settings.ai.keys.warn"))
                     .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(String(localized: "settings.ai.priority"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Picker(String(localized: "settings.ai.captureTime"), selection: Binding(
-                    get: { model.preference.ai.skipImplausibleCaptureDates },
-                    set: { model.updateSkipImplausibleCaptureDates($0) }
-                )) {
-                    Text(String(localized: "settings.ai.captureTime.skipImplausible")).tag(true)
-                    Text(String(localized: "settings.ai.captureTime.preferHeader")).tag(false)
-                }
-                .pickerStyle(.radioGroup)
-                Text(String(localized: "settings.ai.captureTime.detail"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Picker(String(localized: "settings.ai.active"), selection: Binding(
-                    get: { model.preference.ai.selectedProvider },
-                    set: { model.selectAIProvider($0) }
-                )) {
-                    Text(String(localized: "settings.ai.none")).tag(Optional<AIProvider>.none)
-                    ForEach(AIProvider.keyedProviders) { provider in
-                        Text(String(localized: String.LocalizationValue(provider.localizationKey))).tag(Optional(provider))
+                    HStack(spacing: 16) {
+                        if let url = AIProvider.gemini.usageURL {
+                            Link(String(localized: "settings.ai.usage.gemini"), destination: url)
+                        }
+                        if let url = AIProvider.openai.usageURL {
+                            Link(String(localized: "settings.ai.usage.openai"), destination: url)
+                        }
                     }
+                    .font(.callout)
+                    Text(String(localized: "settings.ai.keys.warn"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(localized: "settings.ai.priority"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Picker(String(localized: "settings.ai.captureTime"), selection: Binding(
+                        get: { model.preference.ai.skipImplausibleCaptureDates },
+                        set: { model.updateSkipImplausibleCaptureDates($0) }
+                    )) {
+                        Text(String(localized: "settings.ai.captureTime.skipImplausible")).tag(true)
+                        Text(String(localized: "settings.ai.captureTime.preferHeader")).tag(false)
+                    }
+                    .pickerStyle(.radioGroup)
+                    Text(String(localized: "settings.ai.captureTime.detail"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Picker(String(localized: "settings.ai.active"), selection: Binding(
+                        get: { model.preference.ai.activeCloudPlatform },
+                        set: { model.selectActiveCloudPlatform($0) }
+                    )) {
+                        Text(String(localized: "settings.ai.none")).tag(Optional<AIProvider>.none)
+                        ForEach(AIProvider.cloudProviders) { provider in
+                            Text(String(localized: String.LocalizationValue(provider.localizationKey))).tag(Optional(provider))
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+
+                    Divider()
+
+                    ForEach(AIProvider.cloudProviders) { provider in
+                        providerRow(provider)
+                    }
+
+                    Text(String(localized: "settings.ai.privacy"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.radioGroup)
-
-                Divider()
-
-                ForEach(AIProvider.keyedProviders) { provider in
-                    providerRow(provider)
-                }
-
-                Text(String(localized: "settings.ai.privacy"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 8)
@@ -365,66 +370,134 @@ struct SettingsView: View {
         .padding(.vertical, 4)
     }
 
-    private var joyTagSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var localAISection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: Binding(
-                get: { model.preference.ai.useJoyTag },
-                set: { model.updateUseJoyTag($0) }
+                get: { model.preference.ai.localAIEnabled },
+                set: { model.updateLocalAIEnabled($0) }
             )) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "settings.ai.joytag.toggle"))
+                    Text(String(localized: "settings.ai.local.toggle"))
                         .font(.headline)
-                    Text(String(localized: "ai.capability.joytag"))
+                    Text(String(localized: "settings.ai.local.subtitle"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .toggleStyle(.switch)
-            Text(String(localized: "settings.ai.joytag.privacy"))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let url = AIProvider.joytag.infoURL {
-                Link(String(localized: "settings.ai.joytag.site"), destination: url)
-                    .font(.caption)
-            }
-            Text(String(localized: "settings.ai.joytag.warn"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(String(localized: "settings.ai.joytag.size"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                if model.joyTagDownloading {
-                    ProgressView(value: model.joyTagDownloadFraction)
-                        .frame(maxWidth: 180)
-                    Text("\(Int((model.joyTagDownloadFraction * 100).rounded()))%")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                } else if model.joyTagInstalled {
-                    Text(String(localized: "settings.ai.joytag.ready"))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    Button(String(localized: "settings.ai.joytag.delete")) {
-                        model.removeJoyTagModel()
+
+            if model.preference.ai.localAIEnabled {
+                VStack(spacing: 0) {
+                    ForEach(Array(LocalAIScheme.allCases.enumerated()), id: \.element.id) { index, scheme in
+                        if index > 0 {
+                            Divider()
+                        }
+                        localAISchemeRow(scheme)
                     }
-                    .disabled(model.isBusy)
-                } else {
-                    Button(String(localized: "settings.ai.joytag.download")) {
-                        model.downloadJoyTagModel()
-                    }
-                    .disabled(model.isBusy)
                 }
-            }
-            if !model.joyTagStatusMessage.isEmpty {
-                Text(model.joyTagStatusMessage)
+                .padding(.horizontal, 10)
+                .background(
+                    Color(nsColor: .controlBackgroundColor),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+
+                Text(String(localized: "settings.ai.local.warn"))
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func localAISchemeRow(_ scheme: LocalAIScheme) -> some View {
+        let isSelected = model.preference.ai.localAIScheme == scheme
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 10) {
+                Button {
+                    model.updateLocalAIScheme(scheme)
+                } label: {
+                    Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                        .imageScale(.medium)
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(scheme.title)
+                            .font(.body.weight(isSelected ? .semibold : .medium))
+                        Spacer()
+                        localAIStatusView(scheme)
+                    }
+                    Text(scheme.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            model.updateLocalAIScheme(scheme)
+        }
+    }
+
+    @ViewBuilder
+    private func localAIStatusView(_ scheme: LocalAIScheme) -> some View {
+        switch scheme {
+        case .appleVision:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text(String(localized: "settings.ai.local.appleVision.ready"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .florence2Base, .ramPlus:
+            if model.isLocalAIModelDownloading(scheme) {
+                HStack(spacing: 8) {
+                    ProgressView(value: model.localAIDownloadProgress[scheme] ?? 0)
+                        .frame(width: 90)
+                    Text("\(Int((model.localAIDownloadProgress[scheme] ?? 0) * 100))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Button(String(localized: "settings.ai.local.cancelButton")) {
+                        model.cancelLocalAIDownload(scheme)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            } else if LocalAIStore.isInstalled(scheme: scheme) {
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text(String(format: String(localized: "settings.ai.local.ready"), LocalAIStore.displaySizeString(for: scheme)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button(String(localized: "settings.ai.local.deleteButton")) {
+                        model.deleteLocalAIModel(scheme)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.red)
+                    .font(.caption)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Text(String(format: String(localized: "settings.ai.local.notDownloaded"), LocalAIStore.modelSizeString(for: scheme)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button(String(format: String(localized: "settings.ai.local.downloadButton"), LocalAIStore.modelSizeString(for: scheme))) {
+                        model.downloadLocalAIModel(scheme)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+        }
     }
 
     private func modelLabel(_ modelID: String, provider: AIProvider) -> String {

@@ -2,6 +2,14 @@ import Foundation
 
 struct TagCatalog: Codable, Equatable {
     var categories: [TagCategory]
+
+    static var bundled: TagCatalog {
+        TagCatalogLoader.load()
+    }
+
+    static var defaultCatalog: TagCatalog {
+        bundled
+    }
 }
 
 struct TagCategory: Codable, Identifiable, Hashable {
