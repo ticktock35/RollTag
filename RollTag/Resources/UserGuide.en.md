@@ -17,7 +17,7 @@ You do not need an API key to add a warehouse, preview, hand-tag, search, trim, 
 A warehouse is a footage folder or an external drive.
 
 - **Drop the folder on the window**, choose **File → Add Warehouse** (⌘O), or use ＋ at the bottom of the sidebar.
-- Scanning runs in the background; progress shows on the warehouse row.
+- Scanning runs in the background; progress shows on the warehouse row. Building the initial database index takes time on large drives, but you can browse files immediately as they appear.
 - Removing a warehouse only unregisters it. **Files on disk are not deleted.**
 - Unplug a drive and it goes offline; search hides those clips until you plug it back in.
 - Rescan online warehouses with ⌘R.
