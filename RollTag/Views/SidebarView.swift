@@ -11,7 +11,7 @@ struct SidebarView: View {
                 }
             }
 
-            Section(String(localized: "sidebar.warehouses")) {
+            Section {
                 ForEach(model.warehouses) { warehouse in
                     OutlineGroup(
                         [
@@ -54,6 +54,20 @@ struct SidebarView: View {
                     }
                     .opacity(warehouse.isOnline ? 1 : 0.7)
                 }
+            } header: {
+                HStack {
+                    Text(String(localized: "sidebar.warehouses"))
+                    Spacer()
+                    Button {
+                        model.chooseWarehouseFolder()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "warehouse.add"))
+                }
             }
 
             if !model.populatedTagCategories.isEmpty {
@@ -79,15 +93,20 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            Button {
-                model.chooseWarehouseFolder()
-            } label: {
-                Label(String(localized: "warehouse.add"), systemImage: "plus")
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                Button {
+                    model.chooseWarehouseFolder()
+                } label: {
+                    Label(String(localized: "warehouse.add"), systemImage: "plus")
+                }
+                .buttonStyle(.borderless)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
-            .buttonStyle(.borderless)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
+            .background(Color(nsColor: .windowBackgroundColor))
         }
     }
 
