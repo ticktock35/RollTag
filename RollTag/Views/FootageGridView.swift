@@ -21,6 +21,7 @@ struct FootageGridView: View {
                             FootageCell(
                                 item: item,
                                 isSelected: model.selectedIDs.contains(item.id),
+                                isMainPlayerItem: model.focusedFootage?.id == item.id && item.footage.mediaKind == .video,
                                 warehouseRoot: model.warehouses.first(where: { $0.id == item.footage.warehouseID && $0.isOnline })?.preference.url,
                                 thumbRefreshToken: model.thumbRefreshToken
                             )

@@ -23,16 +23,23 @@ struct HoverPlayerView: NSViewRepresentable {
         private let playerLayer = AVPlayerLayer()
         private var currentURL: URL?
         private var statusObservation: NSKeyValueObservation?
+        private var revealTimer: Timer?
+        private var revealAttempts = 0
         private var wantsPlaying = false
         var isMuted: Bool = true {
             didSet { player.isMuted = isMuted }
         }
 
+        override var isOpaque: Bool { false }
+
         override init(frame frameRect: NSRect) {
             super.init(frame: frameRect)
             wantsLayer = true
+            layer?.backgroundColor = NSColor.clear.cgColor
             playerLayer.player = player
             playerLayer.videoGravity = .resizeAspect
+            playerLayer.backgroundColor = NSColor.clear.cgColor
+            playerLayer.isHidden = true
             layer?.addSublayer(playerLayer)
             player.isMuted = isMuted
         }
@@ -50,12 +57,19 @@ struct HoverPlayerView: NSViewRepresentable {
             guard currentURL != url else { return }
             currentURL = url
             statusObservation = nil
+            revealTimer?.invalidate()
+            revealTimer = nil
+            playerLayer.isHidden = true
             let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
             let item = AVPlayerItem(asset: asset)
             item.preferredMaximumResolution = ThumbnailService.hoverMaxResolution
             statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
-                guard let self, self.wantsPlaying, item.status == .readyToPlay else { return }
-                self.player.play()
+                guard item.status == .readyToPlay else { return }
+                DispatchQueue.main.async {
+                    guard let self, self.wantsPlaying else { return }
+                    self.player.play()
+                    self.startRevealTimer()
+                }
             }
             player.replaceCurrentItem(with: item)
         }
@@ -66,15 +80,42 @@ struct HoverPlayerView: NSViewRepresentable {
                 load(url)
                 if player.currentItem?.status == .readyToPlay {
                     player.play()
+                    startRevealTimer()
                 }
             } else {
                 unload()
             }
         }
 
+        private func startRevealTimer() {
+            guard revealTimer == nil else { return }
+            revealAttempts = 0
+            revealTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in
+                guard let self, self.wantsPlaying else {
+                    timer.invalidate()
+                    return
+                }
+                self.revealAttempts += 1
+                if self.playerLayer.isReadyForDisplay {
+                    self.playerLayer.isHidden = false
+                    timer.invalidate()
+                    self.revealTimer = nil
+                    return
+                }
+                if self.revealAttempts > 90 {
+                    timer.invalidate()
+                    self.revealTimer = nil
+                }
+            }
+        }
+
         private func unload() {
             wantsPlaying = false
             statusObservation = nil
+            revealTimer?.invalidate()
+            revealTimer = nil
+            revealAttempts = 0
+            playerLayer.isHidden = true
             currentURL = nil
             player.pause()
             player.currentItem?.asset.cancelLoading()

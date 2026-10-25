@@ -36,7 +36,7 @@ Common still formats and camera RAW are supported (HEIC, JPEG, PNG, TIFF, AVIF, 
 
 ## Watch videos {#videos}
 
-- Click a clip to see the first frame. Space or Play loads the player. WebM / MKV using VP8 or VP9 play through the system browser engine. AV1 can't be decoded on this Mac; if ffmpeg is installed, RollTag makes a preview and plays that. The first time takes a moment.
+- Rest the pointer on a video thumbnail for 2 seconds and it plays in the tile. Move away and it stops. Click a clip to see the first frame. Space or Play loads the player. WebM / MKV using VP8 or VP9 play through the system browser engine. AV1 can't be decoded on this Mac; if ffmpeg is installed, RollTag makes a preview and plays that. The first time takes a moment.
 - Drag the timeline to scrub. While playing, ← → skip back / forward 5 seconds.
 - Hold the mouse on the picture for 2× speed; release to return. If you have zoomed in, drag moves the frame instead.
 - P while playing pauses, enters fullscreen, then resumes from the same time.
