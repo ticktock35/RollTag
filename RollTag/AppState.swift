@@ -201,6 +201,22 @@ final class AppModel {
         return warehouse.preference.url
     }
 
+    func existingFileURL(for footageID: UUID) -> URL? {
+        guard let footage = footage(id: footageID), footage.status == .available,
+              let root = onlineRoot(for: footageID)
+        else { return nil }
+        return MediaFileDrag.existingFileURL(footage.absoluteURL(warehouseRoot: root))
+    }
+
+    func fileURLsForDrag(startingAt footageID: UUID) -> [URL] {
+        let ids = MediaFileDrag.targetIDs(
+            startingAt: footageID,
+            selectedIDs: selectedIDs,
+            visibleIDs: visibleResults.map(\.id)
+        )
+        return MediaFileDrag.urls(ids: ids, resolve: existingFileURL(for:))
+    }
+
     func presentFocusedMedia() {
         playback.present(focusedMedia)
     }
@@ -1863,6 +1879,38 @@ final class AppModel {
             return
         }
         statusMessage = String(localized: "finder.folderMissing")
+    }
+
+    func shouldOfferOpenWith(for footage: Footage) -> Bool {
+        guard footage.status == .available, existingFileURL(for: footage.id) != nil else { return false }
+        if footage.isTooSmallToPreview { return true }
+        guard focusedFootage?.id == footage.id else { return false }
+        return playback.didFailToLoad || playback.isIncompleteFile
+    }
+
+    func otherAppChoices(for footage: Footage) -> [ExternalMediaOpen.AppChoice] {
+        guard let url = existingFileURL(for: footage.id) else { return [] }
+        return ExternalMediaOpen.menuApps(for: url, kind: footage.mediaKind)
+    }
+
+    func openInOtherApp(_ footage: Footage, appURL: URL?) {
+        guard let url = existingFileURL(for: footage.id) else {
+            statusMessage = String(localized: "openWith.missing")
+            return
+        }
+        ExternalMediaOpen.open(url, with: appURL) { [weak self] in
+            self?.statusMessage = String(localized: "openWith.failed")
+        }
+    }
+
+    func chooseAppToOpen(_ footage: Footage) {
+        guard let url = existingFileURL(for: footage.id) else {
+            statusMessage = String(localized: "openWith.missing")
+            return
+        }
+        ExternalMediaOpen.chooseApp(for: url, from: NSApp.keyWindow) { [weak self] in
+            self?.statusMessage = String(localized: "openWith.failed")
+        }
     }
 
     func proposeDeleteMissing(_ ids: Set<UUID>) {

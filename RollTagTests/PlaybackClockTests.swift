@@ -2,6 +2,36 @@ import XCTest
 @testable import RollTag
 
 final class PlaybackClockTests: XCTestCase {
+    private var tempMediaURLs: [URL] = []
+
+    override func tearDown() {
+        for url in tempMediaURLs {
+            try? FileManager.default.removeItem(at: url)
+        }
+        tempMediaURLs.removeAll()
+        super.tearDown()
+    }
+
+    private func tempMediaURL() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-play-\(UUID().uuidString).mov")
+        try Data(repeating: 0, count: 16_384).write(to: url)
+        tempMediaURLs.append(url)
+        return url
+    }
+
+    private func videoMedia(url: URL, duration: Double = 8) -> PreviewMedia {
+        PreviewMedia(
+            id: UUID(),
+            url: url,
+            kind: .video,
+            filename: url.lastPathComponent,
+            width: 1920,
+            height: 1080,
+            duration: duration,
+            fileSize: 16_384
+        )
+    }
+
     func testFormatsMinutesAndSeconds() {
         XCTAssertEqual(PlaybackClock.format(0), "00:00")
         XCTAssertEqual(PlaybackClock.format(5), "00:05")
@@ -26,20 +56,9 @@ final class PlaybackClockTests: XCTestCase {
     }
 
     @MainActor
-    func testPresentVideoAttachesPlayerItem() {
+    func testPresentVideoAttachesPlayerItem() throws {
         let playback = PreviewPlayback()
-        playback.present(
-            PreviewMedia(
-                id: UUID(),
-                url: URL(fileURLWithPath: "/tmp/clip.mov"),
-                kind: .video,
-                filename: "clip.mov",
-                width: 3840,
-                height: 2160,
-                duration: 8,
-                fileSize: 5_000_000
-            )
-        )
+        playback.present(videoMedia(url: try tempMediaURL()))
         XCTAssertNotNil(playback.player.currentItem)
         XCTAssertTrue(playback.isItemLoaded)
         XCTAssertEqual(playback.duration, 8)
@@ -96,20 +115,9 @@ final class PlaybackClockTests: XCTestCase {
     }
 
     @MainActor
-    func testSkipMovesFiveSecondsAndClamps() {
+    func testSkipMovesFiveSecondsAndClamps() throws {
         let playback = PreviewPlayback()
-        playback.present(
-            PreviewMedia(
-                id: UUID(),
-                url: URL(fileURLWithPath: "/tmp/clip.mov"),
-                kind: .video,
-                filename: "clip.mov",
-                width: 1920,
-                height: 1080,
-                duration: 12,
-                fileSize: 5_000_000
-            )
-        )
+        playback.present(videoMedia(url: try tempMediaURL(), duration: 12))
         playback.skip(by: PreviewPlayback.skipSeconds)
         XCTAssertEqual(playback.currentSeconds, 5, accuracy: 0.01)
         playback.skip(by: PreviewPlayback.skipSeconds)
@@ -123,18 +131,9 @@ final class PlaybackClockTests: XCTestCase {
     }
 
     @MainActor
-    func testPresentSameClipKeepsCurrentTime() {
+    func testPresentSameClipKeepsCurrentTime() throws {
         let playback = PreviewPlayback()
-        let media = PreviewMedia(
-            id: UUID(),
-            url: URL(fileURLWithPath: "/tmp/clip.mov"),
-            kind: .video,
-            filename: "clip.mov",
-            width: 1920,
-            height: 1080,
-            duration: 120,
-            fileSize: 5_000_000
-        )
+        let media = videoMedia(url: try tempMediaURL(), duration: 120)
         playback.present(media)
         playback.skip(by: 75)
         XCTAssertEqual(playback.currentSeconds, 75, accuracy: 0.01)
@@ -144,20 +143,9 @@ final class PlaybackClockTests: XCTestCase {
     }
 
     @MainActor
-    func testFullscreenTransitionPausesThenResumesFromSameTime() {
+    func testFullscreenTransitionPausesThenResumesFromSameTime() throws {
         let playback = PreviewPlayback()
-        playback.present(
-            PreviewMedia(
-                id: UUID(),
-                url: URL(fileURLWithPath: "/tmp/clip.mov"),
-                kind: .video,
-                filename: "clip.mov",
-                width: 1920,
-                height: 1080,
-                duration: 120,
-                fileSize: 5_000_000
-            )
-        )
+        playback.present(videoMedia(url: try tempMediaURL(), duration: 120))
         playback.skip(by: 75)
         playback.play()
         playback.beginFullscreenTransition()
@@ -169,20 +157,9 @@ final class PlaybackClockTests: XCTestCase {
     }
 
     @MainActor
-    func testHoldSpeedOnlyWhilePlaying() {
+    func testHoldSpeedOnlyWhilePlaying() throws {
         let playback = PreviewPlayback()
-        playback.present(
-            PreviewMedia(
-                id: UUID(),
-                url: URL(fileURLWithPath: "/tmp/clip.mov"),
-                kind: .video,
-                filename: "clip.mov",
-                width: 1920,
-                height: 1080,
-                duration: 12,
-                fileSize: 5_000_000
-            )
-        )
+        playback.present(videoMedia(url: try tempMediaURL(), duration: 12))
         playback.beginHoldSpeed()
         XCTAssertFalse(playback.isHoldSpeed)
         XCTAssertEqual(playback.player.rate, 0)
@@ -206,5 +183,72 @@ final class PlaybackClockTests: XCTestCase {
         let inverted = MediaPan.twoFingerDelta(x: 4, y: -3, invert: true)
         XCTAssertEqual(inverted.width, 4)
         XCTAssertEqual(inverted.height, 3)
+    }
+
+    @MainActor
+    func testPresentMissingFileDoesNotPretendCodecFailed() {
+        let playback = PreviewPlayback()
+        playback.present(
+            videoMedia(
+                url: URL(fileURLWithPath: "/tmp/rolltag-missing-\(UUID().uuidString).mov"),
+                duration: 1667
+            )
+        )
+        XCTAssertTrue(playback.isSourceMissing)
+        XCTAssertFalse(playback.didFailToLoad)
+        XCTAssertFalse(playback.canPlay)
+        XCTAssertNil(playback.player.currentItem)
+    }
+
+    @MainActor
+    func testPresentWebMUsesWebKitAndStaysPlayable() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-webm-\(UUID().uuidString).webm")
+        try Data(repeating: 0, count: 16_384).write(to: url)
+        tempMediaURLs.append(url)
+        let playback = PreviewPlayback()
+        playback.present(
+            PreviewMedia(
+                id: UUID(),
+                url: url,
+                kind: .video,
+                filename: url.lastPathComponent,
+                width: 3840,
+                height: 2160,
+                duration: 761,
+                fileSize: 16_384
+            )
+        )
+        XCTAssertTrue(playback.usesWebKitPlayback)
+        XCTAssertTrue(playback.canPlay)
+        XCTAssertFalse(playback.didFailToLoad)
+        XCTAssertNil(playback.player.currentItem)
+        playback.play()
+        XCTAssertTrue(playback.isPlaying)
+        playback.skip(by: 5)
+        XCTAssertEqual(playback.currentSeconds, 5, accuracy: 0.01)
+        XCTAssertEqual(playback.pendingWebKitSeek, 5)
+    }
+
+    @MainActor
+    func testPresentTinyVideoIsIncomplete() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-tiny-\(UUID().uuidString).mov")
+        try Data([0x00]).write(to: url)
+        tempMediaURLs.append(url)
+        let playback = PreviewPlayback()
+        playback.present(
+            PreviewMedia(
+                id: UUID(),
+                url: url,
+                kind: .video,
+                filename: url.lastPathComponent,
+                width: 1920,
+                height: 1080,
+                duration: 3,
+                fileSize: 1
+            )
+        )
+        XCTAssertTrue(playback.isIncompleteFile)
+        XCTAssertFalse(playback.isSourceMissing)
+        XCTAssertFalse(playback.canPlay)
     }
 }

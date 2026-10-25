@@ -32,6 +32,9 @@ struct FootageGridView: View {
                             .contextMenu {
                                 gridContextMenu(for: item)
                             }
+                            .mediaFileDrag(enabled: item.footage.status == .available && item.isOnline) {
+                                model.fileURLsForDrag(startingAt: item.id)
+                            }
                         }
                     }
                     .padding(.horizontal, GridNavigation.horizontalPadding)
@@ -78,6 +81,9 @@ struct FootageGridView: View {
         } else {
             Button(String(localized: "finder.reveal")) {
                 model.revealInFinder(item.footage)
+            }
+            Menu(String(localized: "openWith.button")) {
+                OpenWithMenuContent(footage: item.footage, model: model)
             }
             if model.showsSilentAITagMenu(for: item.footage) {
                 Button(String(localized: "ai.tag.batch")) {
@@ -138,5 +144,21 @@ struct FootageGridView: View {
             return String(localized: "empty.reconciling.detail")
         }
         return String(localized: "empty.noFootage.detail")
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func mediaFileDrag(enabled: Bool, urls: @escaping () -> [URL]) -> some View {
+        if enabled {
+            self.simultaneousGesture(
+                DragGesture(minimumDistance: 7)
+                    .onChanged { _ in
+                        MediaFileDrag.beginSession(urls: urls())
+                    }
+            )
+        } else {
+            self
+        }
     }
 }

@@ -12,6 +12,11 @@ struct PlayerPaneView: View {
             ZoomableMediaView(playback: model.playback, invertTwoFingerPan: model.preference.invertTwoFingerPan) {
                 mediaContent
             }
+            if let message = previewMessage {
+                previewMessageOverlay(message)
+            } else if model.playback.isWaitingOnProxy {
+                proxyWaitOverlay
+            }
             if !fillsScreen {
                 chrome
             }
@@ -21,11 +26,14 @@ struct PlayerPaneView: View {
         .onChange(of: model.focusedFootage?.id) {
             model.presentFocusedMedia()
         }
+        .onChange(of: model.focusedFootage?.status) {
+            model.presentFocusedMedia()
+        }
     }
 
     @ViewBuilder
     private var mediaContent: some View {
-        if model.focusedFootage?.status == .missing {
+        if model.focusedFootage?.status == .missing || model.playback.isSourceMissing {
             VStack(spacing: 10) {
                 Image(systemName: "eye.slash")
                     .font(.system(size: fillsScreen ? 48 : 28))
@@ -52,13 +60,14 @@ struct PlayerPaneView: View {
         } else if let media = model.playback.media {
             switch media.kind {
             case .video:
-                ZStack {
-                    PlayerOriginalStillView(url: media.url)
-                    if model.playback.showsDecodedVideoFrame, !model.playback.isFullscreen || fillsScreen {
-                        SharedPlayerLayer(player: model.playback.player)
-                    }
-                    if let message = previewMessage {
-                        previewMessageOverlay(message)
+                if model.playback.usesWebKitPlayback {
+                    WebKitVideoView(playback: model.playback, url: media.url)
+                } else {
+                    ZStack {
+                        PlayerOriginalStillView(url: media.url)
+                        if model.playback.showsDecodedVideoFrame, !model.playback.isFullscreen || fillsScreen {
+                            SharedPlayerLayer(player: model.playback.player)
+                        }
                     }
                 }
             case .audio:
@@ -104,16 +113,40 @@ struct PlayerPaneView: View {
     }
 
     private func previewMessageOverlay(_ message: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: "film")
-                .font(.system(size: fillsScreen ? 36 : 22))
-                .foregroundStyle(.white.opacity(0.7))
-            Text(message)
+        ZStack {
+            Color.black.opacity(0.55)
+            VStack(spacing: fillsScreen ? 16 : 12) {
+                Image(systemName: "film")
+                    .font(.system(size: fillsScreen ? 36 : 22))
+                    .foregroundStyle(.white.opacity(0.7))
+                Text(message)
+                    .font(fillsScreen ? .title3 : .callout)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                if let footage = model.focusedFootage, model.shouldOfferOpenWith(for: footage) {
+                    OpenWithActions(footage: footage, model: model, compact: !fillsScreen)
+                        .padding(.top, 4)
+                }
+            }
+            .padding(24)
+        }
+        .allowsHitTesting(true)
+    }
+
+    private var proxyWaitOverlay: some View {
+        VStack(spacing: 10) {
+            ProgressView()
+                .controlSize(fillsScreen ? .large : .regular)
+                .tint(.white)
+            Text(String(localized: "preview.proxy.preparing"))
                 .font(fillsScreen ? .title3 : .callout)
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(.white.opacity(0.9))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
         }
+        .padding(24)
+        .allowsHitTesting(false)
     }
 
     private var chrome: some View {

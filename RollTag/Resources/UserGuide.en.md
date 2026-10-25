@@ -28,6 +28,7 @@ Expand a warehouse to see folders. Click one level, or pin several folders, so s
 
 - Click a photo: the left pane shows the original, decoded to fit the screen — not the grid thumbnail.
 - The grid stays on thumbs; hovering a photo does not play it.
+- Drag a tile to a browser, DaVinci Resolve, Photoshop, Terminal, or Finder. RollTag sends the full path so the other app opens the original file. If that tile is already selected, the drag includes every selected file that is online and still on disk.
 - Fullscreen (P by default) supports pinch-zoom; Z fits the frame. Two-finger pan after zoom can be reversed in Settings.
 - [ and ] move to the previous / next item. In fullscreen you can also use , and .
 
@@ -35,12 +36,15 @@ Common still formats and camera RAW are supported (HEIC, JPEG, PNG, TIFF, AVIF, 
 
 ## Watch videos {#videos}
 
-- Click a clip to see the first frame. Space or Play loads the player.
+- Click a clip to see the first frame. Space or Play loads the player. WebM / MKV using VP8 or VP9 play through the system browser engine. AV1 can't be decoded on this Mac; if ffmpeg is installed, RollTag makes a preview and plays that. The first time takes a moment.
 - Drag the timeline to scrub. While playing, ← → skip back / forward 5 seconds.
 - Hold the mouse on the picture for 2× speed; release to return. If you have zoomed in, drag moves the frame instead.
 - P while playing pauses, enters fullscreen, then resumes from the same time.
 - Hover a grid tile to preview video or audio.
+- Video and audio tiles drag the same way: the other app receives the original file path.
 - With a single video selected, **Trim** on the right cuts a new file.
+- If the player says the file is not on disk, it may have been renamed, moved, or replaced by a `_beauty` copy. Tags stay in the library.
+- If the player cannot play a file that is still there, use **Open with default app**, or **Other apps** for QuickTime, Preview, or a picker. The grid context menu has the same action.
 
 ## Duplicates {#duplicates}
 
@@ -87,6 +91,7 @@ The search field at the top of the right pane only looks in **online, readable**
 - Add names and brands in Settings → Glossary.
 - Click **Tagged** or a category (mood, place, custom, …) to see only clips that have that group.
 - Pin folders first if you want the search limited to those directories.
+- Drag matching tiles straight into your editor; you do not have to reveal them in Finder first.
 
 ## AI tagging {#ai}
 

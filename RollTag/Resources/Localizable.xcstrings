@@ -2285,6 +2285,166 @@
         }
       }
     },
+    "openWith.app %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open with %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用%@打開"
+          }
+        }
+      }
+    },
+    "openWith.button" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open with another app"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用其他 App 打開"
+          }
+        }
+      }
+    },
+    "openWith.choose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose app…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選 App…"
+          }
+        }
+      }
+    },
+    "openWith.choose.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開"
+          }
+        }
+      }
+    },
+    "openWith.choose.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose an app to open this file."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選一個 App 來打開這份檔案。"
+          }
+        }
+      }
+    },
+    "openWith.default" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open with default app"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用預設 App 打開"
+          }
+        }
+      }
+    },
+    "openWith.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That app couldn't open this file."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "那個 App 打不開這份檔案。"
+          }
+        }
+      }
+    },
+    "openWith.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the original file in QuickTime, Preview, or another app."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 QuickTime、預覽或其他 App 打開原檔。"
+          }
+        }
+      }
+    },
+    "openWith.missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file is gone, so it can't be opened."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檔案不在了，打不開。"
+          }
+        }
+      }
+    },
+    "openWith.other" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other apps"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他 App"
+          }
+        }
+      }
+    },
     "player.empty" : {
       "localizations" : {
         "en" : {
@@ -2527,18 +2687,34 @@
         }
       }
     },
-    "preview.unavailable.codec" : {
+    "preview.proxy.preparing" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "macOS can't decode this clip. Common with some DJI HEVC / 10-bit / HDR files."
+            "value" : "Making a preview. It will play when the first part is ready."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "系統解不開這支。常見於部分 DJI HEVC／10-bit／HDR。"
+            "value" : "正在做預覽，好了就會播。"
+          }
+        }
+      }
+    },
+    "preview.unavailable.codec" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RollTag can't play this clip here. Try another app, or check the file is still on disk."
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這裡播不了這支。可改用其他 App，或先確認檔案還在硬碟上。"
           }
         }
       }

@@ -154,6 +154,12 @@ struct InspectorView: View {
                         model.revealInFinder(footage)
                     }
                     .buttonStyle(.link)
+                    if model.shouldOfferOpenWith(for: footage) {
+                        Menu(String(localized: "openWith.button")) {
+                            OpenWithMenuContent(footage: footage, model: model)
+                        }
+                        .help(String(localized: "openWith.help"))
+                    }
                 }
             }
         } else {

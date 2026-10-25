@@ -35,6 +35,9 @@ final class PreviewPlayback {
     var isScrubbing = false
     var didFailToLoad = false
     var isIncompleteFile = false
+    var isSourceMissing = false
+    var isPreparingProxy = false
+    var pendingWebKitSeek: Double?
     var zoomScale: CGFloat = 1
     var zoomOffset: CGSize = .zero
     private(set) var isHoldSpeed = false
@@ -54,20 +57,44 @@ final class PreviewPlayback {
     private var fullscreenResumePlaying = false
     private var fullscreenResumeSeconds = 0.0
     private var fullscreenResumeTask: Task<Void, Never>?
+    private var proxyJob: AV1PreviewJob?
+    private var pendingProxySeek: Double?
+    private var proxyResumeAt: Double?
+    private var proxyReloadPending = false
+    private var proxyLoadedDuration = 0.0
 
     init() {
         player = Self.makePlayer()
     }
 
-    var isItemLoaded: Bool { loadedURL != nil && player.currentItem != nil }
+    var isItemLoaded: Bool {
+        if usesWebKitPlayback { return media != nil && !isSourceMissing }
+        return loadedURL != nil && player.currentItem != nil
+    }
+
+    var usesPlaybackProxy: Bool {
+        guard let media, media.kind == .video, !isSourceMissing, !isIncompleteFile else { return false }
+        return AV1PreviewProxy.needsProxy(for: media.url)
+    }
+
+    var isWaitingOnProxy: Bool {
+        isPreparingProxy || pendingProxySeek != nil
+    }
+
+    var usesWebKitPlayback: Bool {
+        guard let media, media.kind == .video, !isSourceMissing, !isIncompleteFile else { return false }
+        guard !usesPlaybackProxy else { return false }
+        return WebKitVideoPlayback.supports(media.url)
+    }
 
     /// Paused on the first frame: AVPlayer often shows a soft proxy. Use a still from the original instead.
     var showsDecodedVideoFrame: Bool {
-        isItemLoaded && (isPlaying || currentSeconds > 0.05)
+        if usesWebKitPlayback { return true }
+        return isItemLoaded && (isPlaying || currentSeconds > 0.05)
     }
 
     var canPlay: Bool {
-        guard let media, !isIncompleteFile, !didFailToLoad else { return false }
+        guard let media, !isIncompleteFile, !didFailToLoad, !isSourceMissing else { return false }
         return media.kind == .video || media.kind == .audio
     }
 
@@ -77,6 +104,7 @@ final class PreviewPlayback {
             if let duration = next.duration, duration > 0 {
                 self.duration = duration
             }
+            refreshSource(next)
             if canPlay, loadedURL != next.url {
                 ensureItemLoaded()
             }
@@ -86,27 +114,31 @@ final class PreviewPlayback {
         presentGeneration += 1
         detachPlayer()
         currentSeconds = 0
-        didFailToLoad = false
+        pendingWebKitSeek = nil
+        resetFailure()
         resetZoom()
         guard let next else {
             duration = 0
-            isIncompleteFile = false
             return
         }
         duration = next.duration ?? 0
-        if next.kind == .video, next.fileSize < MediaConstants.minimumPlayableVideoBytes {
-            isIncompleteFile = true
-            return
-        }
-        isIncompleteFile = false
-        if next.kind == .video || next.kind == .audio {
+        applyFailure(Self.failure(for: next))
+        if canPlay {
             ensureItemLoaded()
         }
     }
 
     func play() {
         guard canPlay, !isPlaying else { return }
+        if usesWebKitPlayback {
+            isPlaying = true
+            return
+        }
         ensureItemLoaded()
+        if usesPlaybackProxy, pendingProxySeek != nil {
+            isPlaying = true
+            return
+        }
         player.play()
         player.rate = isHoldSpeed ? Self.holdRate : 1
         isPlaying = true
@@ -123,8 +155,10 @@ final class PreviewPlayback {
 
     func pause() {
         endHoldSpeed()
-        player.pause()
-        player.rate = 0
+        if !usesWebKitPlayback {
+            player.pause()
+            player.rate = 0
+        }
         isPlaying = false
     }
 
@@ -138,14 +172,16 @@ final class PreviewPlayback {
 
     func beginHoldSpeed() {
         guard canPlay, isPlaying else { return }
-        ensureItemLoaded()
         isHoldSpeed = true
+        if usesWebKitPlayback { return }
+        ensureItemLoaded()
         player.rate = Self.holdRate
     }
 
     func endHoldSpeed() {
         guard isHoldSpeed else { return }
         isHoldSpeed = false
+        if usesWebKitPlayback { return }
         if isPlaying {
             player.rate = 1
         }
@@ -174,8 +210,12 @@ final class PreviewPlayback {
         isScrubbing = false
         seek(to: currentSeconds, precise: true)
         if resumeAfterScrub {
-            player.play()
-            isPlaying = true
+            if usesWebKitPlayback {
+                isPlaying = true
+            } else {
+                player.play()
+                isPlaying = true
+            }
         }
         resumeAfterScrub = false
     }
@@ -262,8 +302,9 @@ final class PreviewPlayback {
         detachPlayer()
         duration = 0
         currentSeconds = 0
-        isIncompleteFile = false
-        didFailToLoad = false
+        pendingWebKitSeek = nil
+        cancelProxy()
+        resetFailure()
         resetZoom()
         exitFullscreen()
     }
@@ -292,28 +333,188 @@ final class PreviewPlayback {
         zoomOffset.height = min(max(zoomOffset.height, -extraY), extraY)
     }
 
+    private func refreshSource(_ next: PreviewMedia) {
+        let failure = Self.failure(for: next)
+        let shouldReload = failure == .none && (isSourceMissing || didFailToLoad || isIncompleteFile || loadedURL == nil)
+        applyFailure(failure)
+        if shouldReload {
+            loadedURL = nil
+            ensureItemLoaded()
+        }
+    }
+
+    private static func failure(for media: PreviewMedia) -> MediaPlaybackFailure {
+        MediaPlaybackFailure.classify(
+            exists: FileManager.default.fileExists(atPath: media.url.path),
+            fileSize: media.fileSize,
+            kind: media.kind
+        )
+    }
+
+    private func applyFailure(_ failure: MediaPlaybackFailure) {
+        isSourceMissing = failure == .missing
+        isIncompleteFile = failure == .incomplete
+        didFailToLoad = failure == .decode
+    }
+
+    private func resetFailure() {
+        applyFailure(.none)
+    }
+
     private static let minZoom: CGFloat = 1
     private static let maxZoom: CGFloat = 8
 
+    func noteWebKitTime(_ seconds: Double, duration: Double) {
+        guard usesWebKitPlayback, !isScrubbing else { return }
+        if duration.isFinite, duration > 0 {
+            self.duration = duration
+        }
+        if seconds.isFinite {
+            currentSeconds = clampedTime(seconds)
+        }
+    }
+
+    func noteWebKitEnded() {
+        guard usesWebKitPlayback else { return }
+        isPlaying = false
+        isHoldSpeed = false
+        currentSeconds = 0
+        pendingWebKitSeek = 0
+    }
+
+    func noteWebKitFailed() {
+        guard usesWebKitPlayback else { return }
+        didFailToLoad = true
+        isPlaying = false
+    }
+
     private func ensureItemLoaded() {
-        guard let media, canPlay else { return }
+        guard let media, canPlay, !usesWebKitPlayback else { return }
+        if usesPlaybackProxy {
+            startProxyIfNeeded()
+            return
+        }
         if loadedURL == media.url, player.currentItem != nil { return }
         replaceCurrentItem(url: media.url)
     }
 
-    private func replaceCurrentItem(url: URL) {
-        pause()
+    private func startProxyIfNeeded() {
+        guard proxyJob == nil, let media else { return }
+        guard AV1PreviewProxy.automaticallyStartsJobs else {
+            isPreparingProxy = true
+            return
+        }
+        let generation = presentGeneration
+        let job = AV1PreviewJob()
+        proxyJob = job
+        isPreparingProxy = true
+        job.start(source: media.url) { [weak self] seconds in
+            guard let self, self.presentGeneration == generation, self.duration <= 0 else { return }
+            self.duration = seconds
+        } onProgress: { [weak self] encoded in
+            guard let self, self.presentGeneration == generation else { return }
+            let loaded = self.player.currentItem?.duration.seconds ?? 0
+            let ahead = !loaded.isFinite || encoded > loaded + 1
+            if let pending = self.pendingProxySeek, encoded + 0.3 >= pending, ahead || loaded <= 0 {
+                self.refreshProxyItem()
+                return
+            }
+            if ahead, loaded > 1, self.currentSeconds >= loaded - 1.2 {
+                self.refreshProxyItem()
+            }
+        } onPlayable: { [weak self] url in
+            guard let self, self.presentGeneration == generation else { return }
+            self.replaceCurrentItem(url: url, resetClock: self.player.currentItem == nil)
+        } onFinished: { [weak self] _ in
+            guard let self, self.presentGeneration == generation else { return }
+            let available = self.player.currentItem?.duration.seconds ?? 0
+            if available > 1, self.duration > available + 1.5 {
+                self.refreshProxyItem()
+            } else if let pending = self.pendingProxySeek, available.isFinite, pending <= available + 0.05 {
+                self.noteProxyReady()
+            }
+        } onFailed: { [weak self] in
+            guard let self, self.presentGeneration == generation else { return }
+            self.proxyJob = nil
+            self.isPreparingProxy = false
+            self.pendingProxySeek = nil
+            if self.player.currentItem == nil {
+                self.didFailToLoad = true
+            }
+        }
+    }
+
+    private func refreshProxyItem() {
+        guard usesPlaybackProxy, !proxyReloadPending, let url = proxyJob?.outputURL else { return }
+        let available = player.currentItem?.duration.seconds ?? 0
+        if available.isFinite, proxyLoadedDuration > 0, available <= proxyLoadedDuration + 0.3,
+           pendingProxySeek == nil {
+            return
+        }
+        if proxyResumeAt == nil {
+            proxyResumeAt = pendingProxySeek ?? currentSeconds
+        }
+        proxyReloadPending = true
+        replaceCurrentItem(url: url, resetClock: false)
+    }
+
+    private func cancelProxy() {
+        proxyJob?.cancel()
+        proxyJob = nil
+        pendingProxySeek = nil
+        proxyResumeAt = nil
+        proxyReloadPending = false
+        proxyLoadedDuration = 0
+        isPreparingProxy = false
+    }
+
+    private func noteProxyReady() {
+        guard usesPlaybackProxy else { return }
+        isPreparingProxy = false
+        proxyReloadPending = false
+        let available = player.currentItem?.duration.seconds ?? 0
+        if available.isFinite, available > 0 {
+            proxyLoadedDuration = available
+        }
+        let resume = pendingProxySeek ?? proxyResumeAt
+        proxyResumeAt = nil
+        if let resume, available.isFinite, resume <= available + 0.05 {
+            pendingProxySeek = nil
+            if resume > 0.05 {
+                currentSeconds = resume
+                seek(to: resume, precise: true)
+            }
+        }
+        if isPlaying, pendingProxySeek == nil {
+            player.play()
+            player.rate = isHoldSpeed ? Self.holdRate : 1
+        }
+    }
+
+    private func replaceCurrentItem(url: URL, resetClock: Bool = true) {
+        let keepPlaying = isPlaying
         if let endObserver {
             NotificationCenter.default.removeObserver(endObserver)
             self.endObserver = nil
         }
+        player.pause()
+        isPlaying = keepPlaying
         loadedURL = url
-        duration = media?.duration ?? 0
-        currentSeconds = 0
-        didFailToLoad = false
-        isIncompleteFile = false
+        if resetClock {
+            if pendingProxySeek == nil {
+                currentSeconds = 0
+            }
+            if let known = media?.duration, known > 0 {
+                duration = known
+            }
+        }
+        resetFailure()
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
-        let item = AVPlayerItem(asset: asset)
+        let item = AVPlayerItem(
+            asset: asset,
+            automaticallyLoadedAssetKeys: ["playable", "tracks", "duration"]
+        )
+        item.preferredMaximumResolution = ThumbnailService.previewMaxResolution
         observeItem(item)
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
@@ -321,9 +522,14 @@ final class PreviewPlayback {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.pause()
-                self?.player.seek(to: .zero)
-                self?.currentSeconds = 0
+                guard let self else { return }
+                if self.usesPlaybackProxy, self.proxyJob?.isComplete != true {
+                    self.refreshProxyItem()
+                    return
+                }
+                self.pause()
+                self.player.seek(to: .zero)
+                self.currentSeconds = 0
             }
         }
         player.replaceCurrentItem(with: item)
@@ -331,6 +537,7 @@ final class PreviewPlayback {
     }
 
     private func detachPlayer() {
+        cancelProxy()
         awaitingSystemFullscreenEnter = false
         hasPendingFullscreenResume = false
         fullscreenResumePlaying = false
@@ -359,7 +566,7 @@ final class PreviewPlayback {
 
     private static func makePlayer() -> AVPlayer {
         let player = AVPlayer()
-        player.automaticallyWaitsToMinimizeStalling = false
+        player.automaticallyWaitsToMinimizeStalling = true
         return player
     }
 
@@ -380,10 +587,19 @@ final class PreviewPlayback {
             Task { @MainActor in
                 switch item.status {
                 case .readyToPlay:
-                    self?.didFailToLoad = false
+                    self?.resetFailure()
                     self?.noteDuration(item.duration.seconds)
+                    self?.noteProxyReady()
                 case .failed:
-                    self?.didFailToLoad = true
+                    let path = (item.asset as? AVURLAsset)?.url.path ?? self?.media?.url.path ?? ""
+                    self?.applyFailure(
+                        MediaPlaybackFailure.classify(
+                            exists: FileManager.default.fileExists(atPath: path),
+                            fileSize: self?.media?.fileSize ?? 0,
+                            kind: self?.media?.kind ?? .video,
+                            playerError: item.error
+                        )
+                    )
                 default:
                     break
                 }
@@ -392,7 +608,7 @@ final class PreviewPlayback {
     }
 
     private func notePlayerTime(_ time: CMTime) {
-        guard !isScrubbing else { return }
+        guard !isScrubbing, pendingProxySeek == nil else { return }
         let seconds = time.seconds
         guard seconds.isFinite else { return }
         currentSeconds = clampedTime(seconds)
@@ -403,10 +619,25 @@ final class PreviewPlayback {
 
     private func noteDuration(_ seconds: Double) {
         guard seconds.isFinite, seconds > 0 else { return }
+        if usesPlaybackProxy, duration > seconds + 0.75 { return }
         duration = seconds
     }
 
     private func seek(to seconds: Double, precise: Bool) {
+        if usesWebKitPlayback {
+            pendingWebKitSeek = seconds
+            return
+        }
+        if usesPlaybackProxy, proxyJob?.isComplete != true {
+            let available = player.currentItem?.duration.seconds ?? 0
+            let buffered = available.isFinite && available > 0.2 && seconds <= available - 0.15
+            if !buffered {
+                pendingProxySeek = seconds
+                player.pause()
+                return
+            }
+        }
+        pendingProxySeek = nil
         let time = CMTime(seconds: seconds, preferredTimescale: 600)
         if precise {
             player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
@@ -417,6 +648,9 @@ final class PreviewPlayback {
     }
 
     private func snapshotCurrentTime() -> Double {
+        if usesWebKitPlayback {
+            return currentSeconds
+        }
         let t = player.currentTime().seconds
         if t.isFinite, t > 0.05 {
             return clampedTime(t)
