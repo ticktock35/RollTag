@@ -36,11 +36,11 @@ Common still formats and camera RAW are supported (HEIC, JPEG, PNG, TIFF, AVIF, 
 
 ## Watch videos {#videos}
 
-- Rest the pointer on a video thumbnail for 2 seconds and it plays in the tile. Move away and it stops. Click a clip to see the first frame. Space or Play loads the player. WebM / MKV using VP8 or VP9 play through the system browser engine. AV1 can't be decoded on this Mac; if ffmpeg is installed, RollTag makes a preview and plays that. The first time takes a moment.
+- A video thumbnail shows a faint play mark when the pointer is off it. Rest there for 2 seconds and it plays in the tile; move away and it stops. The clip already open in the main player does not play again in its tile. Photos stay still. Audio does not play in the grid; select it to hear it in the player.
+- Click a clip to see the first frame. Space or Play loads the player. WebM / MKV using VP8 or VP9 play through the system browser engine. AV1 can't be decoded on this Mac; if ffmpeg from Homebrew is installed, RollTag makes a preview and plays that. The first time takes a moment. Finished previews stay on this Mac and open directly next time.
 - Drag the timeline to scrub. While playing, ← → skip back / forward 5 seconds.
 - Hold the mouse on the picture for 2× speed; release to return. If you have zoomed in, drag moves the frame instead.
 - P while playing pauses, enters fullscreen, then resumes from the same time.
-- Hover a grid tile to preview video or audio.
 - Video and audio tiles drag the same way: the other app receives the original file path.
 - With a single video selected, **Trim** on the right cuts a new file.
 - If the player says the file is not on disk, it may have been renamed, moved, or replaced by a `_beauty` copy. Tags stay in the library.

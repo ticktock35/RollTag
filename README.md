@@ -1,10 +1,12 @@
 # RollTag
 
-本機 B-roll 素材倉庫。檔案依然保留在你的硬碟或資料夾中，不上傳雲端、不變更儲存位置。專為標籤標註、關鍵字搜尋、原檔預覽設計，必要時可快速剪輯精華片段。第一版為原生 macOS 應用程式。
+本機 B-roll 素材倉庫。檔案依然保留在你的硬碟或資料夾中，不上傳雲端、不變更儲存位置。專為標籤標註、關鍵字搜尋、原檔預覽設計，必要時可快速剪輯精華片段。原生 macOS 應用程式。
 
 A local B-roll warehouse for macOS: tag, search, preview, and trim footage on your own disks. For everyone else, it is also a fast viewer for photos and videos already on a drive.
 
 介面跟隨系統語言：繁體中文 macOS 顯示繁體中文，英文 macOS 顯示英文。
+
+目前版本 **1.0.2**。跟上一版差在哪，看 [CHANGELOG.md](CHANGELOG.md)。
 
 這不是非線性剪輯軟體（不具備多軌時間軸、調色或複雜特效剪輯），剪輯成片請回到你慣用的專業剪輯工具。對一般使用者而言，只要把存放照片、短片或手機備份的資料夾拖曳進來，它也非常適合作為高效率的照片與影片檢視器：點選檢視原檔畫質、空白鍵播放、全螢幕檢視、觸控板雙指縮放、切換下一張／下一部影片；日後想尋找特定旅程或親友時，再依賴標籤與關鍵字搜尋。本軟體不取代 Apple 系統「照片」的 iCloud 相簿，檔案永遠存放在你自己的外接硬碟上。
 
@@ -22,7 +24,7 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 
 1. 把存放素材的外接硬碟或資料夾拖曳進視窗，登記為一個「倉庫」。卸載硬碟時顯示離線，重新接回後所有標籤依然完好。
 2. 在左側邊欄勾選本次要處理的目錄（例如某一場活動資料夾），搜尋與標籤標註將只鎖定該範圍。
-3. 游標滑過格線即可靜音預覽；點選立即載入原檔畫質。空白鍵播放，P 進入全螢幕，`[` / `]` 快速切換上一部／下一部影片。
+3. 影片縮圖沒有滑鼠時，中間有半透明播放圖示。停超過 2 秒會在格子裡自動播，移開就停。點選後主播放區載入原檔；正在看的那支，縮圖不再跟著滑鼠播。空白鍵播放，P 進入全螢幕，`[` / `]` 切上一部／下一部。
 4. 同一場景的畫面可多選批次處理，於右側欄位點選主題／情緒／鏡頭等預設標籤，或自行輸入客戶名稱、專案名稱。輸入中文時會自動對應補上英文關鍵字，日後以兩種語言皆能精準搜尋。
 5. 大量未標註素材可批次請本機 AI 協助；人物姓名與專屬品牌仍建議自行輸入。不合適的標籤點擊即可移除。
 6. 搜尋「夜景」「無人」「drone」等關鍵字將合適素材篩選出來，直接從格線拖進瀏覽器、DaVinci、Photoshop、Terminal 或 Finder（送出原檔完整路徑，對方讀硬碟上的檔）。
@@ -39,7 +41,7 @@ A local B-roll warehouse for macOS: tag, search, preview, and trim footage on yo
 
 1. 把當年度的旅遊硬碟或「活動照片」資料夾拖曳進來。
 2. 透過左側目錄樹先縮小範圍，再搜尋地名或自行標記的標籤（例如城市名、餐廳名或同行親友）。
-3. 點選後主檢視區直接載入原檔畫質（非模糊小縮圖）。全螢幕瀏覽照片與影片：空白鍵播放、雙指縮放、Z 鍵適應視窗、`[` / `]` 切換上一張／下一部，不必開啟大量「預覽程式」視窗。
+3. 點選後主檢視區直接載入原檔畫質（非模糊小縮圖）。影片縮圖停超過 2 秒會在格子裡播。全螢幕瀏覽照片與影片：空白鍵播放、雙指縮放、Z 鍵適應視窗、`[` / `]` 切換上一張／下一部，不必開啟大量「預覽程式」視窗。
 4. 批次 AI 可協助歸類主題與地點（內含 GPS 資訊者會優先寫入地名標籤）；仍請抽查檢視，尤其是人物或情緒標籤。
 5. 進入「重複檔案」清理 RAW＋JPEG＋備份中多出來的複本，迅速釋放寶貴的硬碟空間。
 
@@ -166,9 +168,10 @@ open RollTag.xcodeproj
 - 左側邊欄為智慧清單（全部素材、已打標、未打標、找不到、重複檔案）與自訂分類。
 - 倉庫可展開檢視完整目錄樹。點選單一目錄或勾選多個資料夾，搜尋、標籤標註與重複檔案比對將僅限於該範圍；點選倉庫名稱或「看整倉」可重設為全庫檢視。
 - 右半部頂端設有搜尋欄與排序選單，僅搜尋目前已連接且可讀取的倉庫。視窗最右上角的書本圖示可開啟內建使用手冊（涵蓋加入倉庫、檢視照片與影片、重複檔案比對、常用快速鍵、搜尋、AI 輔助打標、GPX 軌跡等）。
-- 點選任一檔案：主檢視區載入原檔畫質（影片載入專用播放器、照片依螢幕解析度解碼），右側欄位呈現檔案路徑、拍攝時間、GPS 座標（有記錄才顯示）與標籤。格線維持縮圖流暢呈現。
+- 點選任一檔案：主檢視區載入原檔畫質（影片載入專用播放器、照片依螢幕解析度解碼），右側欄位呈現檔案路徑、拍攝時間、GPS 座標（有記錄才顯示）與標籤。格線維持縮圖。
+- 影片縮圖滑鼠不在上面時，中間有半透明播放圖示。停超過 2 秒會在格子裡自動播，移開就停。主播放區正在看的那支，縮圖不再跟著滑鼠播。照片維持靜態。音訊在格子上不播，點選後在播放區聽。
+- WebM／MKV 的 VP8、VP9 用系統瀏覽器引擎播。AV1 這台 Mac 解不開；有裝 ffmpeg（Homebrew）會先做成預覽再播，第一次要等一下，做完留在這台 Mac，下次直接播。這裡播不了時，可改用預設 App、QuickTime、預覽，或自己挑一個打開原檔。格線右鍵也有同一項。
 - 倉庫選單支援匯入 GPX，匯入後的航跡會列在左側邊欄的 GPX 專區。在倉庫資料夾按右鍵套用指定軌跡後，拍攝時間落在該航程時段內的照片／短片會集中列出；缺少 GPS 者會自動計算內插座標並寫入倉庫索引（不修改原檔）。各資料夾亦可自訂相機時鐘偏移。
-- 游標滑過格子即可快速靜音預覽影片／音訊。
 
 常用快速鍵（可於「設定 → 快速鍵」中自訂；按下 **⌘/** 檢視完整清單）：
 
@@ -238,6 +241,8 @@ open RollTag.xcodeproj
 ## English
 
 
+Current version: **1.0.2**. See [CHANGELOG.md](CHANGELOG.md).
+
 This is not an NLE and not a photo library. Files stay on your disks. Tag, search, preview, and trim here; edit the story in your usual cutting app.
 
 You do not need an API key to add a warehouse, preview, hand-tag, search, trim, or find duplicates. AI tagging is optional and never runs on import.
@@ -283,9 +288,10 @@ That copies the app into Applications and opens it. Finder lists it there. On ma
 ### Use
 
 1. Drop a footage folder or drive on the window, or press **⌘O**. Removing a warehouse only unregisters it; files on disk stay. Unplugged drives go offline until you plug them back in. Rescan with ⌘R.
-2. Browse the sidebar lists and folders. Search and sort sit in a boxed field at the top of the right pane. The open-book icon at the far top-right opens the user guide (warehouse, photos / video, duplicates, shortcuts, search, AI / batch tagging, GPX). Click a clip to see its stored thumb. Space or Play loads video/audio. Drag the bar between the player and the file info pane to resize them. P toggles fullscreen; ⌘/ lists shortcuts.
+2. Browse the sidebar lists and folders. Search and sort sit at the top of the right pane. The open-book icon at the far top-right opens the user guide. Click a clip and the main pane shows the original: video loads a player, photos are decoded to the screen. The grid stays on thumbnails. A video thumbnail shows a faint play mark when the pointer is off it. Rest there for 2 seconds and it plays in the tile; move away and it stops. The clip already open in the main player does not play again in its tile. Photos stay still. Audio does not play in the grid. Drag a tile to a browser, DaVinci Resolve, Photoshop, Terminal, or Finder and the other app gets the original path. Space plays, P toggles fullscreen, [ / ] moves to the previous / next item. ⌘/ lists shortcuts.
 3. **Hand tags:** select one clip or a similar group, click a preset on the right, or type your own word and press Return. Click a tag to remove it.
-4. **AI tags:** **JoyTag** is on by default and runs first (private, on this Mac; about 370 MB under `~/rolltag/joytag/`). Optionally paste a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key as fallback. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag** (keeps tags immediately). Sidebar **Untagged** only sends files with no tags yet; to replace bad AI tags, select those clips in the grid and batch again. A batch of more than 10 files shows **Stop**. While it runs, the banner shows which provider is sending and whether the last clip succeeded or failed; the provider name opens that platform’s usage page. Files with GPS get a place name first and those locality parts are always written as tags (even if the model fails); nearby shots within about 1 km reuse that result. Folder names are hints only and are not written as tags. On-device Vision counts human bodies (toy faces and dog bodies do not count); empty scenes do not get portrait or name tags. Running AI again replaces the previous AI tags and keeps hand / path tags. Existing custom labels such as people’s names are not auto-applied by AI — add those by hand. **AI tags can be wrong — review them.** Later files in a large batch may fail on quota; the status line clears after about 10 seconds. Wait and retry what is still untagged.
-5. **Duplicates:** sidebar or ⌘⇧D. A / D keep one side, S keeps all, Enter sends the rest to Trash. **Trim** on a single video uses an iPhone-style in/out strip; pick a folder and filename, then the new clip is indexed in the background.
+4. **AI tags:** local AI is on by default and runs first. Frames stay on this Mac. Choose Apple Vision (built in), Florence-2 Base (about 370 MB), or RAM++ (about 2.8 GB) under `~/rolltag/models/`. If that model is missing or fails, RollTag can fall back to a [Gemini](https://aistudio.google.com/api-keys) or [OpenAI](https://platform.openai.com/api-keys) key. Import never runs AI by itself. Inspector / ⌥⌘T waits for Done or Cancel. Right-click **Untagged** or the grid for **AI Batch Tag**. Sidebar **Untagged** only sends files with no tags yet; to replace bad AI tags, select those clips and batch again. A batch of more than 10 files shows **Stop**. Files with GPS get a place name first. Folder names are hints only and are not written as tags. On-device Vision checks for a real person; empty scenes do not get portrait tags. Running AI again replaces previous AI tags and keeps hand tags. **AI tags can be wrong — review them.**
+5. **Video files the Mac cannot decode:** WebM / MKV using VP8 or VP9 play through the system browser engine. AV1 does not. If ffmpeg from Homebrew is installed, RollTag makes an H.264 preview and plays that; the first time waits, later opens use the cached preview. Otherwise use **Open with default app**, or QuickTime, Preview, or another app. The grid context menu has the same action.
+6. **Duplicates:** sidebar or ⌘⇧D. A / D keep one side, S keeps all, Enter sends the rest to Trash. **Trim** on a single video uses an in/out strip; pick a folder and filename, then the new clip is indexed in the background. **GPX:** import a track from the warehouse menu, then right-click a folder to apply it. Coordinates go into the warehouse index, not the original file.
 
-Settings: `~/rolltag/config.json` (do not share). Place-name cache: `~/rolltag/geocode-cache.json`. JoyTag model: `~/rolltag/joytag/`. Tags and thumbs: `<warehouse>/.rolltag/`. Full contract: [SPEC.md](SPEC.md).
+Settings: `~/rolltag/config.json` (do not share). Place-name cache: `~/rolltag/geocode-cache.json`. Local models: `~/rolltag/models/`. Tags, thumbs, and imported GPX: `<warehouse>/.rolltag/`. AV1 previews: `~/Library/Caches/RollTag/av1-preview/`. Full contract: [SPEC.md](SPEC.md).
