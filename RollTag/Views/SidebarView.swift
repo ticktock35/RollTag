@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @Bindable var model: AppModel
+    @Environment(\.rollTagFonts) private var fonts
 
     var body: some View {
         List(selection: $model.sidebarSelection) {
@@ -92,7 +93,13 @@ struct SidebarView: View {
                 }
             }
         }
+        .font(fonts.body)
         .listStyle(.sidebar)
+        .onChange(of: model.sidebarSelection) { _, _ in
+            if AppModel.isFocusInSidebar() {
+                model.libraryGridFocused = false
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 Divider()
@@ -197,13 +204,13 @@ struct SidebarView: View {
                     .foregroundStyle(warehouse.isOnline ? .primary : .secondary)
                 if let progress = model.scanProgress, progress.warehouseID == warehouse.id {
                     Text("\(progress.showsPercent ? "\(progress.percentInt)% · " : "")\(progress.currentFile.isEmpty ? String(localized: "status.scanning") : progress.currentFile)")
-                        .font(.caption2)
+                        .font(fonts.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 } else {
                     Text(warehouse.isOnline ? String(localized: "warehouse.online") : String(localized: "warehouse.offline"))
-                        .font(.caption2)
+                        .font(fonts.caption2)
                         .foregroundStyle(.secondary)
                 }
             }

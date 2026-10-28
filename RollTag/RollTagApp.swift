@@ -22,6 +22,7 @@ struct RollTagApp: App {
         WindowGroup {
             ContentView(model: model)
                 .frame(minWidth: 1180, minHeight: 760)
+                .rollTagFontSize(model.preference.fontSizeStep)
                 .onAppear {
                     appDelegate.model = model
                     model.start()
@@ -58,6 +59,7 @@ struct RollTagApp: App {
                     model.selectAllVisible()
                 }
                 .keyboardShortcut("a", modifiers: [.command])
+                .disabled(model.visibleResults.isEmpty)
                 Button(String(localized: "selection.clear")) {
                     model.exitFullscreenOrClearSelection()
                 }
@@ -92,6 +94,18 @@ struct RollTagApp: App {
                     model.showShortcuts = true
                 }
             }
+            CommandGroup(after: .toolbar) {
+                Button(String(localized: "view.enlargeFont")) {
+                    model.enlargeFont()
+                }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!model.canEnlargeFont)
+                Button(String(localized: "view.shrinkFont")) {
+                    model.shrinkFont()
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!model.canShrinkFont)
+            }
             CommandGroup(after: .help) {
                 Button(String(localized: "help.title")) {
                     model.showHelp = true
@@ -101,40 +115,82 @@ struct RollTagApp: App {
                 }
                 .keyboardShortcut("/", modifiers: .command)
             }
+            CommandGroup(before: .windowList) {
+                Toggle(isOn: Binding(
+                    get: { model.isDualScreen },
+                    set: { wantOn in
+                        if wantOn != model.isDualScreen {
+                            model.toggleDualScreen()
+                        }
+                    }
+                )) {
+                    Text(String(localized: "window.dualScreen"))
+                }
+                .disabled(!model.canUseDualScreen && !model.isDualScreen)
+                if model.attachedDisplays.count > 1 {
+                    Menu(String(localized: "window.primaryDisplay")) {
+                        ForEach(model.attachedDisplays) { screen in
+                            Toggle(isOn: Binding(
+                                get: { model.resolvedPrimaryDisplayID == screen.id },
+                                set: { on in
+                                    if on {
+                                        model.choosePrimaryDisplay(id: screen.id)
+                                    }
+                                }
+                            )) {
+                                Text(screen.name)
+                            }
+                        }
+                    }
+                }
+            }
         }
         .defaultSize(width: 1280, height: 800)
 
         Settings {
             SettingsView(model: model)
+                .rollTagFontSize(model.preference.fontSizeStep)
         }
 
         Window(String(localized: "duplicates.title"), id: "duplicates") {
             DuplicatesView(model: model)
+                .rollTagFontSize(model.preference.fontSizeStep)
         }
         .keyboardShortcut("d", modifiers: [.command, .shift])
 
         Window(String(localized: "shortcuts.title"), id: "shortcuts") {
             ShortcutsView(model: model)
+                .rollTagFontSize(model.preference.fontSizeStep)
         }
         .defaultSize(width: 540, height: 640)
 
         Window(String(localized: "help.title"), id: "help") {
             HelpView(model: model)
+                .rollTagFontSize(model.preference.fontSizeStep)
         }
         .defaultSize(width: 760, height: 640)
 
+        Window(String(localized: "window.player"), id: AppModel.playerStageWindowID) {
+            DualScreenPlayerView(model: model)
+                .rollTagFontSize(model.preference.fontSizeStep)
+        }
+        .defaultSize(width: 1280, height: 800)
+
         Window(String(localized: "trim.title"), id: "trim") {
-            if let session = model.trimSession,
-               let footage = model.footage(id: session.footageID) {
-                TrimEditorView(model: model, footage: footage, url: session.url)
-            } else {
-                ContentUnavailableView(
-                    String(localized: "trim.title"),
-                    systemImage: "scissors",
-                    description: Text(String(localized: "trim.unavailable"))
-                )
-                .frame(minWidth: 480, minHeight: 320)
+            Group {
+                if let session = model.trimSession,
+                   let footage = model.footage(id: session.footageID) {
+                    TrimEditorView(model: model, footage: footage, url: session.url)
+                } else {
+                    ContentUnavailableView(
+                        String(localized: "trim.title"),
+                        systemImage: "scissors",
+                        description: Text(String(localized: "trim.unavailable"))
+                    )
+                    .frame(minWidth: 480, minHeight: 320)
+                }
             }
+            .rollTagFontSize(model.preference.fontSizeStep)
         }
         .defaultSize(width: 800, height: 720)
     }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InspectorView: View {
     @Bindable var model: AppModel
+    @Environment(\.rollTagFonts) private var fonts
 
     var body: some View {
         ScrollView {
@@ -65,73 +66,74 @@ struct InspectorView: View {
     private var header: some View {
         if model.selectedFootage.isEmpty {
             Text(String(localized: "inspector.empty"))
+                .font(fonts.body)
                 .foregroundStyle(.secondary)
         } else if model.selectedFootage.count == 1, let footage = model.selectedFootage.first {
             VStack(alignment: .leading, spacing: 6) {
                 Text(footage.filename)
-                    .font(.title3.weight(.semibold))
+                    .font(fonts.title3)
                 if footage.status == .missing {
                     Text(String(localized: "inspector.status.missing"))
-                        .font(.caption.weight(.semibold))
+                        .font(fonts.caption2)
                         .foregroundStyle(.orange)
                 }
-                LabeledContent(String(localized: "inspector.relativePath")) {
+                inspectorRow(String(localized: "inspector.relativePath")) {
                     Text(footage.relativePath)
                         .textSelection(.enabled)
                 }
-                LabeledContent(String(localized: "inspector.folder")) {
+                inspectorRow(String(localized: "inspector.folder")) {
                     Text(footage.directoryPath.isEmpty ? "—" : footage.directoryPath)
                 }
                 if let warehouse = model.warehouses.first(where: { $0.id == footage.warehouseID }) {
-                    LabeledContent(String(localized: "inspector.warehouse")) {
+                    inspectorRow(String(localized: "inspector.warehouse")) {
                         Text(warehouse.preference.name)
                     }
-                    LabeledContent(String(localized: "inspector.path")) {
+                    inspectorRow(String(localized: "inspector.path")) {
                         Text(warehouse.preference.path)
                             .lineLimit(2)
                     }
                 }
                 if let duration = footage.duration {
-                    LabeledContent(String(localized: "inspector.duration")) {
+                    inspectorRow(String(localized: "inspector.duration")) {
                         Text(duration, format: .number.precision(.fractionLength(1)))
                     }
                 }
                 if let timeText = footage.captureMetadata.inspectorTimeText() {
-                    LabeledContent(String(localized: "inspector.capturedAt")) {
-                        VStack(alignment: .trailing, spacing: 2) {
+                    inspectorRow(String(localized: "inspector.capturedAt")) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(timeText)
                             if let source = footage.capturedAtSource {
                                 Text(captureSourceText(source))
-                                    .font(.caption)
+                                    .font(fonts.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
                 }
                 if footage.captureMetadata.hasGPS, let latitude = footage.latitude, let longitude = footage.longitude {
-                    LabeledContent(String(localized: "inspector.gps")) {
-                        VStack(alignment: .trailing, spacing: 2) {
+                    inspectorRow(String(localized: "inspector.gps")) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(gpsText(latitude: latitude, longitude: longitude, altitude: footage.altitude))
                             if footage.captureMetadata.resolvedGPSSource == .gpx {
                                 Text(String(localized: "inspector.gpsSource.gpx"))
-                                    .font(.caption)
+                                    .font(fonts.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
                 }
                 if let width = footage.width, let height = footage.height, width > 0, height > 0 {
-                    LabeledContent(String(localized: "inspector.dimensions")) {
+                    inspectorRow(String(localized: "inspector.dimensions")) {
                         Text("\(width) × \(height)")
                     }
                 }
-                LabeledContent(String(localized: "inspector.size")) {
+                inspectorRow(String(localized: "inspector.size")) {
                     Text(ByteCountFormatter.string(fromByteCount: footage.size, countStyle: .file))
                 }
                 if let hash = footage.contentHash, !hash.isEmpty {
-                    LabeledContent(String(localized: "inspector.hash")) {
+                    inspectorRow(String(localized: "inspector.hash")) {
                         Text(hash)
-                            .font(.caption.monospaced())
+                            .font(fonts.caption.monospaced())
                             .textSelection(.enabled)
                             .lineLimit(2)
                     }
@@ -144,7 +146,7 @@ struct InspectorView: View {
                             ByteCountFormatter.string(fromByteCount: footage.size, countStyle: .file)
                         )
                     )
-                    .font(.caption)
+                    .font(fonts.caption)
                     .foregroundStyle(.secondary)
                 }
                 if footage.status == .missing {
@@ -162,9 +164,10 @@ struct InspectorView: View {
                     }
                 }
             }
+            .font(fonts.body)
         } else {
             Text(String(format: String(localized: "inspector.batch"), locale: .current, model.selectedFootage.count))
-                .font(.title3.weight(.semibold))
+                .font(fonts.title3)
             if !model.selectedMissingFootage.isEmpty {
                 missingActions(ids: Set(model.selectedMissingFootage.map(\.id)), footage: model.selectedMissingFootage.count == 1 ? model.selectedMissingFootage.first : nil)
             }
@@ -191,17 +194,28 @@ struct InspectorView: View {
     private func notes(_ footage: Footage) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(String(localized: "inspector.notes"))
-                .font(.headline)
+                .font(fonts.headline)
             TextEditor(text: Binding(
                 get: { footage.userNotes },
                 set: { model.updateNotes($0, for: footage.id) }
             ))
-            .font(.body)
+            .font(fonts.body)
             .frame(minHeight: 72)
             .scrollContentBackground(.hidden)
             .padding(6)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
+    }
+
+    private func inspectorRow<Content: View>(_ title: String, @ViewBuilder value: () -> Content) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+            value()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(fonts.body)
     }
 
     private func captureSourceText(_ source: CaptureTimeSource) -> String {

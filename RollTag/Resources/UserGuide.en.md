@@ -45,6 +45,7 @@ Common still formats and camera RAW are supported (HEIC, JPEG, PNG, TIFF, AVIF, 
 - With a single video selected, **Trim** on the right cuts a new file.
 - If the player says the file is not on disk, it may have been renamed, moved, or replaced by a `_beauty` copy. Tags stay in the library.
 - If the player cannot play a file that is still there, use **Open with default app**, or **Other apps** for QuickTime, Preview, or a picker. The grid context menu has the same action.
+- With two or more displays, **Window → Dual Screen** puts the player and tagging inspector on the primary display, and keeps search plus the media list on the other. **Primary Display** chooses which screen is primary. Closing the player window leaves dual-screen mode.
 
 ## Duplicates {#duplicates}
 
@@ -72,7 +73,8 @@ Common defaults (change them in Settings → Shortcuts; ⌘/ shows the full list
 - **P**: fullscreen (again or Esc to leave)
 - **[ / ]**: previous / next (in fullscreen also , / .)
 - **Arrows or W A S D**: move to the neighboring tile (⇧ to extend the selection)
-- **⌘A**: select all current results
+- **⌘A**: select all items in the current list (click a tile first; in the search field it still selects the text)
+- **⌘+ / ⌘-**: larger / smaller font (also in Settings → Display)
 - **⌘O**: add a warehouse
 - **⌘R**: rescan
 - **⌥⌘T**: AI-tag the selected video / photo

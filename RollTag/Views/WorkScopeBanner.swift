@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkScopeBanner: View {
     @Bindable var model: AppModel
+    @Environment(\.rollTagFonts) private var fonts
 
     var body: some View {
         if !model.workFolders.isEmpty {
@@ -16,7 +17,7 @@ struct WorkScopeBanner: View {
                 }
                 .buttonStyle(.borderless)
             }
-            .font(.caption)
+            .font(fonts.caption)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(Color(nsColor: .controlBackgroundColor))

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var model: AppModel
+    @Environment(\.rollTagFonts) private var fonts
     @State private var glossaryNative = ""
     @State private var glossaryEnglish = ""
 
@@ -10,6 +11,8 @@ struct SettingsView: View {
         TabView {
             warehousePane
                 .tabItem { Label(String(localized: "settings.warehouses"), systemImage: "externaldrive") }
+            appearancePane
+                .tabItem { Label(String(localized: "settings.appearance"), systemImage: "textformat.size") }
             glossaryPane
                 .tabItem { Label(String(localized: "settings.glossary"), systemImage: "arrow.left.arrow.right") }
             aiPane
@@ -75,6 +78,53 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var appearancePane: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(String(localized: "settings.fontSize"))
+                .font(.title2.weight(.semibold))
+            Text(String(localized: "settings.fontSize.detail"))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 12) {
+                Button {
+                    model.shrinkFont()
+                } label: {
+                    Image(systemName: "textformat.size.smaller")
+                }
+                .disabled(!model.canShrinkFont)
+                .help(String(localized: "view.shrinkFont"))
+
+                Text(String(localized: String.LocalizationValue(AppFontSize.localizationKey(model.preference.fontSizeStep))))
+                    .font(.headline)
+                    .frame(minWidth: 72)
+
+                Button {
+                    model.enlargeFont()
+                } label: {
+                    Image(systemName: "textformat.size.larger")
+                }
+                .disabled(!model.canEnlargeFont)
+                .help(String(localized: "view.enlargeFont"))
+
+                if model.preference.fontSizeStep != AppFontSize.defaultStep {
+                    Button(String(localized: "settings.fontSize.reset")) {
+                        model.resetFontSize()
+                    }
+                }
+            }
+            .buttonStyle(.bordered)
+
+            Text(String(localized: "settings.fontSize.preview"))
+                .font(fonts.callout)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var glossaryPane: some View {

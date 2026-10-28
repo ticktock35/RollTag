@@ -10,6 +10,21 @@ final class GridNavigationTests: XCTestCase {
         XCTAssertEqual(GridNavigation.columnCount(width: 0), 1)
     }
 
+    func testColumnCountFromLaidOutOriginsIgnoresIncompleteLastRow() {
+        let row0: [CGPoint] = (0..<6).map { CGPoint(x: CGFloat($0) * 190, y: 0) }
+        let row1: [CGPoint] = (0..<2).map { CGPoint(x: CGFloat($0) * 190, y: 220) }
+        XCTAssertEqual(GridNavigation.columnCount(fromCellOrigins: row0 + row1), 6)
+        XCTAssertEqual(GridNavigation.columnCount(fromCellOrigins: []), 1)
+        XCTAssertEqual(
+            GridNavigation.columnCount(fromCellOrigins: [
+                CGPoint(x: 0, y: 0),
+                CGPoint(x: 0.5, y: 0),
+                CGPoint(x: 190, y: 0),
+            ]),
+            2
+        )
+    }
+
     func testLeftAndRightStayOnVisualNeighbors() {
         XCTAssertEqual(GridNavigation.index(moving: .left, from: 5, count: 12, columns: 4), 4)
         XCTAssertEqual(GridNavigation.index(moving: .right, from: 5, count: 12, columns: 4), 6)

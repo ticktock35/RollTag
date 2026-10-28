@@ -26,6 +26,15 @@ struct FootageGridView: View {
                                 thumbRefreshToken: model.thumbRefreshToken
                             )
                             .id(item.id)
+                            .background {
+                                GeometryReader { geo in
+                                    let origin = geo.frame(in: .named("footageGrid")).origin
+                                    Color.clear.preference(
+                                        key: FootageGridOriginsKey.self,
+                                        value: [origin]
+                                    )
+                                }
+                            }
                             .onTapGesture {
                                 focusGrid()
                                 model.selectSingle(item.id, modifiers: NSEvent.modifierFlags)
@@ -38,8 +47,14 @@ struct FootageGridView: View {
                             }
                         }
                     }
+                    .coordinateSpace(name: "footageGrid")
                     .padding(.horizontal, GridNavigation.horizontalPadding)
                     .padding(.vertical, 10)
+                    .onPreferenceChange(FootageGridOriginsKey.self) { origins in
+                        DispatchQueue.main.async {
+                            model.updateGridColumnCount(fromCellOrigins: origins)
+                        }
+                    }
                 }
             }
             .contentShape(Rectangle())
@@ -50,19 +65,35 @@ struct FootageGridView: View {
             .focused($gridFocused)
             .focusEffectDisabled()
             .onChange(of: gridFocused) { _, focused in
-                model.libraryGridFocused = focused
+                if focused {
+                    model.libraryGridFocused = true
+                }
+            }
+            .onAppear {
+                if model.libraryGridFocused || model.focusedFootageID != nil {
+                    focusGrid()
+                }
             }
             .onChange(of: model.focusedFootageID) { _, id in
                 guard let id, model.libraryGridFocused || gridFocused else { return }
                 proxy.scrollTo(id, anchor: .center)
             }
         }
+        .background(GridFocusCatcher().allowsHitTesting(false))
         .background {
             GeometryReader { geo in
                 Color.clear
                     .onAppear { model.updateGridColumnCount(width: geo.size.width) }
                     .onChange(of: geo.size.width) { _, width in
                         model.updateGridColumnCount(width: width)
+                    }
+                    .onChange(of: model.isDualScreen) { _, _ in
+                        model.updateGridColumnCount(width: geo.size.width)
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResizeNotification)) { note in
+                        guard let window = note.object as? NSWindow,
+                              window.identifier?.rawValue == AppModel.libraryWindowID else { return }
+                        model.updateGridColumnCount(width: geo.size.width)
                     }
             }
         }
@@ -99,9 +130,7 @@ struct FootageGridView: View {
     private func focusGrid() {
         gridFocused = true
         model.libraryGridFocused = true
-        if let window = NSApp.keyWindow, AppModel.isFocusInSidebar(window) {
-            window.makeFirstResponder(nil)
-        }
+        GridFocusCatcher.claimFirstResponder()
     }
 
     private var emptyState: some View {
@@ -145,6 +174,14 @@ struct FootageGridView: View {
             return String(localized: "empty.reconciling.detail")
         }
         return String(localized: "empty.noFootage.detail")
+    }
+}
+
+private struct FootageGridOriginsKey: PreferenceKey {
+    static var defaultValue: [CGPoint] = []
+
+    static func reduce(value: inout [CGPoint], nextValue: () -> [CGPoint]) {
+        value.append(contentsOf: nextValue())
     }
 }
 

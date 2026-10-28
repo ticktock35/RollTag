@@ -80,6 +80,7 @@ final class AppModel {
     var selectedIDs: Set<UUID> = []
     var libraryGridFocused = false
     var gridColumnCount = 1
+    private var lastGridWidth: CGFloat = 0
     private var selectionAnchorID: UUID?
     var expandedTagCategory: String?
     var statusMessage = ""
@@ -88,6 +89,12 @@ final class AppModel {
     var showShortcuts = false
     var showHelp = false
     var showSettings = false
+    var isDualScreen = false
+    var openPlayerStage = false
+    var attachedDisplays: [DisplayLayout.Screen] = []
+    private var savedLibraryFrame: NSRect?
+    private var screenObserver: NSObjectProtocol?
+    private var exitingDualScreen = false
     var scanProgress: ScanProgress?
     var focusedFootageID: UUID?
     var trimSession: TrimSession?
@@ -400,14 +407,19 @@ final class AppModel {
             await reconcileOnlineWarehouses()
         }
         installPlaybackKeys()
+        refreshAttachedDisplays()
+        installScreenObserver()
     }
 
     func stop() {
         volumeMonitor.stop()
         aiTags.cancelInFlightSuggest()
         removePlaybackKeys()
+        removeScreenObserver()
         playback.unload()
         trimSession = nil
+        isDualScreen = false
+        openPlayerStage = false
     }
 
     func refreshOnlineState() {
@@ -583,6 +595,28 @@ final class AppModel {
 
     func updateInvertTwoFingerPan(_ invert: Bool) {
         preference.invertTwoFingerPan = invert
+        persistPreference()
+    }
+
+    var canEnlargeFont: Bool { preference.fontSizeStep < AppFontSize.maxStep }
+    var canShrinkFont: Bool { preference.fontSizeStep > AppFontSize.minStep }
+
+    func enlargeFont() {
+        setFontSizeStep(preference.fontSizeStep + 1)
+    }
+
+    func shrinkFont() {
+        setFontSizeStep(preference.fontSizeStep - 1)
+    }
+
+    func resetFontSize() {
+        setFontSizeStep(AppFontSize.defaultStep)
+    }
+
+    private func setFontSizeStep(_ step: Int) {
+        let next = AppFontSize.clamped(step)
+        guard next != preference.fontSizeStep else { return }
+        preference.fontSizeStep = next
         persistPreference()
     }
 
@@ -1687,6 +1721,7 @@ final class AppModel {
     }
 
     func selectSingle(_ id: UUID, modifiers: NSEvent.ModifierFlags) {
+        activateMediaListKeys()
         if modifiers.contains(.command) {
             if selectedIDs.contains(id) {
                 selectedIDs.remove(id)
@@ -1720,7 +1755,17 @@ final class AppModel {
     }
 
     func updateGridColumnCount(width: CGFloat) {
-        let columns = GridNavigation.columnCount(width: width)
+        lastGridWidth = width
+        applyGridColumnCount(GridNavigation.columnCount(width: width))
+    }
+
+    func updateGridColumnCount(fromCellOrigins origins: [CGPoint]) {
+        guard !origins.isEmpty else { return }
+        applyGridColumnCount(GridNavigation.columnCount(fromCellOrigins: origins))
+    }
+
+    private func applyGridColumnCount(_ columns: Int) {
+        let columns = max(1, columns)
         if gridColumnCount != columns {
             gridColumnCount = columns
         }
@@ -1790,12 +1835,14 @@ final class AppModel {
     }
 
     func selectAllVisible() {
-        selectedIDs = Set(visibleResults.map(\.id))
+        let ids = visibleResults.map(\.id)
+        guard !ids.isEmpty else { return }
+        selectedIDs = Set(ids)
         if let focusedFootageID, selectedIDs.contains(focusedFootageID) {
             presentFocusedMedia()
             return
         }
-        focusedFootageID = visibleResults.first?.id
+        focusedFootageID = ids.first
         selectionAnchorID = focusedFootageID
         presentFocusedMedia()
     }
@@ -1815,7 +1862,175 @@ final class AppModel {
         }
     }
 
+    var canUseDualScreen: Bool { attachedDisplays.count > 1 }
+
+    var resolvedPrimaryDisplayID: UInt32? {
+        if let stored = preference.primaryDisplayID, DisplayLayout.screen(id: stored, in: attachedDisplays) != nil {
+            return stored
+        }
+        let libraryID = libraryNSScreen().map { DisplayLayout.displayID(of: $0) }
+        return DisplayLayout.defaultPrimaryID(libraryScreenID: libraryID, screens: attachedDisplays)
+    }
+
+    func toggleDualScreen() {
+        if isDualScreen {
+            exitDualScreen()
+        } else {
+            enterDualScreen()
+        }
+    }
+
+    func enterDualScreen() {
+        refreshAttachedDisplays()
+        guard canUseDualScreen else { return }
+        if savedLibraryFrame == nil {
+            savedLibraryFrame = DisplayLayout.taggedWindow(Self.libraryWindowID)?.frame
+        }
+        if preference.primaryDisplayID == nil || DisplayLayout.screen(id: preference.primaryDisplayID, in: attachedDisplays) == nil {
+            preference.primaryDisplayID = resolvedPrimaryDisplayID
+            persistPreference()
+        }
+        isDualScreen = true
+        if playback.isFullscreen {
+            playback.exitFullscreen()
+        }
+        openPlayerStage = true
+        presentFocusedMedia()
+        DispatchQueue.main.async { [weak self] in
+            self?.layoutDualScreenWindows()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.layoutDualScreenWindows()
+        }
+    }
+
+    func exitDualScreen() {
+        guard isDualScreen else { return }
+        exitingDualScreen = true
+        isDualScreen = false
+        openPlayerStage = false
+        if playback.isFullscreen {
+            playback.exitFullscreen()
+        }
+        restoreLibraryFrame()
+        exitingDualScreen = false
+    }
+
+    func choosePrimaryDisplay(id: UInt32) {
+        guard DisplayLayout.screen(id: id, in: attachedDisplays) != nil else { return }
+        preference.primaryDisplayID = id
+        persistPreference()
+        if isDualScreen {
+            layoutDualScreenWindows()
+        }
+    }
+
+    func notePlayerStageAppeared() {
+        refreshAttachedDisplays()
+        if !isDualScreen {
+            guard canUseDualScreen else {
+                openPlayerStage = false
+                return
+            }
+            enterDualScreen()
+            return
+        }
+        layoutDualScreenWindows()
+    }
+
+    func notePlayerStageClosed() {
+        guard isDualScreen, !exitingDualScreen else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isDualScreen, !self.exitingDualScreen else { return }
+            if DisplayLayout.taggedWindow(Self.playerStageWindowID) == nil {
+                self.exitDualScreen()
+            }
+        }
+    }
+
+    func refreshAttachedDisplays() {
+        attachedDisplays = DisplayLayout.screens()
+        if isDualScreen, attachedDisplays.count < 2 {
+            exitDualScreen()
+        }
+    }
+
+    func layoutDualScreenWindows() {
+        guard isDualScreen else { return }
+        refreshAttachedDisplays()
+        guard canUseDualScreen, let primaryID = resolvedPrimaryDisplayID else {
+            exitDualScreen()
+            return
+        }
+        let libraryID = DisplayLayout.counterpart(to: primaryID, in: attachedDisplays)?.id
+        if let player = DisplayLayout.taggedWindow(Self.playerStageWindowID),
+           let screen = DisplayLayout.nsScreen(id: primaryID) {
+            place(player, on: screen)
+        }
+        if let libraryID, let library = DisplayLayout.taggedWindow(Self.libraryWindowID),
+           let screen = DisplayLayout.nsScreen(id: libraryID) {
+            place(library, on: screen)
+            library.makeKeyAndOrderFront(nil)
+            DispatchQueue.main.async { [weak self] in
+                self?.activateMediaListKeys()
+            }
+        }
+    }
+
+    func activateMediaListKeys() {
+        libraryGridFocused = true
+        if Self.isLibraryKeyWindow {
+            GridFocusCatcher.claimFirstResponder()
+        }
+    }
+
+    private func place(_ window: NSWindow, on screen: NSScreen) {
+        window.setFrame(screen.visibleFrame, display: true)
+        window.orderFront(nil)
+    }
+
+    private func libraryNSScreen() -> NSScreen? {
+        DisplayLayout.taggedWindow(Self.libraryWindowID)?.screen ?? NSScreen.main
+    }
+
+    private func restoreLibraryFrame() {
+        guard let library = DisplayLayout.taggedWindow(Self.libraryWindowID) else {
+            savedLibraryFrame = nil
+            return
+        }
+        if let savedLibraryFrame {
+            library.setFrame(savedLibraryFrame, display: true)
+        }
+        self.savedLibraryFrame = nil
+    }
+
+    private func installScreenObserver() {
+        removeScreenObserver()
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.refreshAttachedDisplays()
+                if self?.isDualScreen == true {
+                    self?.layoutDualScreenWindows()
+                }
+            }
+        }
+    }
+
+    private func removeScreenObserver() {
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+            self.screenObserver = nil
+        }
+    }
+
     func toggleSelectedFullscreen() {
+        if isDualScreen, let player = DisplayLayout.taggedWindow(Self.playerStageWindowID) {
+            player.makeKeyAndOrderFront(nil)
+        }
         if playback.isFullscreen {
             playback.toggleFullscreen()
             return
@@ -1831,6 +2046,38 @@ final class AppModel {
         presentFocusedMedia()
         guard playback.media != nil else { return }
         playback.toggleFullscreen()
+    }
+
+    private func handleFontSizeKey(_ event: NSEvent) -> Bool {
+        guard isCommandPlusMinus(event) else { return false }
+        let chars = event.charactersIgnoringModifiers ?? ""
+        if chars == "=" || chars == "+" {
+            enlargeFont()
+            return true
+        }
+        if chars == "-" || chars == "_" {
+            shrinkFont()
+            return true
+        }
+        return false
+    }
+
+    private func handleLibrarySelectAllKey(_ event: NSEvent) -> Bool {
+        guard commandModifiers(event) == .command else { return false }
+        let chars = (event.charactersIgnoringModifiers ?? "").lowercased()
+        guard chars == "a" else { return false }
+        guard Self.isLibraryKeyWindow else { return false }
+        selectAllVisible()
+        return true
+    }
+
+    private func isCommandPlusMinus(_ event: NSEvent) -> Bool {
+        let mods = commandModifiers(event)
+        return mods == .command || mods == [.command, .shift]
+    }
+
+    private func commandModifiers(_ event: NSEvent) -> NSEvent.ModifierFlags {
+        event.modifierFlags.intersection([.command, .shift, .option, .control])
     }
 
     private func hintSwitchInputSourceIfNeeded(_ event: NSEvent) {
@@ -2447,9 +2694,11 @@ final class AppModel {
 
     private func handlePlaybackKey(_ event: NSEvent) -> NSEvent? {
         if applyCapturedShortcut(event) { return nil }
+        if handleFontSizeKey(event) { return nil }
         if Self.isSettingsKeyWindow { return event }
         if Self.isTrimKeyWindow { return event }
         if Self.isEditingText { return event }
+        if handleLibrarySelectAllKey(event) { return nil }
         let shortcuts = preference.shortcuts
         if playback.isPlaying, playback.canPlay {
             if shortcuts.matches(event, .gridLeft) {
@@ -2472,7 +2721,7 @@ final class AppModel {
             stepFullscreenMedia(delta)
             return nil
         }
-        if Self.isLibraryKeyWindow, !playback.isFullscreen, duplicatePendingDelete == nil {
+        if Self.isMediaKeyWindow, !playback.isFullscreen, duplicatePendingDelete == nil {
             if shortcuts.matches(event, .previousMedia) {
                 hintSwitchInputSourceIfNeeded(event)
                 stepLibraryMedia(-1)
@@ -2585,12 +2834,13 @@ final class AppModel {
     }
 
     private func handleLibraryArrowKey(_ event: NSEvent) -> Bool {
-        guard libraryGridFocused else { return false }
         guard duplicatesKeyboardActive == 0 else { return false }
         guard !playback.isFullscreen else { return false }
         guard sidebarSelection != .collection(.duplicates) else { return false }
-        guard Self.isLibraryKeyWindow else { return false }
-        guard !Self.isFocusInSidebar() else { return false }
+        guard canMoveLibraryGridWithKeys else { return false }
+        if Self.isLibraryKeyWindow, Self.isFocusInSidebar(), !libraryGridFocused {
+            return false
+        }
         guard let direction = preference.shortcuts.libraryGridDirection(
             keyCode: event.keyCode,
             modifiers: event.modifierFlags
@@ -2598,16 +2848,31 @@ final class AppModel {
         if ShortcutKeys.isUSLetter(event.keyCode) {
             hintSwitchInputSourceIfNeeded(event)
         }
+        activateMediaListKeys()
         moveLibrarySelection(direction, extend: event.modifierFlags.contains(.shift))
         return true
     }
 
+    private var canMoveLibraryGridWithKeys: Bool {
+        if Self.isLibraryKeyWindow { return true }
+        if isDualScreen, Self.isPlayerStageKeyWindow { return true }
+        return false
+    }
+
     static var isEditingText: Bool {
         guard let responder = NSApp.keyWindow?.firstResponder else { return false }
-        return responder is NSTextView || responder is NSTextField || responder is NSText
+        if let field = responder as? NSTextField {
+            return field.isEditable
+        }
+        if let textView = responder as? NSTextView {
+            return textView.isEditable
+        }
+        return false
     }
 
     static let settingsWindowID = "settings"
+    static let libraryWindowID = "library"
+    static let playerStageWindowID = "playerStage"
 
     static var isSettingsKeyWindow: Bool {
         NSApp.keyWindow?.identifier?.rawValue == settingsWindowID
@@ -2623,7 +2888,16 @@ final class AppModel {
         guard let window = NSApp.keyWindow else { return false }
         if isTrimKeyWindow || isSettingsKeyWindow { return false }
         let id = window.identifier?.rawValue ?? ""
+        if id == playerStageWindowID { return false }
         return id != "duplicates" && id != "shortcuts" && id != "help"
+    }
+
+    static var isPlayerStageKeyWindow: Bool {
+        NSApp.keyWindow?.identifier?.rawValue == playerStageWindowID
+    }
+
+    static var isMediaKeyWindow: Bool {
+        isLibraryKeyWindow || isPlayerStageKeyWindow
     }
 
     static func isFocusInSidebar(_ window: NSWindow? = NSApp.keyWindow) -> Bool {

@@ -7,6 +7,7 @@ struct FootageCell: View {
     var isMainPlayerItem: Bool = false
     let warehouseRoot: URL?
     var thumbRefreshToken: Int = 0
+    @Environment(\.rollTagFonts) private var fonts
     @State private var thumbHovering = false
     @State private var playing = false
     @State private var hoverPlayTask: Task<Void, Never>?
@@ -39,15 +40,15 @@ struct FootageCell: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.footage.filename)
-                    .font(.callout.weight(.medium))
+                    .font(fonts.callout)
                     .lineLimit(1)
                 if item.footage.status == .missing {
                     Text(String(localized: "inspector.status.missing"))
-                        .font(.caption2.weight(.semibold))
+                        .font(fonts.caption2)
                         .foregroundStyle(.orange)
                 }
                 Text(item.warehouseName)
-                    .font(.caption)
+                    .font(fonts.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

@@ -3,6 +3,7 @@ import SwiftUI
 struct TagPickerView: View {
     @Bindable var model: AppModel
     @Environment(\.locale) private var swiftLocale
+    @Environment(\.rollTagFonts) private var fonts
     @State private var customText = ""
 
     private var locale: String { TagCatalogLoader.localeID(from: swiftLocale) }
@@ -10,12 +11,12 @@ struct TagPickerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(String(localized: "tags.title"))
-                .font(.headline)
+                .font(fonts.headline)
 
             if model.selectedFootage.isEmpty {
                 Text(String(localized: "tags.selectFirst"))
                     .foregroundStyle(.secondary)
-                    .font(.callout)
+                    .font(fonts.callout)
             } else {
                 currentTags
                 customEntry
@@ -33,7 +34,7 @@ struct TagPickerView: View {
                 model.removeTags([tag])
             } label: {
                 Text(label(for: tag))
-                    .font(.caption)
+                    .font(fonts.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.accentColor.opacity(0.14), in: Capsule())
@@ -58,7 +59,7 @@ struct TagPickerView: View {
     private var customSuggestions: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(String(localized: "tags.customUsed"))
-                .font(.caption)
+                .font(fonts.caption)
                 .foregroundStyle(.secondary)
             FlowWrap(items: model.knownCustomTags) { tag in
                 let active = model.selectedFootage.allSatisfy { footage in
@@ -72,7 +73,7 @@ struct TagPickerView: View {
                     }
                 } label: {
                     Text(tag.value)
-                        .font(.caption)
+                        .font(fonts.caption)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
                         .background(active ? Color.accentColor : Color.primary.opacity(0.06), in: Capsule())
@@ -97,7 +98,7 @@ struct TagPickerView: View {
                     .padding(.bottom, 2)
             }
             Text(String(localized: "tags.presetCategories"))
-                .font(.caption)
+                .font(fonts.caption)
                 .foregroundStyle(.secondary)
             categoryRow
             if let expanded = model.expandedTagCategory,
@@ -113,7 +114,7 @@ struct TagPickerView: View {
                 model.expandedTagCategory = model.expandedTagCategory == category.id ? nil : category.id
             } label: {
                 Text(category.localizedName(locale: locale))
-                    .font(.callout.weight(.medium))
+                    .font(fonts.callout)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
@@ -141,7 +142,7 @@ struct TagPickerView: View {
                 }
             } label: {
                 Text(tag.localizedName(locale: locale))
-                    .font(.caption)
+                    .font(fonts.caption)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .background(active ? Color.accentColor : Color.primary.opacity(0.06), in: Capsule())

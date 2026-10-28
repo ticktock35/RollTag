@@ -23,6 +23,8 @@ struct ShortcutsView: View {
                     .init("status.rescan", "⌘R"),
                     .init("duplicates.title", "⌘⇧D"),
                     .init("selection.all", "⌘A"),
+                    .init("view.enlargeFont", "⌘+"),
+                    .init("view.shrinkFont", "⌘-"),
                     .init("ai.tag.selection", "⌥⌘T"),
                     .init("shortcuts.action.settings", "⌘,"),
                     .init("shortcuts.action.openThis", "⌘/"),

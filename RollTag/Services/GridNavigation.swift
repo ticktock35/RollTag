@@ -23,6 +23,19 @@ enum GridNavigation {
         return max(1, Int((inner + spacing) / (cellMinimum + spacing)))
     }
 
+    /// Unique X origins in the laid-out grid — matches what LazyVGrid actually drew,
+    /// including after a dual-screen window jump.
+    static func columnCount(fromCellOrigins origins: [CGPoint], tolerance: CGFloat = 4) -> Int {
+        guard !origins.isEmpty else { return 1 }
+        var xs: [CGFloat] = []
+        for origin in origins {
+            if !xs.contains(where: { abs($0 - origin.x) < tolerance }) {
+                xs.append(origin.x)
+            }
+        }
+        return max(1, xs.count)
+    }
+
     static func index(
         moving direction: Direction,
         from index: Int,

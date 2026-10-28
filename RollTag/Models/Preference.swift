@@ -8,6 +8,8 @@ struct PreferenceFile: Codable, Equatable {
     var glossary: KeywordGlossary
     var recentCustomTags: [String]
     var invertTwoFingerPan: Bool
+    var primaryDisplayID: UInt32?
+    var fontSizeStep: Int
 
     static let currentVersion = 1
 
@@ -19,10 +21,12 @@ struct PreferenceFile: Codable, Equatable {
         case glossary
         case recentCustomTags
         case invertTwoFingerPan
+        case primaryDisplayID
+        case fontSizeStep
     }
 
     static var empty: PreferenceFile {
-        PreferenceFile(version: currentVersion, warehouses: [], ai: .empty, shortcuts: .empty, glossary: .empty, invertTwoFingerPan: false)
+        PreferenceFile(version: currentVersion, warehouses: [], ai: .empty, shortcuts: .empty, glossary: .empty, invertTwoFingerPan: false, primaryDisplayID: nil, fontSizeStep: AppFontSize.defaultStep)
     }
 
     init(
@@ -32,7 +36,9 @@ struct PreferenceFile: Codable, Equatable {
         shortcuts: ShortcutPreference = .empty,
         glossary: KeywordGlossary = .empty,
         recentCustomTags: [String] = [],
-        invertTwoFingerPan: Bool = false
+        invertTwoFingerPan: Bool = false,
+        primaryDisplayID: UInt32? = nil,
+        fontSizeStep: Int = AppFontSize.defaultStep
     ) {
         self.version = version
         self.warehouses = warehouses
@@ -41,6 +47,8 @@ struct PreferenceFile: Codable, Equatable {
         self.glossary = glossary
         self.recentCustomTags = recentCustomTags
         self.invertTwoFingerPan = invertTwoFingerPan
+        self.primaryDisplayID = primaryDisplayID
+        self.fontSizeStep = AppFontSize.clamped(fontSizeStep)
     }
 
     init(from decoder: Decoder) throws {
@@ -58,6 +66,14 @@ struct PreferenceFile: Codable, Equatable {
         glossary = try container.decodeIfPresent(KeywordGlossary.self, forKey: .glossary) ?? .empty
         recentCustomTags = try container.decodeIfPresent([String].self, forKey: .recentCustomTags) ?? []
         invertTwoFingerPan = try container.decodeIfPresent(Bool.self, forKey: .invertTwoFingerPan) ?? false
+        if let storedID = try container.decodeIfPresent(UInt32.self, forKey: .primaryDisplayID), storedID != 0 {
+            primaryDisplayID = storedID
+        } else {
+            primaryDisplayID = nil
+        }
+        fontSizeStep = AppFontSize.clamped(
+            try container.decodeIfPresent(Int.self, forKey: .fontSizeStep) ?? AppFontSize.defaultStep
+        )
     }
 
     func encode(to encoder: Encoder) throws {
@@ -76,6 +92,13 @@ struct PreferenceFile: Codable, Equatable {
         }
         if invertTwoFingerPan {
             try container.encode(invertTwoFingerPan, forKey: .invertTwoFingerPan)
+        }
+        if let primaryDisplayID {
+            try container.encode(primaryDisplayID, forKey: .primaryDisplayID)
+        }
+        let step = AppFontSize.clamped(fontSizeStep)
+        if step != AppFontSize.defaultStep {
+            try container.encode(step, forKey: .fontSizeStep)
         }
     }
 }

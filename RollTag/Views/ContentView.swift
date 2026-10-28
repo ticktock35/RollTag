@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.locale) private var locale
+    @Environment(\.rollTagFonts) private var fonts
 
     var body: some View {
         ZStack {
@@ -20,7 +21,7 @@ struct ContentView: View {
             }
             .navigationSplitViewStyle(.prominentDetail)
             .navigationTitle(title)
-            .toolbar(model.playback.isFullscreen ? .hidden : .automatic)
+            .toolbar(model.playback.isFullscreen && !model.isDualScreen ? .hidden : .automatic)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -32,8 +33,11 @@ struct ContentView: View {
                 }
             }
 
-            FullscreenOverlay(model: model)
+            if !model.isDualScreen {
+                FullscreenOverlay(model: model)
+            }
         }
+        .background(WindowIDMarker(id: AppModel.libraryWindowID))
         .onDrop(of: [.fileURL], isTargeted: nil, perform: handleDrop)
         .onChange(of: model.showDuplicates) { _, shouldOpen in
             if shouldOpen {
@@ -51,6 +55,13 @@ struct ContentView: View {
             if shouldOpen {
                 openWindow(id: "help")
                 model.showHelp = false
+            }
+        }
+        .onChange(of: model.openPlayerStage) { _, shouldOpen in
+            if shouldOpen {
+                openWindow(id: AppModel.playerStageWindowID)
+            } else {
+                dismissWindow(id: AppModel.playerStageWindowID)
             }
         }
         .onChange(of: model.trimSession) { _, session in
@@ -101,25 +112,34 @@ struct ContentView: View {
             } else {
                 VStack(spacing: 0) {
                     libraryBar
-                    VSplitView {
-                        HSplitView {
-                            PlayerPaneView(model: model)
-                                .frame(minWidth: 280, minHeight: 180)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            InspectorView(model: model)
-                                .frame(minWidth: 220, idealWidth: 300, maxWidth: 560)
-                                .frame(maxHeight: .infinity)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 220)
-
+                    if model.isDualScreen {
                         VStack(spacing: 0) {
                             WorkScopeBanner(model: model)
                             FootageGridView(model: model)
                                 .frame(maxWidth: .infinity, minHeight: 160)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        VSplitView {
+                            HSplitView {
+                                PlayerPaneView(model: model)
+                                    .frame(minWidth: 280, minHeight: 180)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                InspectorView(model: model)
+                                    .frame(minWidth: 220, idealWidth: 300, maxWidth: 560)
+                                    .frame(maxHeight: .infinity)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 220)
+
+                            VStack(spacing: 0) {
+                                WorkScopeBanner(model: model)
+                                FootageGridView(model: model)
+                                    .frame(maxWidth: .infinity, minHeight: 160)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -135,11 +155,11 @@ struct ContentView: View {
         HStack(spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .font(.body.weight(.semibold))
+                    .font(fonts.headline)
                     .foregroundStyle(.secondary)
                 TextField(searchPrompt, text: $model.searchText)
                     .textFieldStyle(.plain)
-                    .font(.body)
+                    .font(fonts.body)
                 if !model.searchText.isEmpty {
                     Button {
                         model.searchText = ""
@@ -299,7 +319,7 @@ private struct ScanStatusOverlay: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        if model.playback.isFullscreen {
+        if model.playback.isFullscreen, !model.isDualScreen {
             EmptyView()
         } else if let progress = model.scanProgress {
             ScanProgressBanner(progress: progress, model: model)

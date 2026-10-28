@@ -161,6 +161,50 @@ final class PreferenceTests: XCTestCase {
         XCTAssertFalse(migrated.invertTwoFingerPan)
     }
 
+    func testPrimaryDisplayIDRoundTripAndLegacyOmitsIt() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
+        let store = PreferenceStore(homeDirectory: home)
+        var file = PreferenceFile.empty
+        file.primaryDisplayID = 2_077_750_272
+        try store.save(file)
+        let loaded = try store.load()
+        XCTAssertEqual(loaded.primaryDisplayID, 2_077_750_272)
+
+        let legacy = """
+        {"version":1,"warehouses":[]}
+        """
+        try Data(legacy.utf8).write(to: store.configURL)
+        let migrated = try store.load()
+        XCTAssertNil(migrated.primaryDisplayID)
+
+        let zero = """
+        {"version":1,"warehouses":[],"primaryDisplayID":0}
+        """
+        try Data(zero.utf8).write(to: store.configURL)
+        XCTAssertNil(try store.load().primaryDisplayID)
+    }
+
+    func testFontSizeStepRoundTripAndLegacyDefaults() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
+        let store = PreferenceStore(homeDirectory: home)
+        var file = PreferenceFile.empty
+        file.fontSizeStep = 2
+        try store.save(file)
+        XCTAssertEqual(try store.load().fontSizeStep, 2)
+
+        let legacy = """
+        {"version":1,"warehouses":[]}
+        """
+        try Data(legacy.utf8).write(to: store.configURL)
+        XCTAssertEqual(try store.load().fontSizeStep, AppFontSize.defaultStep)
+
+        file.fontSizeStep = 99
+        try store.save(file)
+        XCTAssertEqual(try store.load().fontSizeStep, AppFontSize.maxStep)
+    }
+
     func testInvertTwoFingerPanRoundTrip() throws {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-pref-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: home.appendingPathComponent("rolltag"), withIntermediateDirectories: true)
