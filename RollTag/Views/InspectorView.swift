@@ -114,13 +114,16 @@ struct InspectorView: View {
                     inspectorRow(String(localized: "inspector.gps")) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(gpsText(latitude: latitude, longitude: longitude, altitude: footage.altitude))
-                            if footage.captureMetadata.resolvedGPSSource == .gpx {
-                                Text(String(localized: "inspector.gpsSource.gpx"))
+                            if let sourceText = gpsSourceText(footage.captureMetadata.resolvedGPSSource) {
+                                Text(sourceText)
                                     .font(fonts.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
+                }
+                if model.showsItineraryLocationActions {
+                    itineraryLocationActions
                 }
                 if let width = footage.width, let height = footage.height, width > 0, height > 0 {
                     inspectorRow(String(localized: "inspector.dimensions")) {
@@ -218,6 +221,115 @@ struct InspectorView: View {
         .font(fonts.body)
     }
 
+    @ViewBuilder
+    private var itineraryLocationActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let guess = model.itineraryActiveGuess, guess.isGap {
+                if model.isPreviewingItineraryGap {
+                    Text(String(localized: "itinerary.gap.previewing"))
+                        .font(fonts.callout)
+                    Button(String(localized: "itinerary.confirmPlace")) {
+                        model.confirmItineraryLocation()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    if let previous = guess.previous {
+                        gapStayButton(
+                            title: String(format: String(localized: "itinerary.gap.previous"), locale: .current, previous.timeText),
+                            prominent: model.itineraryGapPreview?.relation == .previousStay
+                        ) {
+                            model.previewItineraryGapStay(.previousStay)
+                        }
+                    }
+                    if let next = guess.next {
+                        gapStayButton(
+                            title: String(format: String(localized: "itinerary.gap.next"), locale: .current, next.timeText),
+                            prominent: model.itineraryGapPreview?.relation == .nextStay
+                        ) {
+                            model.previewItineraryGapStay(.nextStay)
+                        }
+                    }
+                    Button(String(localized: model.isPinningItineraryLocation ? "itinerary.pin.cancel" : "itinerary.gap.transit")) {
+                        model.beginPinningItineraryLocation()
+                    }
+                    .buttonStyle(.bordered)
+                    Button(String(localized: "itinerary.gap.pickAgain")) {
+                        model.declineItineraryLocation()
+                    }
+                } else {
+                    Text(String(localized: "itinerary.gap.ask"))
+                        .font(fonts.callout)
+                    if let previous = guess.previous {
+                        gapStayButton(
+                            title: String(format: String(localized: "itinerary.gap.previous"), locale: .current, previous.timeText),
+                            prominent: false
+                        ) {
+                            model.previewItineraryGapStay(.previousStay)
+                        }
+                    }
+                    if let next = guess.next {
+                        gapStayButton(
+                            title: String(format: String(localized: "itinerary.gap.next"), locale: .current, next.timeText),
+                            prominent: false
+                        ) {
+                            model.previewItineraryGapStay(.nextStay)
+                        }
+                    }
+                    Button(String(localized: model.isPinningItineraryLocation ? "itinerary.pin.cancel" : "itinerary.gap.transit")) {
+                        model.beginPinningItineraryLocation()
+                    }
+                    .buttonStyle(.bordered)
+                    Button(String(localized: "itinerary.declinePlace")) {
+                        model.skipItineraryLocation()
+                    }
+                }
+            } else {
+                if model.itineraryActiveGuess?.relation == .editedCopy {
+                    Text(String(localized: "itinerary.editedHint"))
+                        .font(fonts.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if model.canConfirmItineraryLocation {
+                    Button(String(localized: model.itineraryActiveGuess?.relation == .editedCopy ? "itinerary.confirmEdited" : "itinerary.confirmPlace")) {
+                        model.confirmItineraryLocation()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button(String(localized: "itinerary.declinePlace")) {
+                        model.declineItineraryLocation()
+                    }
+                }
+                Button(String(localized: model.isPinningItineraryLocation ? "itinerary.pin.cancel" : "itinerary.pinOnMap")) {
+                    model.beginPinningItineraryLocation()
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private func gapStayButton(title: String, prominent: Bool, action: @escaping () -> Void) -> some View {
+        if prominent {
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+        } else {
+            Button(title, action: action)
+                .buttonStyle(.bordered)
+        }
+    }
+
+    private func gpsSourceText(_ source: GPSSource?) -> String? {
+        switch source {
+        case .gpx:
+            String(localized: "inspector.gpsSource.gpx")
+        case .itinerary:
+            String(localized: "inspector.gpsSource.itinerary")
+        case .user:
+            String(localized: "inspector.gpsSource.user")
+        default:
+            nil
+        }
+    }
+
     private func captureSourceText(_ source: CaptureTimeSource) -> String {
         switch source {
         case .header:
@@ -226,6 +338,8 @@ struct InspectorView: View {
             String(localized: "inspector.capturedAtSource.djiFilename")
         case .fileDate:
             String(localized: "inspector.capturedAtSource.fileDate")
+        case .original:
+            String(localized: "inspector.capturedAtSource.original")
         }
     }
 

@@ -7,7 +7,8 @@ enum FootageFilter {
         selection: SidebarSelection,
         isDuplicate: Bool,
         folderScopes: Set<FolderRef> = [],
-        gpx: WarehouseGPXState = .empty
+        gpx: WarehouseGPXState = .empty,
+        itineraries: [ItineraryRecord] = []
     ) -> Bool {
         guard matchesSelection(
             footage: footage,
@@ -15,13 +16,15 @@ enum FootageFilter {
             selection: selection,
             isDuplicate: isDuplicate,
             folderScopes: folderScopes,
-            gpx: gpx
+            gpx: gpx,
+            itineraries: itineraries
         ) else { return false }
         return matchesScopes(footage: footage, scopes: resolvedScopes(selection: selection, folderScopes: folderScopes))
     }
 
     static func resolvedScopes(selection: SidebarSelection, folderScopes: Set<FolderRef>) -> Set<FolderRef> {
         if case .gpx = selection { return [] }
+        if case .itinerary = selection { return [] }
         if !folderScopes.isEmpty { return folderScopes }
         if case .warehouseFolder(let id, let path) = selection {
             return [FolderRef(warehouseID: id, relativePath: path)]
@@ -54,7 +57,8 @@ enum FootageFilter {
         selection: SidebarSelection,
         isDuplicate: Bool,
         folderScopes: Set<FolderRef>,
-        gpx: WarehouseGPXState
+        gpx: WarehouseGPXState,
+        itineraries: [ItineraryRecord]
     ) -> Bool {
         switch selection {
         case .collection(.all):
@@ -67,6 +71,8 @@ enum FootageFilter {
             return footage.status == .missing
         case .collection(.duplicates):
             return isOnline && isDuplicate
+        case .collection(.retouch):
+            return false
         case .warehouse(let id):
             return footage.warehouseID == id && isOnline && footage.status == .available
         case .warehouseFolder(let id, _):
@@ -85,6 +91,10 @@ enum FootageFilter {
                 assignments: gpx.assignments,
                 offsets: gpx.offsets
             )
+        case .itinerary(let id, let itineraryID):
+            guard isOnline, footage.status == .available, footage.warehouseID == id else { return false }
+            guard let item = itineraries.first(where: { $0.id == itineraryID }) else { return false }
+            return item.memberIDs.contains(footage.id)
         case .tagCategory(let category):
             return isOnline
                 && footage.status == .available
@@ -127,7 +137,8 @@ enum FootageFilter {
                     selection: selection,
                     isDuplicate: false,
                     folderScopes: folderScopes,
-                    gpx: warehouse.gpx
+                    gpx: warehouse.gpx,
+                    itineraries: warehouse.itineraries
                 ) else { return nil }
                 return footage.id
             }
@@ -138,13 +149,14 @@ enum FootageFilter {
         selectedIDs.contains(clicked) ? Array(selectedIDs) : [clicked]
     }
 
-    /// Sidebar badges: file counts for All / Tagged / Untagged / Missing; `duplicateGroups` is unresolved groups.
+    /// Sidebar badges: file counts for All / Tagged / Untagged / Missing; `duplicateGroups` and `retouchPairs` are pending groups.
     static func collectionCounts(
         warehouses: [WarehouseRuntime],
         scopes: Set<FolderRef>,
-        duplicateGroups: Int
+        duplicateGroups: Int,
+        retouchPairs: Int = 0
     ) -> SmartCollectionCounts {
-        var counts = SmartCollectionCounts(duplicates: duplicateGroups)
+        var counts = SmartCollectionCounts(duplicates: duplicateGroups, retouch: retouchPairs)
         for warehouse in warehouses {
             for footage in warehouse.footage {
                 guard matchesScopes(footage: footage, scopes: scopes) else { continue }
@@ -171,6 +183,7 @@ struct SmartCollectionCounts: Equatable {
     var untagged = 0
     var missing = 0
     var duplicates = 0
+    var retouch = 0
 
     func value(for collection: SmartCollection) -> Int {
         switch collection {
@@ -179,6 +192,7 @@ struct SmartCollectionCounts: Equatable {
         case .untagged: return untagged
         case .missing: return missing
         case .duplicates: return duplicates
+        case .retouch: return retouch
         }
     }
 }

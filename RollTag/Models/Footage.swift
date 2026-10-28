@@ -14,6 +14,7 @@ struct TagAssignment: Codable, Hashable, Identifiable, Sendable {
     var identityKey: String { "\(category)/\(value)" }
 
     static let customCategory = "custom"
+    static let retouch = TagAssignment.user(category: "style", value: "retouch")
 
     var isCustom: Bool { category == Self.customCategory }
 
@@ -170,22 +171,27 @@ struct Footage: Identifiable, Hashable {
                 capturedAtHasTimeZone: capturedAtHasTimeZone,
                 capturedAtSource: capturedAtSource,
                 gpsSource: gpsSource
-            )
+            ).sanitized()
         }
         set {
-            latitude = newValue.latitude
-            longitude = newValue.longitude
-            altitude = newValue.altitude
-            capturedAt = newValue.capturedAt
-            capturedAtLocal = newValue.capturedAtLocal
-            capturedAtHasTimeZone = newValue.capturedAtHasTimeZone
-            capturedAtSource = newValue.capturedAtSource
-            gpsSource = newValue.gpsSource
+            let capture = newValue.sanitized()
+            latitude = capture.latitude
+            longitude = capture.longitude
+            altitude = capture.altitude
+            capturedAt = capture.capturedAt
+            capturedAtLocal = capture.capturedAtLocal
+            capturedAtHasTimeZone = capture.capturedAtHasTimeZone
+            capturedAtSource = capture.capturedAtSource
+            gpsSource = capture.gpsSource
         }
     }
 
     func absoluteURL(warehouseRoot: URL) -> URL {
         warehouseRoot.appendingPathComponent(relativePath)
+    }
+
+    var hasRetouchTag: Bool {
+        tags.contains { $0.identityKey == TagAssignment.retouch.identityKey }
     }
 }
 

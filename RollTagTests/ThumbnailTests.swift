@@ -104,6 +104,16 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: dest.path))
     }
 
+    func testPerceptualHashIsStableForTheSameImage() throws {
+        let source = try writePNG(width: 320, height: 240)
+        let first = ThumbnailService.stillImage(url: source, maxEdge: 64)
+        let second = ThumbnailService.stillImage(url: source, maxEdge: 64)
+        let hash = ThumbnailService.perceptualHash(first ?? NSImage())
+        XCTAssertEqual(hash.count, 64)
+        XCTAssertEqual(hash, ThumbnailService.perceptualHash(second ?? NSImage()))
+        XCTAssertEqual(SearchService.hamming(hash, hash), 0)
+    }
+
     func testSweepRemovesOrphanThumbnails() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-sweep-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

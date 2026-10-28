@@ -47,7 +47,7 @@ final class WarehouseDatabase {
         let tags = try allTags()
         return rows.map { row in
             let id = UUID(uuidString: row["id"] ?? "") ?? UUID()
-            let capture = decodeCapture(row["metadata_json"])
+            let capture = decodeCapture(row["metadata_json"]).sanitized()
             return Footage(
                 id: id,
                 warehouseID: warehouseID,
@@ -169,6 +169,20 @@ final class WarehouseDatabase {
                 id.uuidString
             ]
         )
+    }
+
+    /// 清掉 0,0 與行程亂猜寫入的座標。回傳被清掉的 footage id。
+    func clearMisplacedGPS() throws -> [UUID] {
+        let rows = try query("SELECT id, metadata_json FROM footage;")
+        var cleared: [UUID] = []
+        for row in rows {
+            guard let id = UUID(uuidString: row["id"] ?? "") else { continue }
+            let capture = decodeCapture(row["metadata_json"])
+            guard capture.shouldResetMisplacedGPS else { continue }
+            try updateCaptureMetadata(id: id, capture: capture.clearedGPS())
+            cleared.append(id)
+        }
+        return cleared
     }
 
     func updateCaptureMetadata(id: UUID, capture: MediaMetadataSnapshot) throws {
@@ -394,6 +408,7 @@ final class WarehouseDatabase {
     }
 
     private func encodeMetadata(_ capture: MediaMetadataSnapshot) -> String? {
+        let capture = capture.sanitized()
         var object: [String: Any] = [:]
         if let capturedAt = capture.capturedAt {
             object["capturedAt"] = capturedAt.timeIntervalSince1970

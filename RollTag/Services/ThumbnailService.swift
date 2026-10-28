@@ -365,9 +365,16 @@ enum ThumbnailService {
 
     private static func analyzeImage(url: URL) -> MediaAnalysis {
         let size = orientedPixelSize(url: url)
+        var hash: String?
+        if let image = decodeStill(url: url, maxEdge: 64) {
+            let bits = perceptualHash(image)
+            if !bits.isEmpty {
+                hash = bits
+            }
+        }
         return MediaAnalysis(
             thumbnail: nil,
-            phash: nil,
+            phash: hash,
             duration: nil,
             width: size?.width,
             height: size?.height,

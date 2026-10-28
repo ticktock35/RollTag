@@ -48,6 +48,48 @@ final class CaptureMetadataTests: XCTestCase {
         XCTAssertFalse((payload["captured_at"] as? String ?? "").contains("Z"))
     }
 
+    func testZeroZeroGPSIsTreatedAsMissing() {
+        var snapshot = MediaMetadataSnapshot(latitude: 0, longitude: 0, altitude: 0, gpsSource: .header)
+        XCTAssertFalse(snapshot.hasGPS)
+        XCTAssertTrue(snapshot.shouldResetMisplacedGPS)
+        snapshot = snapshot.sanitized()
+        XCTAssertNil(snapshot.latitude)
+        XCTAssertNil(snapshot.longitude)
+        XCTAssertNil(snapshot.gpsSource)
+        XCTAssertTrue(MediaMetadata.isUsableGPS(latitude: 35.6699, longitude: 139.7048))
+        XCTAssertFalse(MediaMetadata.isUsableGPS(latitude: 0, longitude: 0))
+        XCTAssertNil(MediaMetadata.parseISO6709("+0.0+0.0+0.0/"))
+    }
+
+    func testItineraryGuessedGPSIsMarkedForReset() {
+        let guessed = MediaMetadataSnapshot(latitude: 42.775, longitude: 141.692, gpsSource: .itinerary)
+        XCTAssertTrue(guessed.hasGPS)
+        XCTAssertTrue(guessed.shouldResetMisplacedGPS)
+        let header = MediaMetadataSnapshot(latitude: 35.6699, longitude: 139.7048, gpsSource: .header)
+        XCTAssertFalse(header.shouldResetMisplacedGPS)
+        let user = MediaMetadataSnapshot(latitude: 35.6699, longitude: 139.7048, gpsSource: .user)
+        XCTAssertFalse(user.shouldResetMisplacedGPS)
+    }
+
+    func testClearMisplacedGPSRewritesWarehouse() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-gps-reset-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let db = try WarehouseDatabase(rootURL: root, warehouseID: UUID())
+        let zero = sampleSnapshot(id: UUID(), path: "zero.jpg", latitude: 0, longitude: 0, source: .header)
+        let guessed = sampleSnapshot(id: UUID(), path: "guess.jpg", latitude: 42.7, longitude: 141.6, source: .itinerary)
+        let keep = sampleSnapshot(id: UUID(), path: "keep.jpg", latitude: 35.67, longitude: 139.70, source: .header)
+        try db.insert(zero)
+        try db.insert(guessed)
+        try db.insert(keep)
+        XCTAssertNil(try db.allFootage().first(where: { $0.filename == "zero.jpg" })?.latitude)
+        let cleared = try db.clearMisplacedGPS()
+        XCTAssertEqual(Set(cleared), [guessed.id])
+        let loaded = Dictionary(uniqueKeysWithValues: try db.allFootage().map { ($0.filename, $0) })
+        XCTAssertNil(loaded["guess.jpg"]?.latitude)
+        XCTAssertEqual(loaded["keep.jpg"]?.latitude, 35.67)
+        XCTAssertEqual(loaded["keep.jpg"]?.gpsSource, .header)
+    }
+
     func testStoredGPSBeatsMissingLiveRead() {
         var footage = sampleFootage()
         footage.latitude = 1.37
@@ -108,6 +150,36 @@ final class CaptureMetadataTests: XCTestCase {
         file = store.updateSkipImplausibleCaptureDates(false, in: file)
         try store.save(file)
         XCTAssertFalse(try store.load().ai.skipImplausibleCaptureDates)
+    }
+
+    private func sampleSnapshot(
+        id: UUID,
+        path: String,
+        latitude: Double,
+        longitude: Double,
+        source: GPSSource
+    ) -> FootageSnapshot {
+        FootageSnapshot(
+            id: id,
+            relativePath: path,
+            filename: (path as NSString).lastPathComponent,
+            size: 1,
+            mtime: 1,
+            contentHash: "h",
+            phash: nil,
+            status: .available,
+            tags: [],
+            userNotes: "",
+            parentID: nil,
+            duration: nil,
+            width: 10,
+            height: 10,
+            capturedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            needsReanalysis: false,
+            latitude: latitude,
+            longitude: longitude,
+            gpsSource: source
+        )
     }
 
     private func sampleFootage() -> Footage {

@@ -7,6 +7,7 @@ struct FootageCell: View {
     var isMainPlayerItem: Bool = false
     let warehouseRoot: URL?
     var thumbRefreshToken: Int = 0
+    var onThumbnail: ((NSImage) -> Void)? = nil
     @Environment(\.rollTagFonts) private var fonts
     @State private var thumbHovering = false
     @State private var playing = false
@@ -100,6 +101,7 @@ struct FootageCell: View {
             }
             if let image {
                 liveThumb = image
+                onThumbnail?(image)
             } else {
                 previewFailed = true
             }

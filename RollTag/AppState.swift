@@ -10,6 +10,8 @@ struct WarehouseRuntime: Identifiable, Hashable {
     var footage: [Footage]
     var groups: [DuplicateGroup]
     var gpx: WarehouseGPXState
+    var itineraries: [ItineraryRecord]
+    var declinedRetouchIDs: Set<UUID>
     var footageByID: [UUID: Footage]
     var folderNodes: [WarehouseFolderNode]
 
@@ -21,7 +23,9 @@ struct WarehouseRuntime: Identifiable, Hashable {
         isReconciling: Bool,
         footage: [Footage],
         groups: [DuplicateGroup],
-        gpx: WarehouseGPXState = .empty
+        gpx: WarehouseGPXState = .empty,
+        itineraries: [ItineraryRecord] = [],
+        declinedRetouchIDs: Set<UUID> = []
     ) {
         self.preference = preference
         self.isOnline = isOnline
@@ -29,8 +33,31 @@ struct WarehouseRuntime: Identifiable, Hashable {
         self.footage = footage
         self.groups = groups
         self.gpx = gpx
+        self.itineraries = itineraries
+        self.declinedRetouchIDs = declinedRetouchIDs
         self.footageByID = Dictionary(uniqueKeysWithValues: footage.map { ($0.id, $0) })
         self.folderNodes = WarehouseFolderTree.nodes(warehouseID: preference.id, from: footage)
+    }
+
+    func updating(
+        isOnline: Bool? = nil,
+        isReconciling: Bool? = nil,
+        footage: [Footage]? = nil,
+        groups: [DuplicateGroup]? = nil,
+        gpx: WarehouseGPXState? = nil,
+        itineraries: [ItineraryRecord]? = nil,
+        declinedRetouchIDs: Set<UUID>? = nil
+    ) -> WarehouseRuntime {
+        WarehouseRuntime(
+            preference: preference,
+            isOnline: isOnline ?? self.isOnline,
+            isReconciling: isReconciling ?? self.isReconciling,
+            footage: footage ?? self.footage,
+            groups: groups ?? self.groups,
+            gpx: gpx ?? self.gpx,
+            itineraries: itineraries ?? self.itineraries,
+            declinedRetouchIDs: declinedRetouchIDs ?? self.declinedRetouchIDs
+        )
     }
 }
 
@@ -56,8 +83,22 @@ final class AppModel {
     var warehouses: [WarehouseRuntime] = []
     var sidebarSelection: SidebarSelection = .collection(.all) {
         didSet {
+            if case .itinerary(let warehouseID, let itineraryID) = oldValue, sidebarSelection != oldValue {
+                persistItineraryMapRegion(
+                    warehouseID: warehouseID,
+                    itineraryID: itineraryID,
+                    region: itineraryMapRegionDraft
+                )
+            }
+            itineraryGapPreview = nil
+            if isShowingItineraryMap {
+                playback.unload()
+            } else {
+                isPinningItineraryLocation = false
+            }
             syncWorkFolders(from: sidebarSelection)
             rebuildVisibleResults()
+            refreshItineraryMapSnapshot()
         }
     }
     var workFolders: Set<FolderRef> = [] {
@@ -74,6 +115,7 @@ final class AppModel {
     }
     private(set) var visibleResults: [ScoredFootage] = []
     private(set) var scopedDuplicateGroups: [ResolvedDuplicateGroup] = []
+    private(set) var scopedRetouchPairs: [RetouchCandidate] = []
     private(set) var sidebarCounts = SmartCollectionCounts()
     var libraryEpoch = 0
     var thumbRefreshToken = 0
@@ -106,12 +148,20 @@ final class AppModel {
     var localAIDownloadProgress: [LocalAIScheme: Double] = [:]
     var localAIDownloadError: [LocalAIScheme: String] = [:]
     var missingLocalModelPrompt: MissingLocalModelPrompt?
+    var folderTimeOffsetPrompt: FolderTimeOffsetPrompt?
+    var itineraryRenamePrompt: ItineraryRenamePrompt?
+    var itineraryRenameDraft = ""
+    var itineraryMapRegionDraft: FittedMapRegion?
     private var pendingAINovelTags: [UUID: [TagAssignment]] = [:]
     private var pendingAIBeforeKeys: [UUID: Set<String>] = [:]
     private var pendingAIReplacedTags: [UUID: [TagAssignment]] = [:]
     private var aiStopRequested = false
     var capturingShortcut: ShortcutAction?
     var shortcutCaptureMessage = ""
+    var isPinningItineraryLocation = false
+    var itineraryGapPreview: ItineraryGapPreview?
+    var itineraryMapFocusToken = UUID()
+    var itineraryMapFocusRegion: FittedMapRegion?
     let playback = PreviewPlayback()
 
     let catalog: TagCatalog
@@ -225,6 +275,10 @@ final class AppModel {
     }
 
     func presentFocusedMedia() {
+        if isShowingItineraryMap {
+            playback.unload()
+            return
+        }
         playback.present(focusedMedia)
     }
 
@@ -341,6 +395,35 @@ final class AppModel {
         focusedFootageID = id
     }
 
+    func confirmRetouch(_ pair: RetouchCandidate) {
+        guard let latitude = pair.original.latitude, let longitude = pair.original.longitude else { return }
+        writeFootageGPS(
+            pair.edited,
+            latitude: latitude,
+            longitude: longitude,
+            altitude: pair.original.altitude,
+            source: .user,
+            original: pair.original
+        )
+        addTags([TagAssignment.retouch], to: [pair.edited.id])
+        statusMessage = String(localized: "retouch.confirmed")
+    }
+
+    func declineRetouch(_ pair: RetouchCandidate) {
+        guard let index = warehouses.firstIndex(where: { $0.id == pair.warehouseID }) else { return }
+        var declined = warehouses[index].declinedRetouchIDs
+        declined.insert(pair.edited.id)
+        warehouses[index] = warehouses[index].updating(declinedRetouchIDs: declined)
+        do {
+            try RetouchStore.save(declined, root: warehouses[index].preference.url)
+        } catch {
+            statusMessage = error.localizedDescription
+            return
+        }
+        rebuildVisibleResults()
+        statusMessage = String(localized: "retouch.declined")
+    }
+
     var workFolderNames: [String] {
         workFolders
             .sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
@@ -377,7 +460,7 @@ final class AppModel {
             if !workFolders.contains(ref) {
                 workFolders = [ref]
             }
-        case .warehouse, .gpx:
+        case .warehouse, .gpx, .itinerary:
             workFolders = []
         default:
             break
@@ -427,13 +510,18 @@ final class AppModel {
             let existing = warehouses.first(where: { $0.id == item.id })
             let online = store.isOnline(item)
             if online { store.startAccessing(item) }
+            if let existing {
+                return existing.updating(isOnline: online)
+            }
             return WarehouseRuntime(
                 preference: item,
                 isOnline: online,
-                isReconciling: existing?.isReconciling ?? false,
-                footage: online ? (existing?.footage ?? []) : (existing?.footage ?? []),
-                groups: existing?.groups ?? [],
-                gpx: existing?.gpx ?? .empty
+                isReconciling: false,
+                footage: [],
+                groups: [],
+                gpx: GPXLibrary.load(root: item.url),
+                itineraries: ItineraryStore.load(root: item.url),
+                declinedRetouchIDs: RetouchStore.load(root: item.url)
             )
         }
     }
@@ -718,7 +806,7 @@ final class AppModel {
         warehouses.contains(where: \.isOnline)
     }
 
-    func chooseGPXFile(for warehouseID: UUID? = nil) {
+    func chooseGPXFile(for warehouseID: UUID? = nil, folder: String = "", createItinerary: Bool = false) {
         guard let warehouse = gpxTargetWarehouse(id: warehouseID) else {
             statusMessage = String(localized: "gpx.import.needWarehouse")
             return
@@ -730,10 +818,10 @@ final class AppModel {
         panel.allowedContentTypes = [UTType(filenameExtension: "gpx") ?? .xml]
         panel.prompt = String(localized: "gpx.import.choose")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        importGPX(url: url, warehouse: warehouse)
+        importGPX(url: url, warehouse: warehouse, folder: folder, createItinerary: createItinerary)
     }
 
-    func applyGPX(_ filename: String, toFolder path: String, warehouseID: UUID) {
+    func applyGPX(_ filename: String, toFolder path: String, warehouseID: UUID, selectGPX: Bool = true) {
         guard let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline else { return }
         guard let imported = warehouse.gpx.track(named: filename) else { return }
         let folder = WarehouseFolderTree.normalize(path)
@@ -753,13 +841,16 @@ final class AppModel {
                 guard GPXMatcher.assignedTrack(directoryPath: footage.directoryPath, assignments: assignments) == filename else {
                     continue
                 }
-                guard let capturedAt = footage.capturedAt else { continue }
-                let minutes = warehouse.gpx.offsets[GPXMatcher.folder(of: footage.relativePath)] ?? 0
-                let adjusted = capturedAt.addingTimeInterval(TimeInterval(minutes * 60))
+                guard let adjusted = GPXMatcher.adjustedCapture(of: footage, offsets: warehouse.gpx.offsets) else {
+                    continue
+                }
                 guard let point = imported.track.location(at: adjusted) else { continue }
                 matching += 1
                 var capture = footage.captureMetadata
                 guard GPXMatcher.shouldWriteGPS(capture) else { continue }
+                guard MediaMetadata.isUsableGPS(latitude: point.latitude, longitude: point.longitude) else {
+                    continue
+                }
                 capture.latitude = point.latitude
                 capture.longitude = point.longitude
                 capture.altitude = point.altitude
@@ -768,14 +859,24 @@ final class AppModel {
                 wrote += 1
             }
             reloadFootage()
-            sidebarSelection = .gpx(warehouseID, filename)
-            statusMessage = String(
-                format: String(localized: "gpx.applied"),
-                locale: .current,
-                imported.displayName,
-                matching,
-                wrote
-            )
+            if selectGPX {
+                sidebarSelection = .gpx(warehouseID, filename)
+                statusMessage = String(
+                    format: String(localized: "gpx.applied"),
+                    locale: .current,
+                    imported.displayName,
+                    matching,
+                    wrote
+                )
+            } else {
+                statusMessage = String(
+                    format: String(localized: "gpx.applied"),
+                    locale: .current,
+                    imported.displayName,
+                    matching,
+                    wrote
+                )
+            }
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -795,18 +896,37 @@ final class AppModel {
         }
     }
 
-    func setFolderGPXOffset(_ minutes: Int, folder path: String, warehouseID: UUID) {
+    func beginFolderTimeOffset(warehouseID: UUID, folder: String) {
+        guard let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline else { return }
+        let path = WarehouseFolderTree.normalize(folder)
+        let title = path.isEmpty
+            ? warehouse.preference.name
+            : (path as NSString).lastPathComponent
+        folderTimeOffsetPrompt = FolderTimeOffsetPrompt(
+            warehouseID: warehouseID,
+            folder: path,
+            folderTitle: title,
+            offset: warehouse.gpx.offsets[path] ?? .zero
+        )
+    }
+
+    func setFolderTimeOffset(_ offset: FolderTimeOffset, folder path: String, warehouseID: UUID) {
         guard let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline else { return }
         let folder = WarehouseFolderTree.normalize(path)
         var offsets = warehouse.gpx.offsets
-        offsets[folder] = minutes
+        if offset.isZero {
+            offsets.removeValue(forKey: folder)
+        } else {
+            offsets[folder] = offset
+        }
         do {
             try GPXOffsetStore.save(offsets, root: warehouse.preference.url)
             reloadFootage()
+            folderTimeOffsetPrompt = nil
             statusMessage = String(
-                format: String(localized: "gpx.offsetSet"),
+                format: String(localized: "offset.set"),
                 locale: .current,
-                minutes
+                offset.summary()
             )
         } catch {
             statusMessage = error.localizedDescription
@@ -821,10 +941,6 @@ final class AppModel {
 
     func hasDirectGPXAssignment(warehouseID: UUID, folder: String) -> Bool {
         warehouses.first(where: { $0.id == warehouseID })?.gpx.assignments[WarehouseFolderTree.normalize(folder)] != nil
-    }
-
-    func folderGPXOffset(warehouseID: UUID, folder: String) -> Int {
-        warehouses.first(where: { $0.id == warehouseID })?.gpx.offsets[WarehouseFolderTree.normalize(folder)] ?? 0
     }
 
     func gpxMatchCount(warehouse: WarehouseRuntime, filename: String) -> Int {
@@ -849,12 +965,104 @@ final class AppModel {
         warehouses.contains { !$0.gpx.tracks.isEmpty }
     }
 
+    var hasItineraries: Bool {
+        warehouses.contains { !$0.itineraries.isEmpty }
+    }
+
+    var isShowingItineraryMap: Bool {
+        if case .itinerary = sidebarSelection { return true }
+        return false
+    }
+
+    var currentItinerary: ItineraryRecord? {
+        guard case .itinerary(let warehouseID, let itineraryID) = sidebarSelection else { return nil }
+        return warehouses.first(where: { $0.id == warehouseID })?.itineraries.first(where: { $0.id == itineraryID })
+    }
+
+    private(set) var itineraryMapPins: [ItineraryMapPin] = []
+    private(set) var itineraryRouteSegments: [ItineraryRoute.Segment] = []
+    private(set) var itineraryFitCoordinates: [(latitude: Double, longitude: Double)] = []
+
+    private static func itineraryPinOrder(_ lhs: ItineraryMapPin, _ rhs: ItineraryMapPin) -> Bool {
+        switch (lhs.capturedAt, rhs.capturedAt) {
+        case let (left?, right?) where left != right:
+            return left < right
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        default:
+            return lhs.filename.localizedStandardCompare(rhs.filename) == .orderedAscending
+        }
+    }
+
+    func refreshItineraryMapSnapshot() {
+        guard case .itinerary(let warehouseID, let itineraryID) = sidebarSelection,
+              let warehouse = warehouses.first(where: { $0.id == warehouseID }),
+              let itinerary = warehouse.itineraries.first(where: { $0.id == itineraryID })
+        else {
+            if !itineraryMapPins.isEmpty {
+                itineraryMapPins = []
+                itineraryRouteSegments = []
+                itineraryFitCoordinates = []
+            }
+            return
+        }
+        let pins = ItineraryMapBuilder.pins(
+            itinerary: itinerary,
+            warehouse: warehouse,
+            preview: itineraryGapPreview
+        )
+        let path = pins.sorted(by: Self.itineraryPinOrder).map {
+            ItineraryRoute.TimedPoint(latitude: $0.latitude, longitude: $0.longitude, time: $0.capturedAt)
+        }
+        itineraryMapPins = pins
+        itineraryRouteSegments = ItineraryRoute.segments(connecting: path)
+        itineraryFitCoordinates = ItineraryRoute.coordinatesForFit(from: path)
+    }
+
+    var showsItineraryLocationActions: Bool {
+        guard currentItinerary != nil else { return false }
+        return selectedFootage.contains { $0.mediaKind == .image || $0.mediaKind == .video }
+    }
+
+    var canConfirmItineraryLocation: Bool {
+        guard let guess = itineraryActiveGuess else { return false }
+        if guess.isGap {
+            return itineraryGapPreview?.footageID == itineraryConfirmTargets.first?.id
+        }
+        return true
+    }
+
+    var isPreviewingItineraryGap: Bool {
+        guard let preview = itineraryGapPreview,
+              preview.footageID == itineraryConfirmTargets.first?.id
+        else { return false }
+        return true
+    }
+
+    var itineraryActiveGuess: ItineraryPlaceGuess? {
+        itineraryConfirmTargets.compactMap { itineraryPlaceGuess(for: $0) }.first
+    }
+
+    var canPinItineraryLocation: Bool {
+        showsItineraryLocationActions
+    }
+
+    private var itineraryConfirmTargets: [Footage] {
+        guard let itinerary = currentItinerary else { return [] }
+        let pending = Set(itinerary.pendingIDs)
+        return selectedFootage.filter {
+            pending.contains($0.id) && ($0.mediaKind == .image || $0.mediaKind == .video)
+        }
+    }
+
     private func gpxTargetWarehouse(id: UUID? = nil) -> WarehouseRuntime? {
         if let id, let warehouse = warehouses.first(where: { $0.id == id }), warehouse.isOnline {
             return warehouse
         }
         switch sidebarSelection {
-        case .gpx(let warehouseID, _), .warehouse(let warehouseID), .warehouseFolder(let warehouseID, _):
+        case .gpx(let warehouseID, _), .warehouse(let warehouseID), .warehouseFolder(let warehouseID, _), .itinerary(let warehouseID, _):
             if let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline {
                 return warehouse
             }
@@ -874,20 +1082,394 @@ final class AppModel {
         return online.first
     }
 
-    private func importGPX(url: URL, warehouse: WarehouseRuntime) {
+    private func importGPX(
+        url: URL,
+        warehouse: WarehouseRuntime,
+        folder: String = "",
+        createItinerary: Bool = false
+    ) {
         do {
             let data = try Data(contentsOf: url)
             _ = try GPXDocument.parse(data: data)
             let copied = try GPXOffsetStore.copyTrack(from: url, root: warehouse.preference.url)
+            let filename = copied.lastPathComponent
             reloadFootage()
-            sidebarSelection = .gpx(warehouse.id, copied.lastPathComponent)
-            statusMessage = String(
-                format: String(localized: "gpx.imported"),
-                locale: .current,
-                (copied.lastPathComponent as NSString).deletingPathExtension
-            )
+            if createItinerary {
+                applyGPX(filename, toFolder: folder, warehouseID: warehouse.id, selectGPX: false)
+                createGPXItinerary(warehouseID: warehouse.id, filename: filename, folder: folder)
+            } else {
+                sidebarSelection = .gpx(warehouse.id, filename)
+                statusMessage = String(
+                    format: String(localized: "gpx.imported"),
+                    locale: .current,
+                    (filename as NSString).deletingPathExtension
+                )
+            }
         } catch GPXParseError.empty {
             statusMessage = String(localized: "gpx.import.empty")
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    func createTimelineItinerary(warehouseID: UUID, folder: String) {
+        guard let warehouse = warehouses.first(where: { $0.id == warehouseID }), warehouse.isOnline else { return }
+        let folderName = folder.isEmpty
+            ? warehouse.preference.name
+            : (folder as NSString).lastPathComponent
+        let name = ItineraryBuilder.uniqueName(
+            folderName,
+            existing: warehouse.itineraries
+        )
+        guard let record = ItineraryBuilder.buildTimeline(
+            name: name,
+            folder: folder,
+            footage: warehouse.footage
+        ) else {
+            statusMessage = String(localized: "itinerary.timeline.noGPS")
+            return
+        }
+        appendItinerary(record, warehouseID: warehouseID)
+        sidebarSelection = .itinerary(warehouseID, record.id)
+        statusMessage = String(
+            format: String(localized: "itinerary.created"),
+            locale: .current,
+            record.name,
+            record.memberIDs.count - record.pendingIDs.count,
+            record.pendingIDs.count
+        )
+    }
+
+    func openItinerary(warehouseID: UUID, itineraryID: UUID) {
+        sidebarSelection = .itinerary(warehouseID, itineraryID)
+    }
+
+    func beginRenameItinerary(warehouseID: UUID, itineraryID: UUID) {
+        guard let itinerary = warehouses.first(where: { $0.id == warehouseID })?.itineraries.first(where: { $0.id == itineraryID }) else {
+            return
+        }
+        itineraryRenameDraft = itinerary.name
+        itineraryRenamePrompt = ItineraryRenamePrompt(
+            warehouseID: warehouseID,
+            itineraryID: itineraryID,
+            name: itinerary.name
+        )
+    }
+
+    func confirmRenameItinerary() {
+        guard let prompt = itineraryRenamePrompt else { return }
+        let trimmed = itineraryRenameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        itineraryRenamePrompt = nil
+        guard !trimmed.isEmpty else { return }
+        guard let index = warehouses.firstIndex(where: { $0.id == prompt.warehouseID }) else { return }
+        var items = warehouses[index].itineraries
+        guard let itemIndex = items.firstIndex(where: { $0.id == prompt.itineraryID }) else { return }
+        let others = items.filter { $0.id != prompt.itineraryID }
+        items[itemIndex].name = ItineraryBuilder.uniqueName(trimmed, existing: others)
+        persistItineraries(items, warehouseID: prompt.warehouseID)
+        statusMessage = String(localized: "itinerary.renamed")
+    }
+
+    func rememberItineraryMapRegion(_ region: FittedMapRegion) {
+        guard region.isUsable else { return }
+        itineraryMapRegionDraft = region
+    }
+
+    func persistItineraryMapRegion(warehouseID: UUID, itineraryID: UUID, region: FittedMapRegion? = nil) {
+        guard let region = region ?? itineraryMapRegionDraft, region.isUsable else { return }
+        guard let index = warehouses.firstIndex(where: { $0.id == warehouseID }) else { return }
+        var items = warehouses[index].itineraries
+        guard let itemIndex = items.firstIndex(where: { $0.id == itineraryID }) else { return }
+        if items[itemIndex].savedMapRegion == region {
+            itineraryMapRegionDraft = nil
+            return
+        }
+        items[itemIndex].savedMapRegion = region
+        persistItineraries(items, warehouseID: warehouseID, rebuild: false)
+        itineraryMapRegionDraft = nil
+    }
+
+    func deleteItinerary(warehouseID: UUID, itineraryID: UUID) {
+        guard let index = warehouses.firstIndex(where: { $0.id == warehouseID }) else { return }
+        var items = warehouses[index].itineraries
+        items.removeAll { $0.id == itineraryID }
+        persistItineraries(items, warehouseID: warehouseID)
+        if case .itinerary(let selectedWarehouse, let selectedID) = sidebarSelection,
+           selectedWarehouse == warehouseID, selectedID == itineraryID {
+            sidebarSelection = .warehouse(warehouseID)
+        }
+        statusMessage = String(localized: "itinerary.deleted")
+    }
+
+    func itineraryDisplayName(warehouseID: UUID, itineraryID: UUID) -> String {
+        warehouses.first(where: { $0.id == warehouseID })?.itineraries.first(where: { $0.id == itineraryID })?.name
+            ?? String(localized: "itinerary.untitled")
+    }
+
+    func itineraryRowTitle(warehouse: WarehouseRuntime, itinerary: ItineraryRecord) -> String {
+        let named = warehouses.filter { !$0.itineraries.isEmpty }
+        if named.count > 1 {
+            return "\(warehouse.preference.name) / \(itinerary.name)"
+        }
+        return itinerary.name
+    }
+
+    func selectItineraryPin(_ id: UUID) {
+        selectedIDs = [id]
+        focusedFootageID = id
+        presentFocusedMedia()
+    }
+
+    func confirmItineraryLocation() {
+        if let preview = itineraryGapPreview, itineraryActiveGuess?.isGap == true {
+            confirmItineraryGapStay(preview.relation)
+            return
+        }
+        writeItineraryGuesses(itineraryConfirmTargets.compactMap { footage in
+            itineraryPlaceGuess(for: footage).map { (footage, $0.point) }
+        })
+    }
+
+    func previewItineraryGapStay(_ relation: ItineraryGuessRelation) {
+        guard let footage = itineraryConfirmTargets.first,
+              let guess = itineraryPlaceGuess(for: footage),
+              let stay = guess.stay(for: relation)
+        else { return }
+        itineraryGapPreview = ItineraryGapPreview(footageID: footage.id, relation: relation)
+        isPinningItineraryLocation = false
+        refreshItineraryMapSnapshot()
+        itineraryMapFocusRegion = ItineraryMapCamera.region(focusing: (stay.latitude, stay.longitude))
+        itineraryMapFocusToken = UUID()
+    }
+
+    func confirmItineraryGapStay(_ relation: ItineraryGuessRelation) {
+        let targets = itineraryConfirmTargets
+        var writes: [(Footage, GPXPoint)] = []
+        for footage in targets {
+            guard let guess = itineraryPlaceGuess(for: footage),
+                  let stay = guess.stay(for: relation)
+            else { continue }
+            writes.append((footage, stay.point(at: guess.point.time)))
+        }
+        itineraryGapPreview = nil
+        writeItineraryGuesses(writes)
+    }
+
+    func declineItineraryLocation() {
+        if itineraryGapPreview != nil {
+            itineraryGapPreview = nil
+            isPinningItineraryLocation = false
+            refreshItineraryMapSnapshot()
+            return
+        }
+        let ids = Set(itineraryConfirmTargets.map(\.id))
+        guard !ids.isEmpty else { return }
+        removePending(ids: ids)
+        isPinningItineraryLocation = false
+        statusMessage = String(localized: "itinerary.declined")
+    }
+
+    func skipItineraryLocation() {
+        itineraryGapPreview = nil
+        let ids = Set(itineraryConfirmTargets.map(\.id))
+        guard !ids.isEmpty else { return }
+        removePending(ids: ids)
+        isPinningItineraryLocation = false
+        statusMessage = String(localized: "itinerary.declined")
+    }
+
+    func beginPinningItineraryLocation() {
+        guard canPinItineraryLocation else { return }
+        itineraryGapPreview = nil
+        isPinningItineraryLocation.toggle()
+        refreshItineraryMapSnapshot()
+    }
+
+    func placeItineraryLocation(latitude: Double, longitude: Double) {
+        let targets = selectedFootage.filter { $0.mediaKind == .image || $0.mediaKind == .video }
+        guard !targets.isEmpty else { return }
+        var retouchIDs: [UUID] = []
+        for footage in targets {
+            let guess = itineraryPlaceGuess(for: footage)
+            writeFootageGPS(
+                footage,
+                latitude: latitude,
+                longitude: longitude,
+                altitude: nil,
+                source: .user,
+                original: guess?.relation == .editedCopy ? editedOriginal(for: guess) : nil
+            )
+            if guess?.relation == .editedCopy {
+                retouchIDs.append(footage.id)
+            }
+        }
+        itineraryGapPreview = nil
+        addTags([TagAssignment.retouch], to: retouchIDs)
+        addMembers(ids: Set(targets.map(\.id)))
+        removePending(ids: Set(targets.map(\.id)))
+        isPinningItineraryLocation = false
+        statusMessage = String(localized: retouchIDs.isEmpty ? "itinerary.placed" : "itinerary.editedConfirmed")
+    }
+
+    private func createGPXItinerary(warehouseID: UUID, filename: String, folder: String) {
+        guard let warehouse = warehouses.first(where: { $0.id == warehouseID }),
+              let imported = warehouse.gpx.track(named: filename)
+        else { return }
+        let record = ItineraryBuilder.buildGPX(
+            name: ItineraryBuilder.uniqueName(imported.displayName, existing: warehouse.itineraries),
+            folder: folder,
+            filename: filename,
+            footage: warehouse.footage,
+            track: imported.track,
+            assignments: warehouse.gpx.assignments,
+            offsets: warehouse.gpx.offsets
+        )
+        appendItinerary(record, warehouseID: warehouseID)
+        sidebarSelection = .itinerary(warehouseID, record.id)
+        let placed = record.memberIDs.count - record.pendingIDs.count
+        statusMessage = String(
+            format: String(localized: "itinerary.imported"),
+            locale: .current,
+            record.name,
+            placed
+        )
+    }
+
+    func itineraryPlaceGuess(for footage: Footage) -> ItineraryPlaceGuess? {
+        guard case .itinerary(let warehouseID, let itineraryID) = sidebarSelection,
+              let warehouse = warehouses.first(where: { $0.id == warehouseID }),
+              let itinerary = warehouse.itineraries.first(where: { $0.id == itineraryID })
+        else { return nil }
+        let members = itinerary.memberIDs.compactMap { warehouse.footageByID[$0] }
+        let offsets = itinerary.source == .gpx ? warehouse.gpx.offsets : [:]
+        return ItineraryBuilder.placeGuess(
+            for: footage,
+            members: members,
+            offsets: offsets,
+            fallbackGPX: ItineraryMapBuilder.fallbackGPX(itinerary: itinerary, warehouse: warehouse)
+        )
+    }
+
+    private func writeItineraryGuesses(_ writes: [(Footage, GPXPoint)]) {
+        guard !writes.isEmpty else { return }
+        var retouchIDs: [UUID] = []
+        for (footage, point) in writes {
+            let guess = itineraryPlaceGuess(for: footage)
+            writeFootageGPS(
+                footage,
+                latitude: point.latitude,
+                longitude: point.longitude,
+                altitude: point.altitude,
+                source: .itinerary,
+                original: editedOriginal(for: guess)
+            )
+            if guess?.relation == .editedCopy {
+                retouchIDs.append(footage.id)
+            }
+        }
+        addTags([TagAssignment.retouch], to: retouchIDs)
+        removePending(ids: Set(writes.map(\.0.id)))
+        isPinningItineraryLocation = false
+        statusMessage = String(localized: retouchIDs.isEmpty ? "itinerary.confirmed" : "itinerary.editedConfirmed")
+    }
+
+    func rememberPhash(id: UUID, warehouseID: UUID, hash: String) {
+        let bits = hash.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bits.isEmpty else { return }
+        guard let warehouseIndex = warehouses.firstIndex(where: { $0.id == warehouseID }) else { return }
+        var list = warehouses[warehouseIndex].footage
+        guard let footageIndex = list.firstIndex(where: { $0.id == id }) else { return }
+        guard list[footageIndex].phash == nil || list[footageIndex].phash?.isEmpty == true else { return }
+        list[footageIndex].phash = bits
+        warehouses[warehouseIndex] = warehouses[warehouseIndex].updating(footage: list)
+        let footage = list[footageIndex]
+        try? databases[warehouseID]?.updateAnalysis(
+            id: id,
+            phash: bits,
+            duration: footage.duration,
+            width: footage.width,
+            height: footage.height
+        )
+    }
+
+    private func editedOriginal(for guess: ItineraryPlaceGuess?) -> Footage? {
+        guard guess?.relation == .editedCopy, let id = guess?.editedFromID else { return nil }
+        return footage(id: id)
+    }
+
+    private func writeFootageGPS(
+        _ footage: Footage,
+        latitude: Double,
+        longitude: Double,
+        altitude: Double?,
+        source: GPSSource,
+        original: Footage? = nil
+    ) {
+        guard let warehouse = warehouses.first(where: { $0.id == footage.warehouseID }), warehouse.isOnline else { return }
+        var capture = footage.captureMetadata
+        guard MediaMetadata.isUsableGPS(latitude: latitude, longitude: longitude) else { return }
+        capture.latitude = latitude
+        capture.longitude = longitude
+        capture.altitude = altitude
+        capture.gpsSource = source
+        if let original {
+            capture = ItineraryBuilder.applyingOriginalCapture(original, to: capture)
+        }
+        do {
+            let db = try openDatabase(for: warehouse.preference)
+            try db.updateCaptureMetadata(id: footage.id, capture: capture)
+            var updated = footage
+            updated.captureMetadata = capture
+            updated.updatedAt = Date()
+            upsertFootage(updated)
+        } catch {
+            statusMessage = error.localizedDescription
+        }
+    }
+
+    private func appendItinerary(_ record: ItineraryRecord, warehouseID: UUID) {
+        guard let index = warehouses.firstIndex(where: { $0.id == warehouseID }) else { return }
+        var items = warehouses[index].itineraries
+        items.append(record)
+        persistItineraries(items, warehouseID: warehouseID)
+    }
+
+    private func addMembers(ids: Set<UUID>) {
+        mutateCurrentItinerary { record in
+            var members = record.memberIDs
+            for id in ids where !members.contains(id) {
+                members.append(id)
+            }
+            record.memberIDs = members
+        }
+    }
+
+    private func removePending(ids: Set<UUID>) {
+        mutateCurrentItinerary { record in
+            record.pendingIDs.removeAll { ids.contains($0) }
+        }
+    }
+
+    private func mutateCurrentItinerary(_ mutate: (inout ItineraryRecord) -> Void) {
+        guard case .itinerary(let warehouseID, let itineraryID) = sidebarSelection,
+              let index = warehouses.firstIndex(where: { $0.id == warehouseID })
+        else { return }
+        var items = warehouses[index].itineraries
+        guard let itemIndex = items.firstIndex(where: { $0.id == itineraryID }) else { return }
+        mutate(&items[itemIndex])
+        persistItineraries(items, warehouseID: warehouseID)
+    }
+
+    private func persistItineraries(_ items: [ItineraryRecord], warehouseID: UUID, rebuild: Bool = true) {
+        guard let index = warehouses.firstIndex(where: { $0.id == warehouseID }) else { return }
+        let warehouse = warehouses[index]
+        do {
+            try ItineraryStore.save(items, root: warehouse.preference.url)
+            warehouses[index] = warehouse.updating(itineraries: items)
+            if rebuild {
+                rebuildVisibleResults()
+                refreshItineraryMapSnapshot()
+            }
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -956,11 +1538,24 @@ final class AppModel {
     }
 
     func addTags(_ tags: [TagAssignment]) {
+        addTags(tags, to: selectedFootage.map(\.id))
+    }
+
+    func addTags(_ tags: [TagAssignment], to ids: [UUID]) {
+        let uniqueIDs = Array(Set(ids))
+        guard !tags.isEmpty, !uniqueIDs.isEmpty else { return }
         let expanded = expandTags(tags, includeEnglishKeywords: localeID != "en")
-        applyToSelection { db, ids in
-            try db.addTags(expanded, to: ids)
+        let grouped = Dictionary(grouping: uniqueIDs.compactMap { footage(id: $0) }, by: \.warehouseID)
+        do {
+            for (warehouseID, items) in grouped {
+                guard let db = databases[warehouseID] else { continue }
+                try db.addTags(expanded, to: items.map(\.id))
+            }
+            reloadFootage()
+            rememberRecentCustomTags(expanded.filter(\.isCustom).map(\.value))
+        } catch {
+            statusMessage = error.localizedDescription
         }
-        rememberRecentCustomTags(tags.filter(\.isCustom).map(\.value))
     }
 
     func tagSelectedWithAI() {
@@ -1517,14 +2112,7 @@ final class AppModel {
                 groups[i].resolution = resolution
             }
         }
-        warehouses[index] = WarehouseRuntime(
-            preference: current.preference,
-            isOnline: current.isOnline,
-            isReconciling: current.isReconciling,
-            footage: footage,
-            groups: groups,
-            gpx: current.gpx
-        )
+        warehouses[index] = current.updating(footage: footage, groups: groups)
         rebuildVisibleResults()
     }
 
@@ -1672,14 +2260,7 @@ final class AppModel {
         } else {
             list.append(footage)
         }
-        warehouses[index] = WarehouseRuntime(
-            preference: current.preference,
-            isOnline: current.isOnline,
-            isReconciling: current.isReconciling,
-            footage: list,
-            groups: current.groups,
-            gpx: current.gpx
-        )
+        warehouses[index] = current.updating(footage: list)
         rebuildVisibleResults()
     }
 
@@ -2066,7 +2647,9 @@ final class AppModel {
         guard commandModifiers(event) == .command else { return false }
         let chars = (event.charactersIgnoringModifiers ?? "").lowercased()
         guard chars == "a" else { return false }
-        guard Self.isLibraryKeyWindow else { return false }
+        guard ShortcutKeyPolicy.allowsSelectAll(window: Self.currentShortcutWindow, isDualScreen: isDualScreen) else {
+            return false
+        }
         selectAllVisible()
         return true
     }
@@ -2580,13 +3163,21 @@ final class AppModel {
             let online = store.isOnline(item)
             let existing = warehouses.first(where: { $0.id == item.id })
             if online, let db = try? openDatabase(for: item) {
+                let cleared = (try? db.clearMisplacedGPS()) ?? []
+                var itineraries = ItineraryStore.load(root: item.url)
+                if !cleared.isEmpty {
+                    itineraries = ItineraryBuilder.restoringPending(itineraries, clearedIDs: Set(cleared))
+                    try? ItineraryStore.save(itineraries, root: item.url)
+                }
                 return WarehouseRuntime(
                     preference: item,
                     isOnline: true,
                     isReconciling: existing?.isReconciling ?? false,
                     footage: (try? db.allFootage()) ?? [],
                     groups: (try? db.duplicateGroups()) ?? [],
-                    gpx: GPXLibrary.load(root: item.url)
+                    gpx: GPXLibrary.load(root: item.url),
+                    itineraries: itineraries,
+                    declinedRetouchIDs: RetouchStore.load(root: item.url)
                 )
             }
             return WarehouseRuntime(
@@ -2595,7 +3186,9 @@ final class AppModel {
                 isReconciling: false,
                 footage: existing?.footage ?? [],
                 groups: existing?.groups ?? [],
-                gpx: existing?.gpx ?? .empty
+                gpx: existing?.gpx ?? .empty,
+                itineraries: existing?.itineraries ?? ItineraryStore.load(root: item.url),
+                declinedRetouchIDs: existing?.declinedRetouchIDs ?? RetouchStore.load(root: item.url)
             )
         }
         rebuildVisibleResults()
@@ -2604,12 +3197,19 @@ final class AppModel {
     private func rebuildVisibleResults() {
         let scopes = FootageFilter.resolvedScopes(selection: sidebarSelection, folderScopes: workFolders)
         scopedDuplicateGroups = DuplicateIndex.resolve(warehouses: warehouses, scopes: scopes)
+        scopedRetouchPairs = RetouchIndex.resolve(warehouses: warehouses, scopes: scopes)
         sidebarCounts = FootageFilter.collectionCounts(
             warehouses: warehouses,
             scopes: scopes,
-            duplicateGroups: scopedDuplicateGroups.count
+            duplicateGroups: scopedDuplicateGroups.count,
+            retouchPairs: scopedRetouchPairs.count
         )
         if case .collection(.duplicates) = sidebarSelection {
+            visibleResults = []
+            libraryEpoch += 1
+            return
+        }
+        if case .collection(.retouch) = sidebarSelection {
             visibleResults = []
             libraryEpoch += 1
             return
@@ -2628,7 +3228,8 @@ final class AppModel {
                     selection: sidebarSelection,
                     isDuplicate: duplicateIDs.contains(footage.id),
                     folderScopes: workFolders,
-                    gpx: warehouse.gpx
+                    gpx: warehouse.gpx,
+                    itineraries: warehouse.itineraries
                 ) else { return nil }
                 return (footage, context)
             }
@@ -2721,7 +3322,8 @@ final class AppModel {
             stepFullscreenMedia(delta)
             return nil
         }
-        if Self.isMediaKeyWindow, !playback.isFullscreen, duplicatePendingDelete == nil {
+        if ShortcutKeyPolicy.allowsStepMedia(window: Self.currentShortcutWindow, isFullscreen: playback.isFullscreen),
+           duplicatePendingDelete == nil {
             if shortcuts.matches(event, .previousMedia) {
                 hintSwitchInputSourceIfNeeded(event)
                 stepLibraryMedia(-1)
@@ -2734,6 +3336,10 @@ final class AppModel {
             }
         }
         if shortcuts.matches(event, .clearSelection) || shortcuts.matches(event, .duplicateCancelTrash) {
+            if isPinningItineraryLocation {
+                isPinningItineraryLocation = false
+                return nil
+            }
             if playback.isFullscreen {
                 playback.exitFullscreen()
                 return nil
@@ -2834,13 +3440,16 @@ final class AppModel {
     }
 
     private func handleLibraryArrowKey(_ event: NSEvent) -> Bool {
-        guard duplicatesKeyboardActive == 0 else { return false }
-        guard !playback.isFullscreen else { return false }
-        guard sidebarSelection != .collection(.duplicates) else { return false }
-        guard canMoveLibraryGridWithKeys else { return false }
-        if Self.isLibraryKeyWindow, Self.isFocusInSidebar(), !libraryGridFocused {
-            return false
-        }
+        guard ShortcutKeyPolicy.allowsGridMove(
+            window: Self.currentShortcutWindow,
+            isDualScreen: isDualScreen,
+            sidebarFocused: Self.isFocusInSidebar(),
+            libraryGridFocused: libraryGridFocused,
+            isFullscreen: playback.isFullscreen,
+            duplicatesActive: duplicatesKeyboardActive > 0,
+            isDuplicatesCollection: sidebarSelection == .collection(.duplicates)
+                || sidebarSelection == .collection(.retouch)
+        ) else { return false }
         guard let direction = preference.shortcuts.libraryGridDirection(
             keyCode: event.keyCode,
             modifiers: event.modifierFlags
@@ -2853,10 +3462,15 @@ final class AppModel {
         return true
     }
 
-    private var canMoveLibraryGridWithKeys: Bool {
-        if Self.isLibraryKeyWindow { return true }
-        if isDualScreen, Self.isPlayerStageKeyWindow { return true }
-        return false
+    static var currentShortcutWindow: ShortcutKeyWindow {
+        if isTrimKeyWindow { return .trim }
+        if isSettingsKeyWindow { return .settings }
+        if isPlayerStageKeyWindow { return .playerStage }
+        let id = NSApp.keyWindow?.identifier?.rawValue ?? ""
+        if id == "duplicates" || id == "shortcuts" || id == "help" {
+            return .sheet
+        }
+        return .library
     }
 
     static var isEditingText: Bool {
@@ -2894,10 +3508,6 @@ final class AppModel {
 
     static var isPlayerStageKeyWindow: Bool {
         NSApp.keyWindow?.identifier?.rawValue == playerStageWindowID
-    }
-
-    static var isMediaKeyWindow: Bool {
-        isLibraryKeyWindow || isPlayerStageKeyWindow
     }
 
     static func isFocusInSidebar(_ window: NSWindow? = NSApp.keyWindow) -> Bool {

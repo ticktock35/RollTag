@@ -6,9 +6,16 @@ struct DualScreenPlayerView: View {
     var body: some View {
         ZStack {
             HSplitView {
-                PlayerPaneView(model: model)
-                    .frame(minWidth: 360, minHeight: 240)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Group {
+                    if model.isShowingItineraryMap {
+                        ItineraryMapView(model: model)
+                            .id(model.currentItinerary?.id)
+                    } else {
+                        PlayerPaneView(model: model)
+                    }
+                }
+                .frame(minWidth: 360, minHeight: 240)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 InspectorView(model: model)
                     .frame(minWidth: 220, idealWidth: 320, maxWidth: 640)
                     .frame(maxHeight: .infinity)

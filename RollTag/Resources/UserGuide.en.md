@@ -65,6 +65,16 @@ If you pin folders first, only groups with at least one file in that scope are l
 
 Trash only receives the copies you did not keep. Check the keeper before you confirm. Groups you skip stay in the list.
 
+## Retouch review {#retouch}
+
+An export from Lightroom or a phone editor often looks like an earlier photo, but the clock is hours later and GPS is gone. **Retouch review** sits under Duplicates in Library. The badge is how many pairs you have not looked at yet.
+
+1. Open **Retouch review**. The original is on the left, the likely export on the right, with time and place under each.
+2. If it is a retouch, click **It's a retouch**: the warehouse copies the original’s capture time and GPS, and tags it Retouch. Original files are not changed.
+3. If it is not the same shot, click **Not a retouch**. That pair leaves the list.
+
+Pinned folders limit the list to pairs that touch those directories.
+
 ## Shortcuts {#shortcuts}
 
 Common defaults (change them in Settings → Shortcuts; ⌘/ shows the full list):
@@ -72,8 +82,8 @@ Common defaults (change them in Settings → Shortcuts; ⌘/ shows the full list
 - **Space**: play / pause
 - **P**: fullscreen (again or Esc to leave)
 - **[ / ]**: previous / next (in fullscreen also , / .)
-- **Arrows or W A S D**: move to the neighboring tile (⇧ to extend the selection)
-- **⌘A**: select all items in the current list (click a tile first; in the search field it still selects the text)
+- **Arrows or W A S D**: move to the neighboring tile (⇧ to extend the selection). Same keys in single- and dual-screen; they also work when the player window is in front
+- **⌘A**: select all items in the current list (click a tile first; in the search field it still selects the text). Same when the dual-screen player window is in front
 - **⌘+ / ⌘-**: larger / smaller font (also in Settings → Display)
 - **⌘O**: add a warehouse
 - **⌘R**: rescan
@@ -125,4 +135,19 @@ If a photo or video has no GPS in its header, you can fill coordinates from a GP
 4. Photos and videos in that folder (and below) whose capture time falls in the track span appear under that GPX item.
 5. Files with no GPS get interpolated coordinates. Header GPS is not overwritten, but those files can still appear in the list.
 
-The same menu sets a **camera clock offset** (minutes) for that folder. A more specific child folder wins if you apply a different track there. You can stop applying GPX on a folder. Audio is skipped.
+Right-click a warehouse or folder → **Fill in time offset…** to set years, days, hours, minutes, and seconds (plus or minus; default is zero). That difference is added to capture times in the folder before matching GPS or an itinerary. A more specific child folder wins if you apply a different track there. You can stop applying GPX on a folder. Audio is skipped.
+
+## Itineraries and the map {#itinerary}
+
+**Itineraries** sit under Warehouses in the sidebar. Right-click a warehouse or folder:
+
+1. **Bring in GPX file…** copies a `.gpx` and fills missing photo/video coordinates from capture time. Header GPS is left alone. The new itinerary opens a map in the player pane.
+2. **Create itinerary from timeline and GPS** groups GPS clips into stays. Clips without GPS show up in the list. If the time sits in a stay, confirm “Was this taken here?” If it sits between two stays, look at the earlier or later stay on the map first, then confirm, or mark a place on the way.
+
+The first time you open an itinerary, the map fits every clip with a place (including a guessed place from the timeline or GPX). After that, pan and zoom are remembered; leave and come back, and you get the same view.
+
+Pins are navy drops. Zoomed out, overlapping clips merge into a count; click the number to zoom in and split. At street scale the counts go away: each clip is its own pin with a filename. Shots stacked on the same table are fanned out so you can tell them apart. The selected pin shows a callout with a thumbnail. Dashed lines follow shooting time: straight on land, curved over sea. A jump that covers an impossible distance in a second or two is ignored.
+
+Clips without GPS are matched to a stay. A restaurant video stays at the restaurant; it is not pulled to Sapporo just because the evening has GPS there. DJI filenames without a time zone are aligned to GPS photos from that day. An export that looks like an earlier photo, but is hours later and has no GPS, can copy that photo’s time and place when you confirm, and is tagged Retouch. Original files are not changed. A file that only has 0,0 is treated as having no GPS.
+
+Right-click an itinerary in the sidebar to **Rename**. Click a clip to focus it. Coordinates are stored in the warehouse only. Original files are not changed.

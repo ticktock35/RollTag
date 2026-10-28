@@ -29,6 +29,7 @@ struct SidebarView: View {
                             warehouseRow(warehouse)
                                 .tag(SidebarSelection.warehouse(warehouse.id))
                                 .contextMenu {
+                                    itineraryFolderMenu(warehouse: warehouse, folder: "")
                                     gpxFolderMenu(warehouse: warehouse, folder: "")
                                 }
                         } else {
@@ -49,6 +50,7 @@ struct SidebarView: View {
                             .tag(SidebarSelection.warehouseFolder(warehouse.id, node.relativePath))
                             .help(node.relativePath)
                             .contextMenu {
+                                itineraryFolderMenu(warehouse: warehouse, folder: node.relativePath)
                                 gpxFolderMenu(warehouse: warehouse, folder: node.relativePath)
                             }
                         }
@@ -68,6 +70,36 @@ struct SidebarView: View {
                     }
                     .buttonStyle(.plain)
                     .help(String(localized: "warehouse.add"))
+                }
+            }
+
+            if model.hasItineraries {
+                Section(String(localized: "sidebar.itineraries")) {
+                    ForEach(model.warehouses.filter { !$0.itineraries.isEmpty }) { warehouse in
+                        ForEach(warehouse.itineraries) { itinerary in
+                            Button {
+                                model.openItinerary(warehouseID: warehouse.id, itineraryID: itinerary.id)
+                            } label: {
+                                Label(
+                                    model.itineraryRowTitle(warehouse: warehouse, itinerary: itinerary),
+                                    systemImage: "map"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .tag(SidebarSelection.itinerary(warehouse.id, itinerary.id))
+                            .badge(itinerary.memberIDs.count)
+                            .help(warehouse.preference.name)
+                            .id("itinerary-\(itinerary.id.uuidString)")
+                            .contextMenu {
+                                Button(String(localized: "itinerary.rename")) {
+                                    model.beginRenameItinerary(warehouseID: warehouse.id, itineraryID: itinerary.id)
+                                }
+                                Button(String(localized: "itinerary.delete"), role: .destructive) {
+                                    model.deleteItinerary(warehouseID: warehouse.id, itineraryID: itinerary.id)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -137,44 +169,42 @@ struct SidebarView: View {
     }
 
     @ViewBuilder
-    private func gpxFolderMenu(warehouse: WarehouseRuntime, folder: String) -> some View {
+    private func itineraryFolderMenu(warehouse: WarehouseRuntime, folder: String) -> some View {
         if warehouse.isOnline {
-            if warehouse.gpx.tracks.isEmpty {
-                Button(String(localized: "gpx.import.menu")) {
-                    model.chooseGPXFile(for: warehouse.id)
-                }
-            } else {
-                Menu(String(localized: "gpx.apply")) {
-                    ForEach(warehouse.gpx.tracks) { track in
-                        Button {
-                            model.applyGPX(track.filename, toFolder: folder, warehouseID: warehouse.id)
-                        } label: {
-                            if model.effectiveGPXFilename(warehouseID: warehouse.id, folder: folder) == track.filename {
-                                Label(track.displayName, systemImage: "checkmark")
-                            } else {
-                                Text(track.displayName)
-                            }
+            Button(String(localized: "itinerary.importGPX")) {
+                model.chooseGPXFile(for: warehouse.id, folder: folder, createItinerary: true)
+            }
+            Button(String(localized: "itinerary.createTimeline")) {
+                model.createTimelineItinerary(warehouseID: warehouse.id, folder: folder)
+            }
+            Button(String(localized: "offset.edit")) {
+                model.beginFolderTimeOffset(warehouseID: warehouse.id, folder: folder)
+            }
+            if !warehouse.gpx.tracks.isEmpty {
+                Divider()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gpxFolderMenu(warehouse: WarehouseRuntime, folder: String) -> some View {
+        if warehouse.isOnline, !warehouse.gpx.tracks.isEmpty {
+            Menu(String(localized: "gpx.apply")) {
+                ForEach(warehouse.gpx.tracks) { track in
+                    Button {
+                        model.applyGPX(track.filename, toFolder: folder, warehouseID: warehouse.id)
+                    } label: {
+                        if model.effectiveGPXFilename(warehouseID: warehouse.id, folder: folder) == track.filename {
+                            Label(track.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(track.displayName)
                         }
                     }
-                    if model.hasDirectGPXAssignment(warehouseID: warehouse.id, folder: folder) {
-                        Divider()
-                        Button(String(localized: "gpx.clear")) {
-                            model.clearGPXAssignment(folder: folder, warehouseID: warehouse.id)
-                        }
-                    }
                 }
-                Menu(String(localized: "gpx.offset")) {
-                    let current = model.folderGPXOffset(warehouseID: warehouse.id, folder: folder)
-                    ForEach(GPXOffsetStore.presets, id: \.self) { minutes in
-                        Button {
-                            model.setFolderGPXOffset(minutes, folder: folder, warehouseID: warehouse.id)
-                        } label: {
-                            if minutes == current {
-                                Label(offsetLabel(minutes), systemImage: "checkmark")
-                            } else {
-                                Text(offsetLabel(minutes))
-                            }
-                        }
+                if model.hasDirectGPXAssignment(warehouseID: warehouse.id, folder: folder) {
+                    Divider()
+                    Button(String(localized: "gpx.clear")) {
+                        model.clearGPXAssignment(folder: folder, warehouseID: warehouse.id)
                     }
                 }
             }
@@ -187,11 +217,6 @@ struct SidebarView: View {
             return "\(warehouse.preference.name) / \(track.displayName)"
         }
         return track.displayName
-    }
-
-    private func offsetLabel(_ minutes: Int) -> String {
-        if minutes == 0 { return "0" }
-        return minutes > 0 ? "+\(minutes)" : "\(minutes)"
     }
 
     private func warehouseRow(_ warehouse: WarehouseRuntime) -> some View {
@@ -229,6 +254,12 @@ struct SidebarView: View {
             }
             return String(format: String(localized: "sidebar.duplicates.pending"), locale: .current, count)
         }
+        if collection == .retouch {
+            if count == 0 {
+                return String(localized: "sidebar.retouch.none")
+            }
+            return String(format: String(localized: "sidebar.retouch.pending"), locale: .current, count)
+        }
         let key: String
         switch collection {
         case .all: key = "sidebar.count.all"
@@ -236,6 +267,7 @@ struct SidebarView: View {
         case .untagged: key = "sidebar.count.untagged"
         case .missing: key = "sidebar.count.missing"
         case .duplicates: key = "sidebar.duplicates.pending"
+        case .retouch: key = "sidebar.retouch.pending"
         }
         return String(format: String(localized: String.LocalizationValue(key)), locale: .current, count)
     }
@@ -247,6 +279,7 @@ struct SidebarView: View {
         case .untagged: return "tag"
         case .missing: return "eye.slash"
         case .duplicates: return "square.on.square"
+        case .retouch: return "wand.and.stars"
         }
     }
 }

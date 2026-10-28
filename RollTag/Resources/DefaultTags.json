@@ -177,7 +177,8 @@
         { "id": "vivid", "names": { "zh-Hant": "鮮豔", "en": "Vivid" } },
         { "id": "bold", "names": { "zh-Hant": "大膽", "en": "Bold" } },
         { "id": "dramaticGrade", "names": { "zh-Hant": "戲劇色調", "en": "Dramatic Grade" } },
-        { "id": "blackAndWhite", "names": { "zh-Hant": "黑白", "en": "Black and White" } }
+        { "id": "blackAndWhite", "names": { "zh-Hant": "黑白", "en": "Black and White" } },
+        { "id": "retouch", "names": { "zh-Hant": "修圖", "en": "Retouch" } }
       ]
     },
     {

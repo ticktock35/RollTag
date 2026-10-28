@@ -18,7 +18,7 @@ enum HelpBlock: Equatable, Sendable {
 
 enum UserGuide {
     static let expectedIDs = [
-        "start", "warehouse", "photos", "videos", "duplicates", "shortcuts", "search", "ai", "batch", "gpx",
+        "start", "warehouse", "photos", "videos", "duplicates", "retouch", "shortcuts", "search", "ai", "batch", "gpx", "itinerary",
     ]
 
     static func topics(localeID: String) -> [HelpTopic] {

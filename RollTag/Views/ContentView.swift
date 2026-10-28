@@ -102,12 +102,34 @@ struct ContentView: View {
         .sheet(item: $model.missingLocalModelPrompt) { prompt in
             MissingLocalModelSheet(model: model, prompt: prompt)
         }
+        .sheet(item: $model.folderTimeOffsetPrompt) { prompt in
+            FolderTimeOffsetSheet(model: model, prompt: prompt)
+        }
+        .alert(
+            String(localized: "itinerary.rename.title"),
+            isPresented: Binding(
+                get: { model.itineraryRenamePrompt != nil },
+                set: { if !$0 { model.itineraryRenamePrompt = nil } }
+            )
+        ) {
+            TextField(String(localized: "itinerary.rename.placeholder"), text: $model.itineraryRenameDraft)
+            Button(String(localized: "itinerary.rename.save")) {
+                model.confirmRenameItinerary()
+            }
+            .keyboardShortcut(.defaultAction)
+            Button(String(localized: "itinerary.rename.cancel"), role: .cancel) {
+                model.itineraryRenamePrompt = nil
+            }
+        }
     }
 
     private var rightColumn: some View {
         VStack(spacing: 0) {
             if model.sidebarSelection == .collection(.duplicates) {
                 DuplicatesWorkspace(model: model)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.sidebarSelection == .collection(.retouch) {
+                RetouchReviewWorkspace(model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 0) {
@@ -122,7 +144,7 @@ struct ContentView: View {
                     } else {
                         VSplitView {
                             HSplitView {
-                                PlayerPaneView(model: model)
+                                playbackStage
                                     .frame(minWidth: 280, minHeight: 180)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 InspectorView(model: model)
@@ -254,6 +276,8 @@ struct ContentView: View {
                 folderTitle(warehouseID: id, path: path)
             case .gpx(let id, let filename):
                 model.gpxDisplayName(warehouseID: id, filename: filename)
+            case .itinerary(let id, let itineraryID):
+                model.itineraryDisplayName(warehouseID: id, itineraryID: itineraryID)
             case .tagCategory(let id):
                 model.populatedTagCategories.first(where: { $0.id == id })?.title
                     ?? model.catalog.categories.first(where: { $0.id == id })?.localizedName(locale: TagCatalogLoader.localeID(from: locale))
@@ -264,6 +288,16 @@ struct ContentView: View {
             return String(localized: "scope.title \(base) \(model.workFolderSummary)")
         }
         return base
+    }
+
+    @ViewBuilder
+    private var playbackStage: some View {
+        if model.isShowingItineraryMap {
+            ItineraryMapView(model: model)
+                .id(model.currentItinerary?.id)
+        } else {
+            PlayerPaneView(model: model)
+        }
     }
 
     private var searchPrompt: String {

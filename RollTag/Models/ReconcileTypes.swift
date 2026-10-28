@@ -125,6 +125,8 @@ enum MediaConstants {
     static let gpxDirectory = "gpx"
     static let gpxOffsetsName = "gpx-offsets.json"
     static let gpxAssignmentsName = "gpx-assignments.json"
+    static let itinerariesName = "itineraries.json"
+    static let retouchReviewName = "retouch.json"
     static let trimmedDirectory = "trimmed"
     static let minimumPlayableVideoBytes: Int64 = 8 * 1024
 }

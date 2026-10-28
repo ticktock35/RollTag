@@ -13,6 +13,15 @@ struct GPXTrack: Equatable, Hashable, Sendable {
     var start: Date? { points.first?.time }
     var end: Date? { points.last?.time }
 
+    func nearest(at date: Date) -> GPXPoint? {
+        guard let first = points.first else { return nil }
+        return points.min { abs($0.time.timeIntervalSince(date)) < abs($1.time.timeIntervalSince(date)) } ?? first
+    }
+
+    func locationOrNearest(at date: Date) -> GPXPoint? {
+        location(at: date) ?? nearest(at: date)
+    }
+
     func location(at date: Date) -> GPXPoint? {
         guard !points.isEmpty else { return nil }
         if date < points[0].time || date > points[points.count - 1].time {
@@ -201,17 +210,28 @@ enum GPXMatcher {
         filename: String,
         track: GPXTrack,
         assignments: [String: String],
-        offsets: [String: Int]
+        offsets: [String: FolderTimeOffset]
     ) -> Bool {
         guard footage.status == .available else { return false }
         guard footage.mediaKind == .image || footage.mediaKind == .video else { return false }
         guard assignedTrack(directoryPath: footage.directoryPath, assignments: assignments) == filename else {
             return false
         }
-        guard let capturedAt = footage.capturedAt else { return false }
-        let minutes = offsets[folder(of: footage.relativePath)] ?? 0
-        let adjusted = capturedAt.addingTimeInterval(TimeInterval(minutes * 60))
+        guard let adjusted = adjustedCapture(of: footage, offsets: offsets) else { return false }
         return track.location(at: adjusted) != nil
+    }
+
+    static func adjustedCapture(of footage: Footage, offsets: [String: FolderTimeOffset]) -> Date? {
+        guard let capturedAt = footage.capturedAt else { return nil }
+        return adjustedCapture(capturedAt, folder: folder(of: footage.relativePath), offsets: offsets)
+    }
+
+    static func adjustedCapture(
+        _ capturedAt: Date,
+        folder: String,
+        offsets: [String: FolderTimeOffset]
+    ) -> Date {
+        (offsets[folder] ?? .zero).applied(to: capturedAt)
     }
 
     static func shouldWriteGPS(_ capture: MediaMetadataSnapshot) -> Bool {
@@ -237,11 +257,10 @@ enum GPXMatcher {
     static func candidates(
         files: [GPXEligibleFile],
         track: GPXTrack,
-        offsets: [String: Int]
+        offsets: [String: FolderTimeOffset]
     ) -> [GPXCandidate] {
         files.compactMap { file in
-            let minutes = offsets[file.folder] ?? 0
-            let adjusted = file.capturedAt.addingTimeInterval(TimeInterval(minutes * 60))
+            let adjusted = adjustedCapture(file.capturedAt, folder: file.folder, offsets: offsets)
             guard let point = track.location(at: adjusted) else { return nil }
             return GPXCandidate(
                 id: file.id,
@@ -259,28 +278,28 @@ enum GPXMatcher {
 }
 
 enum GPXOffsetStore {
-    static let presets = [0, 1, -1, 5, -5, 15, -15, 30, -30, 60, -60]
-
-    static func load(root: URL) -> [String: Int] {
+    static func load(root: URL) -> [String: FolderTimeOffset] {
         let url = offsetsURL(root: root)
         guard let data = try? Data(contentsOf: url),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return [:] }
-        var result: [String: Int] = [:]
+        var result: [String: FolderTimeOffset] = [:]
         for (key, value) in object {
-            if let number = value as? Int {
-                result[key] = number
-            } else if let number = value as? NSNumber {
-                result[key] = number.intValue
+            if let offset = FolderTimeOffset.parse(value) {
+                result[key] = offset
             }
         }
         return result
     }
 
-    static func save(_ offsets: [String: Int], root: URL) throws {
+    static func save(_ offsets: [String: FolderTimeOffset], root: URL) throws {
         let url = offsetsURL(root: root)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let data = try JSONSerialization.data(withJSONObject: offsets, options: [.prettyPrinted, .sortedKeys])
+        var object: [String: Any] = [:]
+        for (key, offset) in offsets {
+            object[key] = offset.jsonObject()
+        }
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: url, options: .atomic)
     }
 
@@ -347,7 +366,7 @@ struct ImportedGPXTrack: Identifiable, Equatable, Hashable, Sendable {
 struct WarehouseGPXState: Equatable, Hashable, Sendable {
     var tracks: [ImportedGPXTrack]
     var assignments: [String: String]
-    var offsets: [String: Int]
+    var offsets: [String: FolderTimeOffset]
 
     static let empty = WarehouseGPXState(tracks: [], assignments: [:], offsets: [:])
 

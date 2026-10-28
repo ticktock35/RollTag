@@ -6,11 +6,14 @@ enum CaptureTimeSource: String, Codable, Equatable, Sendable {
     case header
     case djiFilename
     case fileDate
+    case original
 }
 
 enum GPSSource: String, Codable, Equatable, Sendable {
     case header
     case gpx
+    case itinerary
+    case user
 }
 
 struct MediaMetadataSnapshot: Equatable, Sendable {
@@ -23,26 +26,52 @@ struct MediaMetadataSnapshot: Equatable, Sendable {
     var capturedAtSource: CaptureTimeSource?
     var gpsSource: GPSSource?
 
-    var hasGPS: Bool { latitude != nil && longitude != nil }
+    var hasGPS: Bool {
+        MediaMetadata.isUsableGPS(latitude: latitude, longitude: longitude)
+    }
 
     var resolvedGPSSource: GPSSource? {
         guard hasGPS else { return nil }
         return gpsSource ?? .header
     }
 
-    func merging(live: MediaMetadataSnapshot, replaceTime: Bool) -> MediaMetadataSnapshot {
+    /// 0,0（Null Island）或行程亂猜寫入的座標，當成沒有 GPS。
+    var shouldResetMisplacedGPS: Bool {
+        if gpsSource == .itinerary { return true }
+        if latitude != nil || longitude != nil || gpsSource != nil {
+            return !hasGPS
+        }
+        return false
+    }
+
+    func sanitized() -> MediaMetadataSnapshot {
+        guard hasGPS else { return clearedGPS() }
+        return self
+    }
+
+    func clearedGPS() -> MediaMetadataSnapshot {
         var next = self
+        next.latitude = nil
+        next.longitude = nil
+        next.altitude = nil
+        next.gpsSource = nil
+        return next
+    }
+
+    func merging(live: MediaMetadataSnapshot, replaceTime: Bool) -> MediaMetadataSnapshot {
+        var next = sanitized()
         if replaceTime {
             next.capturedAt = live.capturedAt
             next.capturedAtLocal = live.capturedAtLocal
             next.capturedAtHasTimeZone = live.capturedAtHasTimeZone
             next.capturedAtSource = live.capturedAtSource
         }
-        if live.hasGPS {
-            next.latitude = live.latitude
-            next.longitude = live.longitude
-            next.altitude = live.altitude
-            next.gpsSource = live.gpsSource ?? .header
+        let liveGPS = live.sanitized()
+        if liveGPS.hasGPS {
+            next.latitude = liveGPS.latitude
+            next.longitude = liveGPS.longitude
+            next.altitude = liveGPS.altitude
+            next.gpsSource = liveGPS.gpsSource ?? .header
         }
         return next
     }
@@ -73,6 +102,18 @@ struct MediaMetadataSnapshot: Equatable, Sendable {
 
 enum MediaMetadata {
     static let earliestPlausibleYear = 2015
+    /// 緯度、經度都幾乎是 0 就是 Null Island，當成沒有 GPS。
+    static let nullIslandEpsilon = 1e-4
+
+    static func isUsableGPS(latitude: Double?, longitude: Double?) -> Bool {
+        guard let latitude, let longitude else { return false }
+        guard latitude.isFinite, longitude.isFinite else { return false }
+        guard abs(latitude) <= 90, abs(longitude) <= 180 else { return false }
+        if abs(latitude) < nullIslandEpsilon, abs(longitude) < nullIslandEpsilon {
+            return false
+        }
+        return true
+    }
 
     static func read(url: URL, skipImplausibleHeader: Bool = true) async -> MediaMetadataSnapshot {
         let header = await readHeader(url: url)
@@ -80,21 +121,21 @@ enum MediaMetadata {
             latitude: header.latitude,
             longitude: header.longitude,
             altitude: header.altitude,
-            gpsSource: header.latitude != nil && header.longitude != nil ? .header : nil
+            gpsSource: isUsableGPS(latitude: header.latitude, longitude: header.longitude) ? .header : nil
         )
 
         if let headerTime = header.time, !skipImplausibleHeader || isPlausible(headerTime) {
             apply(headerTime, source: .header, to: &snapshot)
-            return snapshot
+            return snapshot.sanitized()
         }
         if let dji = parseDJIFilename(url.lastPathComponent), !skipImplausibleHeader || isPlausible(dji) {
             apply(dji, source: .djiFilename, to: &snapshot)
-            return snapshot
+            return snapshot.sanitized()
         }
         if let file = fileClock(url) {
             apply(file, source: .fileDate, to: &snapshot)
         }
-        return snapshot
+        return snapshot.sanitized()
     }
 
     static func parseDJIFilename(_ filename: String) -> CaptureClock? {
@@ -119,6 +160,7 @@ enum MediaMetadata {
         if match.numberOfRanges > 3, let altRange = Range(match.range(at: 3), in: trimmed) {
             altitude = Double(trimmed[altRange])
         }
+        guard isUsableGPS(latitude: latitude, longitude: longitude) else { return nil }
         return (latitude, longitude, altitude)
     }
 
@@ -175,11 +217,15 @@ enum MediaMetadata {
         if let gps = properties[kCGImagePropertyGPSDictionary] as? [CFString: Any],
            let lat = doubleValue(gps[kCGImagePropertyGPSLatitude]),
            let lon = doubleValue(gps[kCGImagePropertyGPSLongitude]) {
-            header.latitude = signedCoordinate(lat, reference: gps[kCGImagePropertyGPSLatitudeRef] as? String, southOrWest: "S")
-            header.longitude = signedCoordinate(lon, reference: gps[kCGImagePropertyGPSLongitudeRef] as? String, southOrWest: "W")
-            if let altitude = doubleValue(gps[kCGImagePropertyGPSAltitude]) {
-                let below = (gps[kCGImagePropertyGPSAltitudeRef] as? NSNumber)?.intValue == 1
-                header.altitude = below ? -abs(altitude) : altitude
+            let latitude = signedCoordinate(lat, reference: gps[kCGImagePropertyGPSLatitudeRef] as? String, southOrWest: "S")
+            let longitude = signedCoordinate(lon, reference: gps[kCGImagePropertyGPSLongitudeRef] as? String, southOrWest: "W")
+            if isUsableGPS(latitude: latitude, longitude: longitude) {
+                header.latitude = latitude
+                header.longitude = longitude
+                if let altitude = doubleValue(gps[kCGImagePropertyGPSAltitude]) {
+                    let below = (gps[kCGImagePropertyGPSAltitudeRef] as? NSNumber)?.intValue == 1
+                    header.altitude = below ? -abs(altitude) : altitude
+                }
             }
         }
         return header

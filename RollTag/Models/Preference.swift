@@ -522,6 +522,7 @@ enum SmartCollection: String, CaseIterable, Identifiable {
     case untagged
     case missing
     case duplicates
+    case retouch
 
     var id: String { rawValue }
 
@@ -537,6 +538,8 @@ enum SidebarSelection: Hashable {
     case warehouseFolder(UUID, String)
     /// Imported GPX filename inside a warehouse. Grid shows files whose folder is assigned to this track and whose time falls in the span.
     case gpx(UUID, String)
+    /// Saved itinerary inside a warehouse. Grid shows member clips; the player pane is a map.
+    case itinerary(UUID, UUID)
     case tagCategory(String)
 }
 

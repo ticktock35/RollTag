@@ -45,5 +45,10 @@ final class TagCatalogTests: XCTestCase {
                 )
             }
         }
+        let retouch = catalog.categories
+            .first { $0.id == "style" }?
+            .tags.first { $0.id == "retouch" }
+        XCTAssertEqual(retouch?.localizedName(locale: "zh-Hant"), "修圖")
+        XCTAssertEqual(retouch?.localizedName(locale: "en"), "Retouch")
     }
 }

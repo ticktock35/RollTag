@@ -68,11 +68,21 @@ final class GPXImportTests: XCTestCase {
             capturedAt: t0.addingTimeInterval(-5 * 60)
         )
         XCTAssertTrue(GPXMatcher.candidates(files: [file], track: track, offsets: [:]).isEmpty)
-        let hits = GPXMatcher.candidates(files: [file], track: track, offsets: ["card": 5])
+        let hits = GPXMatcher.candidates(
+            files: [file],
+            track: track,
+            offsets: ["card": FolderTimeOffset(minutes: 5)]
+        )
         XCTAssertEqual(hits.count, 1)
         XCTAssertEqual(hits[0].latitude, 8, accuracy: 0.0001)
         XCTAssertEqual(hits[0].altitude, 3)
-        XCTAssertTrue(GPXMatcher.candidates(files: [file], track: track, offsets: ["other": 5]).isEmpty)
+        XCTAssertTrue(
+            GPXMatcher.candidates(
+                files: [file],
+                track: track,
+                offsets: ["other": FolderTimeOffset(minutes: 5)]
+            ).isEmpty
+        )
     }
 
     func testEligibleIgnoresGPSAudioAndUntimedFiles() {
@@ -148,15 +158,54 @@ final class GPXImportTests: XCTestCase {
     func testOffsetStoreRoundTripAndTrackCopy() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-off-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try GPXOffsetStore.save(["trip": 5, "": -1], root: root)
-        XCTAssertEqual(GPXOffsetStore.load(root: root)["trip"], 5)
-        XCTAssertEqual(GPXOffsetStore.load(root: root)[""], -1)
+        try GPXOffsetStore.save(
+            ["trip": FolderTimeOffset(minutes: 5), "": FolderTimeOffset(minutes: -1)],
+            root: root
+        )
+        XCTAssertEqual(GPXOffsetStore.load(root: root)["trip"], FolderTimeOffset(minutes: 5))
+        XCTAssertEqual(GPXOffsetStore.load(root: root)[""], FolderTimeOffset(minutes: -1))
 
         let source = root.appendingPathComponent("walk.gpx")
         try Data("<gpx/>".utf8).write(to: source)
         let copied = try GPXOffsetStore.copyTrack(from: source, root: root)
         XCTAssertTrue(copied.path.contains("/.rolltag/gpx/walk.gpx"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: copied.path))
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testOffsetStoreReadsLegacyMinutesAndComponentObjects() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("rolltag-off-legacy-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent(".rolltag"),
+            withIntermediateDirectories: true
+        )
+        let url = root.appendingPathComponent(".rolltag").appendingPathComponent("gpx-offsets.json")
+        try Data(#"{"trip":5,"japan":{"hours":-1,"seconds":30}}"#.utf8).write(to: url)
+        let loaded = GPXOffsetStore.load(root: root)
+        XCTAssertEqual(loaded["trip"], FolderTimeOffset(minutes: 5))
+        XCTAssertEqual(loaded["japan"], FolderTimeOffset(hours: -1, seconds: 30))
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    func testFolderTimeOffsetAppliesYearsDaysHoursMinutesSeconds() {
+        let start = GPXDocument.parseGPXTime("2020-06-01T10:00:00Z")!
+        XCTAssertEqual(
+            FolderTimeOffset(minutes: 5).applied(to: start),
+            start.addingTimeInterval(5 * 60)
+        )
+        XCTAssertEqual(
+            FolderTimeOffset(hours: -2).applied(to: start),
+            start.addingTimeInterval(-2 * 3600)
+        )
+        XCTAssertEqual(
+            FolderTimeOffset(days: 1, seconds: 15).applied(to: start),
+            start.addingTimeInterval(24 * 3600 + 15)
+        )
+        XCTAssertEqual(
+            FolderTimeOffset(years: 1).applied(to: start),
+            GPXDocument.parseGPXTime("2021-06-01T10:00:00Z")!
+        )
+        XCTAssertEqual(FolderTimeOffset.zero.applied(to: start), start)
     }
 
     func testEmptyGPXThrows() {
